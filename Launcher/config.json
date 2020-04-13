@@ -9,7 +9,7 @@
   "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
 
   // algorithm class selector
-  "algorithm-type-name": "BasicTemplateFrameworkAlgorithm",
+  "algorithm-type-name": "PaoloTestCryptoAlgorithm",
 
   // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
   "algorithm-language": "CSharp",
@@ -39,6 +39,7 @@
   "map-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider",
   "factor-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskFactorFileProvider",
   "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
+  //"data-provider": "QuantConnect.Lean.Engine.DataFeeds.ApiDataProvider",
   "alpha-handler": "QuantConnect.Lean.Engine.Alphas.DefaultAlphaHandler",
   "data-channel-provider": "DataChannelProvider",
   "object-store": "QuantConnect.Lean.Engine.Storage.LocalObjectStore",
@@ -59,8 +60,8 @@
   "transaction-log": "",
 
   // To get your api access token go to quantconnect.com/account
-  "job-user-id": "0",
-  "api-access-token": "",
+  "job-user-id": "40630",
+  "api-access-token": "4f5045ac5049f94bf1f8daed7110241dc48328a6b758830be7ca1a33af824c08",
 
   // live data configuration
   "live-data-url": "ws://www.quantconnect.com/api/v2/live/data/",
@@ -104,9 +105,9 @@
   "iqfeed-version": "1.0",
 
   // gdax configuration
-  "gdax-api-secret": "",
-  "gdax-api-key": "",
-  "gdax-passphrase": "",
+  "gdax-api-secret": "\"8VDvTMErRuVa0Qw5uaAJVeyJhf12Dbm4ZOXPhHWrr/du5n9PrR3HSRJ2WloixIDql2CZ2Ir9Kqo4/pPFtv/6QA==",
+  "gdax-api-key": "c25aeedaa11b6a3172024cb8219c16f5",
+  "gdax-passphrase": "mwqbx6woqk",
 
   // bitfinex configuration
   "bitfinex-api-secret": "",
