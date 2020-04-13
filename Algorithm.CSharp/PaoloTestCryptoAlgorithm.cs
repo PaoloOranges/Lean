@@ -38,6 +38,7 @@ namespace QuantConnect.Algorithm.CSharp
         private bool _bought = false;
         readonly string SymbolName = "BTCUSD";
 
+        private Symbol _symbol = null;
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
@@ -58,19 +59,19 @@ namespace QuantConnect.Algorithm.CSharp
 
             SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
 
-            SetWarmUp(new TimeSpan(24, 0, 0));
+            //SetWarmUp(new TimeSpan(24, 0, 0));
             // You can uncomment the following line when live trading with GDAX,
             // to ensure limit orders will only be posted to the order book and never executed as a taker (incurring fees).
             // Please note this statement has no effect in backtesting or paper trading.
             // DefaultOrderProperties = new GDAXOrderProperties { PostOnly = true };
 
             // Find more symbols here: http://quantconnect.com/data
-            var symbol = AddCrypto(SymbolName, Resolution.Hour, Market.GDAX).Symbol;
+            _symbol = AddCrypto(SymbolName, Resolution.Hour, Market.GDAX).Symbol;
             
 
             // create two moving averages
-            _fast = EMA(symbol, 5, Resolution.Hour);
-            _slow = EMA(symbol, 14, Resolution.Hour);
+            _fast = EMA(_symbol, 5, Resolution.Hour);
+            _slow = EMA(_symbol, 14, Resolution.Hour);
             _bought = false;
         }
 
@@ -100,7 +101,7 @@ namespace QuantConnect.Algorithm.CSharp
                     {
                         decimal btcPrice = Securities[SymbolName].Price;
                         decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
-                        Buy(SymbolName, quantity);
+                        Buy(_symbol, quantity);
                         _bought = true;
                     }
                 }
@@ -111,7 +112,7 @@ namespace QuantConnect.Algorithm.CSharp
                         // The following two statements currently behave differently if we have initial holdings:
                         // https://github.com/QuantConnect/Lean/issues/1860
 
-                        Liquidate(SymbolName);
+                        Liquidate(_symbol);
                         // SetHoldings("LTCUSD", 0);
                         _bought = false;
                     }
