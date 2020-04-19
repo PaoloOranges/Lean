@@ -35,10 +35,15 @@ namespace QuantConnect.Algorithm.CSharp
         private ExponentialMovingAverage _fast;
         private ExponentialMovingAverage _slow;
         private MovingAverageConvergenceDivergence _macd;
+        private decimal _max_macd = Decimal.MinValue;
         private AverageDirectionalIndex _adx;
 
         private bool _bought = false;
-        readonly string SymbolName = "BTCUSD";
+        private DateTime bought_time;
+
+        private readonly string SymbolName = "BTCUSD";
+        private readonly string CashName = "USD";
+        private readonly string CryptoName = "BTC";
 
         private Symbol _symbol = null;
         /// <summary>
@@ -53,7 +58,7 @@ namespace QuantConnect.Algorithm.CSharp
             // Set Strategy Cash (EUR)
             // EUR/USD conversion rate will be updated dynamically
             //SetCash("EUR", 300);
-            SetCash("USD", 300);
+            SetCash(CashName, 300);
 
             // Add some coins as initial holdings
             // When connected to a real brokerage, the amount specified in SetCash
@@ -92,8 +97,8 @@ namespace QuantConnect.Algorithm.CSharp
             if (Portfolio.CashBook["USD"].ConversionRate == 0
                 || Portfolio.CashBook["BTC"].ConversionRate == 0)
             {
-                Log($"EUR conversion rate: {Portfolio.CashBook["USD"].ConversionRate}");
-                Log($"BTC conversion rate: {Portfolio.CashBook["BTC"].ConversionRate}");
+                Log($"{CashName} conversion rate: {Portfolio.CashBook[CashName].ConversionRate}");
+                Log($"{CryptoName} conversion rate: {Portfolio.CashBook[CryptoName].ConversionRate}");
 
                 throw new Exception("Conversion rate is 0");
             }
@@ -105,14 +110,28 @@ namespace QuantConnect.Algorithm.CSharp
 
             if(!_bought)
             {
-                if(_adx > 15.0)
+                if(_adx > 15.0 && _macd > 0)
                 {
-                    var a = _adx;
+                    decimal btcPrice = Securities[SymbolName].Price;
+                    decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
+                    Buy(_symbol, quantity);
+                    _bought = true;
+                    bought_time = data.Time;
+                    _max_macd = Decimal.MinValue;
+
+
                 }
             }
             else
             {
+                TimeSpan span = data.Time - bought_time;
+                _max_macd = Math.Max(_macd, _max_macd);
+                if (_macd <= 0.5m * _max_macd)
+                {
+                    Liquidate(_symbol);
+                    _bought = false;
 
+                }
             }
 
             // To include any initial holdings, we read the LTC amount from the cashbook
