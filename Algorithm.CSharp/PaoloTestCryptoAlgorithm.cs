@@ -46,12 +46,17 @@ namespace QuantConnect.Algorithm.CSharp
         private readonly string CryptoName = "BTC";
 
         private Symbol _symbol = null;
+
+        private Action<Slice> _on_data_action = null;
+
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
         public override void Initialize()
         {
             Resolution resolution = Resolution.Daily;
+            _on_data_action = OnDataDaily;
+
             SetStartDate(2019, 2, 5); // Set Start Date
             SetEndDate(2020, 4, 1); // Set End Date
                        
@@ -108,9 +113,15 @@ namespace QuantConnect.Algorithm.CSharp
                 return;
             }
 
-            if(!_bought)
+            _on_data_action(data);
+
+        }
+
+        private void OnDataDaily(Slice data)
+        {
+            if (!_bought)
             {
-                if(_adx > 15.0 && _macd > 0)
+                if (_adx > 15.0 && _macd > 0)
                 {
                     decimal btcPrice = Securities[SymbolName].Price;
                     decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
@@ -133,33 +144,6 @@ namespace QuantConnect.Algorithm.CSharp
 
                 }
             }
-
-            // To include any initial holdings, we read the LTC amount from the cashbook
-            // instead of using Portfolio["LTCUSD"].Quantity
-
-            //if (_fast > _slow)
-            //{
-            //    if (!_bought)
-            //    {
-            //        decimal btcPrice = Securities[SymbolName].Price;
-            //        decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
-            //        Buy(_symbol, quantity);
-            //        _bought = true;
-            //    }
-            //}
-            //else
-            //{
-            //    if (Portfolio.CashBook["BTC"].Amount > 0)
-            //    {
-            //        // The following two statements currently behave differently if we have initial holdings:
-            //        // https://github.com/QuantConnect/Lean/issues/1860
-
-            //        Liquidate(_symbol);
-            //        // SetHoldings("LTCUSD", 0);
-            //        _bought = false;
-            //    }
-            //}
-
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
