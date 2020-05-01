@@ -36,9 +36,11 @@ namespace QuantConnect.Algorithm.CSharp
         private ExponentialMovingAverage _slow;
         private MovingAverageConvergenceDivergence _macd;
         private decimal _max_macd = Decimal.MinValue;
+        private decimal _min_macd = Decimal.MaxValue;
+        private decimal _max_adx = Decimal.MinValue;
         private AverageDirectionalIndex _adx;
 
-        private bool _bought = false;
+        private int _bought = -1;
         private DateTime bought_time;
 
         private readonly string SymbolName = "BTCUSD";
@@ -54,8 +56,13 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public override void Initialize()
         {
-            Resolution resolution = Resolution.Daily;
+            Resolution resolution = Resolution.Hour;
             _on_data_action = OnDataDaily;
+
+            if(resolution == Resolution.Hour)
+            {
+                _on_data_action = OnDataHourly;
+            }
 
             SetStartDate(2019, 2, 5); // Set Start Date
             SetEndDate(2020, 4, 1); // Set End Date
@@ -88,7 +95,7 @@ namespace QuantConnect.Algorithm.CSharp
             _macd = MACD(_symbol, 5, 25, 15, MovingAverageType.Exponential, resolution);
             _adx = ADX(_symbol, 15, resolution);
 
-            _bought = false;
+            _bought = -1;
 
             SetWarmUp(30);
         }
@@ -119,36 +126,99 @@ namespace QuantConnect.Algorithm.CSharp
 
         private void OnDataDaily(Slice data)
         {
-            if (!_bought)
+            if (_bought < 0)
             {
                 if (_adx > 15.0 && _macd > 0)
                 {
                     decimal btcPrice = Securities[SymbolName].Price;
                     decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
                     Buy(_symbol, quantity);
-                    _bought = true;
+                    _bought = 1;
                     bought_time = data.Time;
                     _max_macd = Decimal.MinValue;
-
 
                 }
             }
             else
             {
-                TimeSpan span = data.Time - bought_time;
                 _max_macd = Math.Max(_macd, _max_macd);
+
                 if (_macd <= 0.5m * _max_macd)
                 {
                     Liquidate(_symbol);
-                    _bought = false;
+                    _bought = -1;
 
                 }
+            }
+        }
+
+        private void OnDataHourly(Slice data)
+        {
+            if (_bought < 0)
+            {
+
+                const double adx_limit = 25.0;
+                if (_adx.PositiveDirectionalIndex > adx_limit && _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex && _macd > 30.0)
+                {
+                    decimal btcPrice = Securities[SymbolName].Price;
+                    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / btcPrice, 2);
+                    var order = Buy(_symbol, quantity);
+                    _max_macd = Decimal.MinValue;
+                    _max_adx = Decimal.MinValue;
+
+                }
+            }
+            else if(_bought > 0)
+            {
+                _max_macd = Math.Max(_macd, _max_macd);
+                _max_adx = Math.Max(_adx, _max_adx);
+
+                // check on gain
+                bool is_adx_ok = _adx < 0.9m * _max_adx;
+
+                decimal holding_value = Portfolio[SymbolName].HoldingsValue;
+                decimal current_value = data[SymbolName].Value;
+
+                if(1.5m * holding_value < current_value)
+                {
+                    var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
+                }
+                else
+                {
+                    bool is_price_ok = 1.20m * holding_value < current_value;
+                    if (_macd <= 0.5m * _max_macd && is_adx_ok && is_price_ok)
+                    {
+                        var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
+                    }
+                }
+
+                
             }
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
         {
             Debug(Time + " " + orderEvent);
+            if(orderEvent.Direction == OrderDirection.Buy && orderEvent.Status == OrderStatus.Filled)
+            {
+                _bought = 1;
+                bought_time = orderEvent.UtcTime;
+            }
+
+            if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
+            {
+                _bought = -1;
+                bought_time = orderEvent.UtcTime;
+            }
+
+            if(orderEvent.Status == OrderStatus.Invalid)
+            {
+                _bought = orderEvent.Direction == OrderDirection.Buy ? -1 : 1;
+            }
+            if(orderEvent.Status == OrderStatus.Submitted)
+            {
+                _bought = 0;
+            }
         }
 
         public override void OnEndOfAlgorithm()
