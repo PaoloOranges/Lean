@@ -33,15 +33,16 @@ namespace QuantConnect.Algorithm.CSharp
     public class PaoloTestCryptoAlgorithm : QCAlgorithm
     {
         private ExponentialMovingAverage _fast;
-        private ExponentialMovingAverage _slow;
+        private LeastSquaresMovingAverage _slow;
         private MovingAverageConvergenceDivergence _macd;
+        private AverageDirectionalIndex _adx;
+
         private decimal _max_macd = Decimal.MinValue;
         private decimal _min_macd = Decimal.MaxValue;
         private decimal _max_adx = Decimal.MinValue;
-        private AverageDirectionalIndex _adx;
 
+        private MinMaxMACD _min_max_macd;
         private int _bought = -1;
-        private DateTime bought_time;
 
         private readonly string SymbolName = "BTCUSD";
         private readonly string CashName = "USD";
@@ -57,13 +58,7 @@ namespace QuantConnect.Algorithm.CSharp
         public override void Initialize()
         {
             Resolution resolution = Resolution.Hour;
-            _on_data_action = OnDataDaily;
-
-            if(resolution == Resolution.Hour)
-            {
-                _on_data_action = OnDataHourly;
-            }
-
+    
             SetStartDate(2019, 2, 5); // Set Start Date
             SetEndDate(2020, 4, 1); // Set End Date
                        
@@ -87,13 +82,30 @@ namespace QuantConnect.Algorithm.CSharp
 
             // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
+
+
+            if (resolution == Resolution.Hour)
+            {
+                _on_data_action = OnDataHourly;
+
+                _fast = EMA(_symbol, 5, resolution);
+                _slow = LSMA(_symbol, 25, resolution);
+                _macd = MACD(_symbol, 15, 60, 20, MovingAverageType.Exponential, resolution);
+                _adx = ADX(_symbol, 60, resolution);
+            }
+            else
+            {
+                _on_data_action = OnDataDaily;
+
+                _fast = EMA(_symbol, 5, resolution);
+                _slow = LSMA(_symbol, 15, resolution);
+                _macd = MACD(_symbol, 5, 25, 15, MovingAverageType.Exponential, resolution);
+                _adx = ADX(_symbol, 15, resolution);
+
+            }
             
 
-            // create two moving averages
-            _fast = EMA(_symbol, 5, resolution);
-            _slow = EMA(_symbol, 15, resolution);
-            _macd = MACD(_symbol, 5, 25, 15, MovingAverageType.Exponential, resolution);
-            _adx = ADX(_symbol, 15, resolution);
+            _min_max_macd = new MinMaxMACD(15);
 
             _bought = -1;
 
@@ -133,8 +145,6 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal btcPrice = Securities[SymbolName].Price;
                     decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
                     Buy(_symbol, quantity);
-                    _bought = 1;
-                    bought_time = data.Time;
                     _max_macd = Decimal.MinValue;
 
                 }
@@ -145,23 +155,25 @@ namespace QuantConnect.Algorithm.CSharp
 
                 if (_macd <= 0.5m * _max_macd)
                 {
-                    Liquidate(_symbol);
-                    _bought = -1;
-
+                    var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
                 }
             }
         }
 
         private void OnDataHourly(Slice data)
         {
+            _min_max_macd.OnData(_macd);
+
             if (_bought < 0)
             {
-
                 const double adx_limit = 25.0;
-                if (_adx.PositiveDirectionalIndex > adx_limit && _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex && _macd > 30.0)
+                bool is_adx_ok = _adx.NegativeDirectionalIndex > 20.0 & _adx.PositiveDirectionalIndex > 15.0 && _adx.PositiveDirectionalIndex < _adx.NegativeDirectionalIndex;
+                bool is_macd_ok = _macd > 0 /*&& _macd - _min_max_macd.Min > 50.0m */;
+                bool is_moving_averages_ok = _fast > _slow;
+                if (is_adx_ok && is_macd_ok && is_moving_averages_ok)                
                 {
                     decimal btcPrice = Securities[SymbolName].Price;
-                    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / btcPrice, 2);
+                    decimal quantity = Math.Round(0.95m * Portfolio.CashBook[CashName].Amount / btcPrice, 2);
                     var order = Buy(_symbol, quantity);
                     _max_macd = Decimal.MinValue;
                     _max_adx = Decimal.MinValue;
@@ -174,19 +186,21 @@ namespace QuantConnect.Algorithm.CSharp
                 _max_adx = Math.Max(_adx, _max_adx);
 
                 // check on gain
-                bool is_adx_ok = _adx < 0.9m * _max_adx;
+                bool is_adx_ok = _adx.PositiveDirectionalIndex > 30 && _adx.PositiveDirectionalIndex < _adx;
+                bool is_macd_ok = _macd < 0;
+                bool is_moving_averages_ok = _fast < _slow;
 
                 decimal holding_value = Portfolio[SymbolName].HoldingsValue;
                 decimal current_value = data[SymbolName].Value;
 
-                if(1.5m * holding_value < current_value)
-                {
-                    var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
-                }
-                else
+                //if(1.5m * holding_value < current_value)
+                //{
+                //    var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
+                //}
+                //else
                 {
                     bool is_price_ok = 1.20m * holding_value < current_value;
-                    if (_macd <= 0.5m * _max_macd && is_adx_ok && is_price_ok)
+                    if (is_adx_ok && is_macd_ok)
                     {
                         var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
                     }
@@ -202,13 +216,11 @@ namespace QuantConnect.Algorithm.CSharp
             if(orderEvent.Direction == OrderDirection.Buy && orderEvent.Status == OrderStatus.Filled)
             {
                 _bought = 1;
-                bought_time = orderEvent.UtcTime;
             }
 
             if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
             {
                 _bought = -1;
-                bought_time = orderEvent.UtcTime;
             }
 
             if(orderEvent.Status == OrderStatus.Invalid)
@@ -225,6 +237,45 @@ namespace QuantConnect.Algorithm.CSharp
         {
             Log($"{Time} - TotalPortfolioValue: {Portfolio.TotalPortfolioValue}");
             Log($"{Time} - CashBook: {Portfolio.CashBook}");
+        }
+
+        internal class MinMaxMACD
+        {
+            private int _length = 0;
+
+            private Queue<decimal> _datas = new Queue<decimal>();
+            
+            public decimal Max
+            {
+                get
+                {
+                    return _datas.Max();
+                }
+            }
+
+            public decimal Min
+            {
+                get
+                {
+                    return _datas.Min();
+                }
+            }
+            
+            public MinMaxMACD(int length)               
+            {
+                _length = length;
+            }
+
+            public void OnData(decimal mcd_data)
+            {
+                _datas.Enqueue(mcd_data);
+                while(_datas.Count > _length)
+                {
+                    _datas.Dequeue();
+                }
+            }
+
+            
         }
     }
 }
