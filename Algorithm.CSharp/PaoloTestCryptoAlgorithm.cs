@@ -187,7 +187,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                 // check on gain
                 bool is_adx_ok = _adx.PositiveDirectionalIndex > 30 && _adx.PositiveDirectionalIndex < _adx;
-                bool is_macd_ok = _macd < 0;
+                bool is_macd_ok = _macd < 0.75m * _max_macd;
                 bool is_moving_averages_ok = _fast < _slow;
 
                 decimal holding_value = Portfolio[SymbolName].HoldingsValue;
@@ -199,7 +199,7 @@ namespace QuantConnect.Algorithm.CSharp
                 //}
                 //else
                 {
-                    bool is_price_ok = 1.20m * holding_value < current_value;
+                    bool is_price_ok = 1.50m * holding_value < current_value;
                     if (is_adx_ok && is_macd_ok)
                     {
                         var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
