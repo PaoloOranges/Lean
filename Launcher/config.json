@@ -6,7 +6,7 @@
   // two predefined environments, 'backtesting' and 'live', feel free
   // to add more!
 
-  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
+  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed", "paper-gdax"
 
   // algorithm class selector
   "algorithm-type-name": "PaoloTestHourlyCryptoAlgorithm",
@@ -106,7 +106,7 @@
   "iqfeed-version": "1.0",
 
   // gdax configuration
-  "gdax-api-secret": "\"8VDvTMErRuVa0Qw5uaAJVeyJhf12Dbm4ZOXPhHWrr/du5n9PrR3HSRJ2WloixIDql2CZ2Ir9Kqo4/pPFtv/6QA==",
+  "gdax-api-secret": "8VDvTMErRuVa0Qw5uaAJVeyJhf12Dbm4ZOXPhHWrr/du5n9PrR3HSRJ2WloixIDql2CZ2Ir9Kqo4/pPFtv/6QA==",
   "gdax-api-key": "c25aeedaa11b6a3172024cb8219c16f5",
   "gdax-passphrase": "mwqbx6woqk",
 
@@ -169,6 +169,22 @@
       "data-queue-handler": "QuantConnect.Lean.Engine.DataFeeds.Queues.LiveDataQueue",
       "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
       "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BacktestingTransactionHandler"
+    },
+
+    // GDAX Paper mode
+    "paper-gdax": {
+      "live-mode": true,
+
+      // real brokerage implementations require the BrokerageTransactionHandler
+      "live-mode-brokerage": "PaperBrokerage",
+
+      "data-queue-handler": "GDAXDataQueueHandler",
+      "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
+      "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
+      "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
+      "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "history-provider": "BrokerageHistoryProvider"
     },
 
     // defines the 'live-tradier' environment
