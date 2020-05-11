@@ -68,7 +68,7 @@ namespace QuantConnect.Algorithm.CSharp
             // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
 
-                    _fast = EMA(_symbol, 5, resolution);
+            _fast = EMA(_symbol, 5, resolution);
             _slow = LSMA(_symbol, 30, resolution);
             _macd = MACD(_symbol, 10, 35, 15, MovingAverageType.Exponential, resolution);
             _adx = ADX(_symbol, 35, resolution);
