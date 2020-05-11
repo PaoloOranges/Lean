@@ -163,7 +163,8 @@
     <Compile Include="AutomaticIndicatorWarmupRegressionAlgorithm.cs" />
     <Compile Include="EquityTradeAndQuotesRegressionAlgorithm.cs" />
     <Compile Include="BasicTemplateConstituentUniverseAlgorithm.cs" />
-    <Compile Include="PaoloTestCryptoAlgorithm.cs" />
+    <Compile Include="PaoloTestDailyCryptoAlgorithm.cs" />
+    <Compile Include="PaoloTestHourlyCryptoAlgorithm.cs" />
     <Compile Include="ConsolidateRegressionAlgorithm.cs" />
     <Compile Include="DefaultResolutionRegressionAlgorithm.cs" />
     <Compile Include="BasicPythonIntegrationTemplateAlgorithm.cs" />
