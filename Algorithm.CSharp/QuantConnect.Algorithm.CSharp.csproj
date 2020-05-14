@@ -151,16 +151,17 @@
     <Compile Include="Alphas\TriangleExchangeRateArbitrageAlpha.cs" />
     <Compile Include="Alphas\TripleLeveragedETFPairVolatilityDecayAlpha.cs" />
     <Compile Include="Alphas\VixDualThrustAlpha.cs" />
+    <Compile Include="AltData\RobintrackHoldingsAlgorithm.cs" />
     <Compile Include="AltData\CachedAlternativeDataAlgorithm.cs" />
     <Compile Include="AltData\BenzingaNewsAlgorithm.cs" />
     <Compile Include="AltData\SECReport8KAlgorithm.cs" />
     <Compile Include="AltData\SmartInsiderTransactionAlgorithm.cs" />
     <Compile Include="AltData\USTreasuryYieldCurveRateAlgorithm.cs" />
-    <Compile Include="AltData\PsychSignalSentimentAlgorithm.cs" />
     <Compile Include="AltData\TradingEconomicsAlgorithm.cs" />
     <Compile Include="AltData\TiingoNewsAlgorithm.cs" />
     <Compile Include="AutomaticIndicatorWarmupDataTypeRegressionAlgorithm.cs" />
     <Compile Include="AutomaticIndicatorWarmupRegressionAlgorithm.cs" />
+    <Compile Include="CustomPartialFillModelAlgorithm.cs" />
     <Compile Include="EquityTradeAndQuotesRegressionAlgorithm.cs" />
     <Compile Include="BasicTemplateConstituentUniverseAlgorithm.cs" />
     <Compile Include="PaoloTestDailyCryptoAlgorithm.cs" />
@@ -169,6 +170,8 @@
     <Compile Include="DefaultResolutionRegressionAlgorithm.cs" />
     <Compile Include="BasicPythonIntegrationTemplateAlgorithm.cs" />
     <Compile Include="BasicSetAccountCurrencyAlgorithm.cs" />
+    <Compile Include="FineFundamentalFilteredUniverseRegressionAlgorithm.cs" />
+    <Compile Include="FutureSharingTickerRegressionAlgorithm.cs" />
     <Compile Include="LongOnlyAlphaStreamAlgorithm.cs" />
     <Compile Include="Benchmarks\SECReportBenchmarkAlgorithm.cs" />
     <Compile Include="Benchmarks\SmartInsiderEventBenchmarkAlgorithm.cs" />
@@ -198,6 +201,7 @@
     <Compile Include="PortfolioRebalanceOnSecurityChangesRegressionAlgorithm.cs" />
     <Compile Include="ResolutionSwitchingAlgorithm.cs" />
     <Compile Include="SetHoldingsFutureRegressionAlgorithm.cs" />
+    <Compile Include="StringToSymbolImplicitConversionRegressionAlgorithm.cs" />
     <Compile Include="TimeRulesDefaultTimeZoneRegressionAlgorithm.cs" />
     <Compile Include="SetHoldingsMultipleTargetsRegressionAlgorithm.cs" />
     <Compile Include="SetHoldingsMarketOnOpenRegressionAlgorithm.cs" />
@@ -242,7 +246,6 @@
     <Compile Include="StopLossOnOrderEventRegressionAlgorithm.cs" />
     <Compile Include="TotalPortfolioValueRegressionAlgorithm.cs" />
     <Compile Include="TradingEconomicsCalendarIndicatorAlgorithm.cs" />
-    <Compile Include="PsychSignalSentimentRegressionAlgorithm.cs" />
     <Compile Include="TrailingStopRiskFrameworkAlgorithm.cs" />
     <Compile Include="BasicTemplateFuturesFrameworkAlgorithm.cs" />
     <Compile Include="BasicTemplateOptionsFrameworkAlgorithm.cs" />

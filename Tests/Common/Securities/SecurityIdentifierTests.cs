@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using QuantConnect.Algorithm.CSharp;
@@ -161,17 +162,36 @@ namespace QuantConnect.Tests.Common.Securities
         }
 
         [Test]
+        public void InvalidSecurityType()
+        {
+            Assert.Throws<ArgumentException>(() =>
+            {
+                var sid = new SecurityIdentifier("some-symbol", 0357960000000009915);
+            }, $"The provided properties do not match with a valid {nameof(SecurityType)}");
+        }
+
+        [TestCaseSource(nameof(ValidSecurityTypes))]
+        public void ValidSecurityType(ulong properties)
+        {
+            Assert.DoesNotThrow(() =>
+            {
+                var sid = new SecurityIdentifier("some-symbol", properties);
+            });
+        }
+
+        [Test]
         public void ReturnsCorrectOptionRight()
         {
             Assert.AreEqual(OptionRight.Put, SPY_Put_19550.OptionRight);
         }
 
         [Test]
-        [ExpectedException(typeof(InvalidOperationException), MatchType = MessageMatch.Contains,
-            ExpectedMessage = "OptionRight is only defined for SecurityType.Option")]
         public void OptionRightThrowsOnNonOptionSecurityType()
         {
-            var OptionRight = SPY.OptionRight;
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                var OptionRight = SPY.OptionRight;
+            }, "OptionRight is only defined for SecurityType.Option");
         }
 
         [Test]
@@ -207,11 +227,12 @@ namespace QuantConnect.Tests.Common.Securities
         }
 
         [Test]
-        [ExpectedException(typeof(InvalidOperationException), MatchType = MessageMatch.Contains,
-            ExpectedMessage = "OptionStyle is only defined for SecurityType.Option")]
         public void OptionStyleThrowsOnNonOptionSecurityType()
         {
-            var optionStyle = SPY.OptionStyle;
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                var optionStyle = SPY.OptionStyle;
+            }, "OptionStyle is only defined for SecurityType.Option");
         }
 
         [Test]
@@ -320,10 +341,12 @@ namespace QuantConnect.Tests.Common.Securities
         }
 
         [Theory, TestCase("|"), TestCase(" ")]
-        [ExpectedException(typeof(ArgumentException), MatchType = MessageMatch.Contains, ExpectedMessage = "must not contain the characters")]
         public void ThrowsOnInvalidSymbolCharacters(string input)
         {
-            new SecurityIdentifier(input, 0);
+            Assert.Throws<ArgumentException>(() =>
+            {
+                new SecurityIdentifier(input, 0);
+            }, "must not contain the characters");
         }
 
         [Test]
@@ -370,5 +393,8 @@ namespace QuantConnect.Tests.Common.Securities
         {
             public SecurityIdentifier sid;
         }
+        private static List<TestCaseData> ValidSecurityTypes =>
+            (from object value in Enum.GetValues(typeof(SecurityType)) select new TestCaseData((ulong)(0357960000000009900 + (int)value))).ToList();
+
     }
 }

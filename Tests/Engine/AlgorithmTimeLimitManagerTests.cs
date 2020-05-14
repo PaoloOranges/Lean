@@ -14,24 +14,28 @@
  *
 */
 
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using QuantConnect.Algorithm.CSharp;
 using QuantConnect.Configuration;
+using QuantConnect.Lean.Engine;
+using QuantConnect.Util.RateLimit;
 
 namespace QuantConnect.Tests.Engine
 {
     [TestFixture]
     public class AlgorithmTimeLimitManagerTests
     {
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void TearUp()
         {
             // clear the config
             Config.Reset();
         }
 
-        [TestFixtureTearDown]
+        [OneTimeTearDown]
         public void TearDown()
         {
             // clear the config
@@ -52,6 +56,33 @@ namespace QuantConnect.Tests.Engine
                 parameter.AlphaStatistics,
                 parameter.Language,
                 parameter.ExpectedFinalStatus);
+        }
+
+        [Test]
+        public void RaceCondition()
+        {
+            var timeManager = new AlgorithmTimeLimitManager(TokenBucket.Null, TimeSpan.FromMinutes(1));
+
+            const int loops = 1000000;
+            var task = Task.Factory.StartNew(() =>
+            {
+                var count = 0;
+                while (count++ < loops)
+                {
+                    var result = timeManager.IsWithinLimit();
+                    Assert.IsTrue(result.IsWithinCustomLimits, result.ErrorMessage);
+                }
+            });
+            var task2 = Task.Factory.StartNew(() =>
+            {
+                var count = 0;
+                while (count++ < loops)
+                {
+                    timeManager.StartNewTimeStep();
+                }
+            });
+
+            Task.WaitAll(task, task2);
         }
     }
 }

@@ -161,7 +161,7 @@ namespace QuantConnect
 
             if (expiry == SecurityIdentifier.DefaultDate)
             {
-                alias = alias ?? "?" + underlyingSymbol.Value.LazyToUpper();
+                alias = alias ?? $"?{underlyingSymbol.Value.LazyToUpper()}";
             }
             else
             {
@@ -515,7 +515,7 @@ namespace QuantConnect
                 return new Symbol(sid, sid.Symbol);
             }
 
-            return Empty;
+            return new Symbol(new SecurityIdentifier(ticker, 0), ticker);
         }
 
         #endregion

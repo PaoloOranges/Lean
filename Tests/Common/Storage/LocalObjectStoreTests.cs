@@ -16,11 +16,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using QuantConnect.Configuration;
 using QuantConnect.Lean.Engine.Storage;
 using QuantConnect.Packets;
 using QuantConnect.Storage;
+using QuantConnect.Util;
 
 namespace QuantConnect.Tests.Common.Storage
 {
@@ -32,7 +34,7 @@ namespace QuantConnect.Tests.Common.Storage
 
         private ObjectStore _store;
 
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void Setup()
         {
             Config.Set("object-store-root", TestStorageRoot);
@@ -41,9 +43,10 @@ namespace QuantConnect.Tests.Common.Storage
             _store.Initialize("CSharp-TestAlgorithm", 0, 0, "", new Controls());
         }
 
-        [TestFixtureTearDown]
+        [OneTimeTearDown]
         public void Cleanup()
         {
+            _store.DisposeSafely();
             Config.Set("object-store-root", StorageRootConfigurationValue);
             try
             {
@@ -52,6 +55,28 @@ namespace QuantConnect.Tests.Common.Storage
             catch
             {
             }
+        }
+
+        [Test]
+        public void PersistCalledSynchronously()
+        {
+            var store = new TestLocalObjectStore();
+            store.Initialize("CSharp-TestAlgorithm2", 0, 0, "", new Controls
+            {
+                PersistenceIntervalSeconds = -1
+            });
+
+            store.SaveBytes("Pepe", new byte[] {1});
+            Assert.AreEqual(1, store.ReadBytes("Pepe").Single());
+            Assert.IsTrue(store.PersistDataCalled);
+
+            store.PersistDataCalled = false;
+
+            store.Delete("Pepe");
+            Assert.IsTrue(store.PersistDataCalled);
+            Assert.IsFalse(store.ContainsKey("Pepe"));
+
+            store.DisposeSafely();
         }
 
         [Test]
@@ -152,6 +177,16 @@ namespace QuantConnect.Tests.Common.Storage
         {
             public int EmaFastPeriod { get; set; }
             public int EmaSlowPeriod { get; set; }
+        }
+
+        private class TestLocalObjectStore : LocalObjectStore
+        {
+            public bool PersistDataCalled { get; set; }
+            protected override bool PersistData(IEnumerable<KeyValuePair<string, byte[]>> data)
+            {
+                PersistDataCalled = true;
+                return base.PersistData(data);
+            }
         }
     }
 }

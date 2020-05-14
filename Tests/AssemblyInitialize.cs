@@ -14,16 +14,48 @@
  *
 */
 
+using System;
+using System.IO;
 using NUnit.Framework;
+using QuantConnect;
+using QuantConnect.Configuration;
 using QuantConnect.Logging;
+using QuantConnect.Python;
 
 [SetUpFixture]
 public class AssemblyInitialize
 {
-    [SetUp]
+    [OneTimeSetUp]
     public void SetLogHandler()
     {
+        AdjustCurrentDirectory();
         // save output to file as well
         Log.LogHandler = new ConsoleLogHandler();
+    }
+
+    public static void AdjustCurrentDirectory()
+    {
+        // nunit 3 sets the current folder to a temp folder we need it to be the test bin output folder
+        var dir = TestContext.CurrentContext.TestDirectory;
+        Environment.CurrentDirectory = dir;
+        Directory.SetCurrentDirectory(dir);
+        Config.Reset();
+        Globals.Reset();
+        PythonInitializer.SetPythonPathEnvironmentVariable(
+            new[]
+            {
+                "./Alphas",
+                "./Execution",
+                "./Portfolio",
+                "./Risk",
+                "./Selection",
+                "./RegressionAlgorithms",
+                "./Jupyter/RegressionScripts",
+                "../../../Algorithm",
+                "../../../Algorithm/Selection",
+                "../../../Algorithm.Framework",
+                "../../../Algorithm.Framework/Selection",
+                "../../../Algorithm.Python"
+            });
     }
 }

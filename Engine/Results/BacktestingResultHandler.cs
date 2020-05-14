@@ -47,8 +47,8 @@ namespace QuantConnect.Lean.Engine.Results
         private DateTime _nextUpdate;
         private DateTime _nextS3Update;
         private string _errorMessage;
-        private double _daysProcessed;
-        private double _daysProcessedFrontier;
+        private int _daysProcessed;
+        private int _daysProcessedFrontier;
         private readonly HashSet<string> _chartSeriesExceededDataPoints;
 
         //Processing Time:
@@ -153,7 +153,8 @@ namespace QuantConnect.Lean.Engine.Results
                     return;
                 }
 
-                if (DateTime.UtcNow <= _nextUpdate || _daysProcessed < _daysProcessedFrontier) return;
+                var utcNow = DateTime.UtcNow;
+                if (utcNow <= _nextUpdate || _daysProcessed < _daysProcessedFrontier) return;
 
                 var deltaOrders = GetDeltaOrders(LastDeltaOrderPosition, shouldStop: orderCount => orderCount >= 50);
                 // Deliberately skip to the end of order event collection to prevent overloading backtesting UX
@@ -163,7 +164,7 @@ namespace QuantConnect.Lean.Engine.Results
                 try
                 {
                     _daysProcessedFrontier = _daysProcessed + 1;
-                    _nextUpdate = DateTime.UtcNow.AddSeconds(3);
+                    _nextUpdate = utcNow.AddSeconds(3);
                 }
                 catch (Exception err)
                 {
@@ -171,7 +172,7 @@ namespace QuantConnect.Lean.Engine.Results
                 }
 
                 var deltaCharts = new Dictionary<string, Chart>();
-
+                var serverStatistics = GetServerStatistics(utcNow);
                 var performanceCharts = new Dictionary<string, Chart>();
                 lock (ChartLock)
                 {
@@ -210,7 +211,7 @@ namespace QuantConnect.Lean.Engine.Results
                 if (progress > 0.999m) progress = 0.999m;
 
                 //1. Cloud Upload -> Upload the whole packet to S3  Immediately:
-                if (DateTime.UtcNow > _nextS3Update)
+                if (utcNow > _nextS3Update)
                 {
                     // For intermediate backtesting results, we truncate the order list to include only the last 100 orders
                     // The final packet will contain the full list of orders.
@@ -233,12 +234,15 @@ namespace QuantConnect.Lean.Engine.Results
                 }
 
                 //2. Backtest Update -> Send the truncated packet to the backtester:
-                var splitPackets = SplitPackets(deltaCharts, deltaOrders, runtimeStatistics, progress);
+                var splitPackets = SplitPackets(deltaCharts, deltaOrders, runtimeStatistics, progress, serverStatistics);
 
                 foreach (var backtestingPacket in splitPackets)
                 {
                     MessagingHandler.Send(backtestingPacket);
                 }
+
+                // let's re update this value after we finish just in case, so we don't re enter in the next loop
+                _nextUpdate = DateTime.UtcNow.AddSeconds(3);
             }
             catch (Exception err)
             {
@@ -249,7 +253,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <summary>
         /// Run over all the data and break it into smaller packets to ensure they all arrive at the terminal
         /// </summary>
-        public IEnumerable<BacktestResultPacket> SplitPackets(Dictionary<string, Chart> deltaCharts, Dictionary<int, Order> deltaOrders, Dictionary<string, string> runtimeStatistics, decimal progress)
+        public IEnumerable<BacktestResultPacket> SplitPackets(Dictionary<string, Chart> deltaCharts, Dictionary<int, Order> deltaOrders, Dictionary<string, string> runtimeStatistics, decimal progress, Dictionary<string, string> serverStatistics)
         {
             // break the charts into groups
             var splitPackets = new List<BacktestResultPacket>();
@@ -267,11 +271,15 @@ namespace QuantConnect.Lean.Engine.Results
             // Send alpha run time statistics
             splitPackets.Add(new BacktestResultPacket(_job, new BacktestResult { AlphaRuntimeStatistics = AlphaRuntimeStatistics }, Algorithm.EndDate, Algorithm.StartDate, progress));
 
-            // Add the orders into the charting packet:
-            splitPackets.Add(new BacktestResultPacket(_job, new BacktestResult { Orders = deltaOrders }, Algorithm.EndDate, Algorithm.StartDate, progress));
+            // only send orders if there is actually any update
+            if (deltaOrders.Count > 0)
+            {
+                // Add the orders into the charting packet:
+                splitPackets.Add(new BacktestResultPacket(_job, new BacktestResult { Orders = deltaOrders }, Algorithm.EndDate, Algorithm.StartDate, progress));
+            }
 
             //Add any user runtime statistics into the backtest.
-            splitPackets.Add(new BacktestResultPacket(_job, new BacktestResult { RuntimeStatistics = runtimeStatistics }, Algorithm.EndDate, Algorithm.StartDate, progress));
+            splitPackets.Add(new BacktestResultPacket(_job, new BacktestResult { ServerStatistics = serverStatistics, RuntimeStatistics = runtimeStatistics }, Algorithm.EndDate, Algorithm.StartDate, progress));
 
             return splitPackets;
         }
@@ -552,8 +560,14 @@ namespace QuantConnect.Lean.Engine.Results
         {
             base.SampleEquity(time, value);
 
-            //Recalculate the days processed:
-            _daysProcessed = (time - Algorithm.StartDate).TotalDays;
+            try
+            {
+                //Recalculate the days processed. We use 'int' so it's thread safe
+                _daysProcessed = (int) (time - Algorithm.StartDate).TotalDays;
+            }
+            catch (OverflowException)
+            {
+            }
         }
 
         /// <summary>

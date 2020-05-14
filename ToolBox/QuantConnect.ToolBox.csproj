@@ -139,9 +139,6 @@
     <Reference Include="IKVM.OpenJDK.XML.XPath, Version=8.1.5717.0, Culture=neutral, PublicKeyToken=13235d27fcbfff58, processorArchitecture=MSIL">
       <HintPath>..\packages\IKVM.8.1.5717.0\lib\IKVM.OpenJDK.XML.XPath.dll</HintPath>
     </Reference>
-    <Reference Include="IKVM.Reflection">
-      <HintPath>..\packages\IKVM-WithExes.7.3.4830.1\tools\IKVM.Reflection.dll</HintPath>
-    </Reference>
     <Reference Include="IKVM.Runtime, Version=8.1.5717.0, Culture=neutral, PublicKeyToken=13235d27fcbfff58, processorArchitecture=MSIL">
       <HintPath>..\packages\IKVM.8.1.5717.0\lib\IKVM.Runtime.dll</HintPath>
     </Reference>
@@ -276,9 +273,6 @@
     <Compile Include="IQFeedDownloader\IQFeedDownloaderProgram.cs" />
     <Compile Include="IVolatilityEquityConverter\IVolatilityEquityConverterProgram.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="PsychSignalDataConverter\PsychSignalDataConverterProgram.cs" />
-    <Compile Include="PsychSignalDataConverter\PsychSignalDataConverter.cs" />
-    <Compile Include="PsychSignalDataConverter\PsychSignalDataDownloader.cs" />
     <Compile Include="RandomDataGenerator\DividendSplitMapGenerator.cs" />
     <Compile Include="RandomDataGenerator\ConsoleLeveledOutput.cs" />
     <Compile Include="RandomDataGenerator\DataDensity.cs" />

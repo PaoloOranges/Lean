@@ -188,10 +188,7 @@ namespace QuantConnect.Lean.Engine.Results
                     var holdings = new Dictionary<string, Holding>();
                     var deltaStatistics = new Dictionary<string, string>();
                     var runtimeStatistics = new Dictionary<string, string>();
-                    var serverStatistics = OS.GetServerStatistics();
-                    var upTime = utcNow - StartTime;
-                    serverStatistics["Up Time"] = $"{upTime.Days}d {upTime:hh\\:mm\\:ss}";
-                    serverStatistics["Total RAM (MB)"] = _job.Controls.RamAllocation.ToStringInvariant();
+                    var serverStatistics = GetServerStatistics(utcNow);
 
                     // Only send holdings updates when we have changes in orders, except for first time, then we want to send all
                     foreach (var kvp in Algorithm.Securities.OrderBy(x => x.Key.Value))
@@ -481,7 +478,6 @@ namespace QuantConnect.Lean.Engine.Results
             // these are easier to split up, not as big as the chart objects
             var packets = new[]
             {
-                new LiveResultPacket(_job, new LiveResult { Orders = deltaOrders, OrderEvents = deltaOrderEvents}),
                 new LiveResultPacket(_job, new LiveResult { Holdings = holdings, Cash = cashbook}),
                 new LiveResultPacket(_job, new LiveResult
                 {
@@ -492,7 +488,15 @@ namespace QuantConnect.Lean.Engine.Results
                 })
             };
 
-            return packets.Concat(chartPackets);
+            var result = packets.Concat(chartPackets);
+
+            // only send order and order event packet if there is actually any update
+            if (deltaOrders.Count > 0 || deltaOrderEvents.Count > 0)
+            {
+                result= result.Concat(new []{ new LiveResultPacket(_job, new LiveResult { Orders = deltaOrders, OrderEvents = deltaOrderEvents }) });
+            }
+
+            return result;
         }
 
 
