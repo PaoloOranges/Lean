@@ -30,18 +30,8 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="using data" />
     /// <meta name="tag" content="using quantconnect" />
     /// <meta name="tag" content="trading and orders" />
-    public class PaoloTestDailyCryptoAlgorithm : QCAlgorithm
+    public class PaoloTestAlgo : QCAlgorithm
     {
-        private ExponentialMovingAverage _fast;
-        private LeastSquaresMovingAverage _slow;
-        private MovingAverageConvergenceDivergence _macd;
-        private AverageDirectionalIndex _adx;
-
-        private decimal _max_macd = Decimal.MinValue;
-        private decimal _min_macd = Decimal.MaxValue;
-        private decimal _max_adx = Decimal.MinValue;
-
-        private MinMaxMACD _min_max_macd;
         private int _bought = -1;
         private decimal _price_bought = 0;
 
@@ -56,7 +46,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public override void Initialize()
         {
-            Resolution resolution = Resolution.Daily;
+            Resolution resolution = Resolution.Minute;
 
             SetStartDate(2019, 2, 8); // Set Start Date
             SetEndDate(2020, 3, 30); // Set End Date
@@ -67,13 +57,6 @@ namespace QuantConnect.Algorithm.CSharp
 
             // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
-
-            _fast = EMA(_symbol, 5, resolution);
-            _slow = LSMA(_symbol, 15, resolution);
-            _macd = MACD(_symbol, 5, 25, 15, MovingAverageType.Exponential, resolution);
-            _adx = ADX(_symbol, 15, resolution);
-
-            _min_max_macd = new MinMaxMACD(15);
 
             _bought = -1;
 
@@ -100,32 +83,24 @@ namespace QuantConnect.Algorithm.CSharp
                 return;
             }
 
-            OnDataDaily(data);
-
-        }
-
-        private void OnDataDaily(Slice data)
-        {
+            decimal closePrice = data.Bars[SymbolName].Close;
             if (_bought < 0)
             {
-                if (_adx > 15.0 && _macd > 0)
+                if(closePrice < 9700)
                 {
                     decimal btcPrice = Securities[SymbolName].Price;
                     decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
                     Buy(_symbol, quantity);
-                    _max_macd = Decimal.MinValue;
-
                 }
             }
-            else
+            else if(_bought > 0)
             {
-                _max_macd = Math.Max(_macd, _max_macd);
-
-                if (_macd <= 0.5m * _max_macd)
+                if (closePrice > _price_bought * 1.20m)
                 {
                     Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
                 }
             }
+
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)

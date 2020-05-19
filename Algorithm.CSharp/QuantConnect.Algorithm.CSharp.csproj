@@ -164,6 +164,7 @@
     <Compile Include="CustomPartialFillModelAlgorithm.cs" />
     <Compile Include="EquityTradeAndQuotesRegressionAlgorithm.cs" />
     <Compile Include="BasicTemplateConstituentUniverseAlgorithm.cs" />
+    <Compile Include="PaoloTestAlgo.cs" />
     <Compile Include="PaoloTestDailyCryptoAlgorithm.cs" />
     <Compile Include="PaoloTestHourlyCryptoAlgorithm.cs" />
     <Compile Include="ConsolidateRegressionAlgorithm.cs" />

@@ -145,7 +145,7 @@ namespace QuantConnect.Algorithm.CSharp
                     bool is_price_ok = _price_bought < current_price;
                     if (is_adx_ok && is_macd_ok && is_moving_averages_ok && is_price_ok)
                     {
-                        var order = Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
+                        Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
                     }
                 }
 
