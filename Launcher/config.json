@@ -9,7 +9,7 @@
   "environment": "paper-gdax", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed", "paper-gdax"
 
   // algorithm class selector
-  "algorithm-type-name": "PaoloTestAlgo",
+  "algorithm-type-name": "PaoloTestHourlyCryptoAlgorithm",
   //"algorithm-type-name": "IndicatorWarmupAlgorithm",
 
   // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
