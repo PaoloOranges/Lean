@@ -183,6 +183,46 @@ namespace QuantConnect.Tests.Python
             }
         }
 
+        [Test]
+        public void HandlesNullableValues()
+        {
+            var converter = new PandasConverter();
+            var rawBars = Enumerable
+                .Range(0, 10)
+                .Select(i => new NullableValueData {
+                    Symbol = Symbols.AAPL,
+                    EndTime = new DateTime(2020, 1, 1),
+                    NullableInt = null,
+                    NullableTime = null,
+                    NullableColumn = null
+                })
+                .ToArray();
+
+            rawBars[0].NullableInt = 0;
+            rawBars[1].NullableTime = new DateTime(2020, 1, 2);
+
+            // GetDataFrame with argument of type IEnumerable<QuoteBar>
+            dynamic dataFrame = converter.GetDataFrame(rawBars);
+
+            using (Py.GIL())
+            {
+                Assert.AreEqual(2, dataFrame.columns.__len__().AsManagedObject(typeof(int)));
+                var count = dataFrame.__len__().AsManagedObject(typeof(int));
+                Assert.AreEqual(10, count);
+            }
+
+            // GetDataFrame with argument of type IEnumerable<QuoteBar>
+            var history = GetHistory(Symbols.AAPL, Resolution.Daily, rawBars);
+            dataFrame = converter.GetDataFrame(history);
+
+            using (Py.GIL())
+            {
+                Assert.AreEqual(2, dataFrame.columns.__len__().AsManagedObject(typeof(int)));
+                var count = dataFrame.__len__().AsManagedObject(typeof(int));
+                Assert.AreEqual(10, count);
+            }
+        }
+
         [TestCase("'SPY'", true)]
         [TestCase("symbol")]
         [TestCase("str(symbol.ID)")]
@@ -1026,6 +1066,30 @@ def Test(dataFrame, symbol):
             }
         }
 
+        [TestCase("['SPY','AAPL']", true)]
+        [TestCase("symbols")]
+        [TestCase("[str(symbols[0].ID), str(symbols[1].ID)]")]
+        public void BackwardsCompatibilityDataFrame_loc_list(string index, bool cache = false)
+        {
+            if (cache)
+            {
+                SymbolCache.Set("SPY", Symbols.SPY);
+                SymbolCache.Set("AAPL", Symbols.AAPL);
+            }
+
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    $@"
+def Test(dataFrame, symbols):
+    data = dataFrame.lastprice.unstack(0)
+    data = data.loc[:, {index}]").GetAttr("Test");
+
+                var symbols = new List<Symbol> {Symbols.SPY, Symbols.AAPL};
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(symbols), symbols));
+            }
+        }
+
         [TestCase("'SPY'", true)]
         [TestCase("symbol")]
         [TestCase("str(symbol.ID)")]
@@ -1238,6 +1302,28 @@ def Test(dataFrame, symbol):
         raise Exception('Data is zero')").GetAttr("Test");
 
                 Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [TestCase("'SPY'", true)]
+        [TestCase("symbol")]
+        [TestCase("str(symbol.ID)")]
+        public void BackwardsCompatibilityDataFrame_query_index(string index, bool cache = false)
+        {
+            if (cache) SymbolCache.Set("SPY", Symbols.SPY);
+
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    $@"
+def Test(dataFrame, symbol):
+    time = '2011-02-01'
+    data = dataFrame.lastprice.unstack(0).query('index > @time')
+    data = data[{index}]
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY, 10), Symbols.SPY));
             }
         }
 
@@ -3185,11 +3271,33 @@ def Test(dataFrame, symbol):
 
         private dynamic GetTestDataFrame(Symbol symbol, int count = 1)
         {
-            var rawBars = Enumerable
+            return GetTestDataFrame(new[] {symbol}, count);
+        }
+
+        private dynamic GetTestDataFrame(IEnumerable<Symbol> symbols, int count = 1)
+        {
+            var slices = Enumerable
                 .Range(0, count)
-                .Select(i => new Tick(symbol, $"144{i:D2}000,167{i:D2}00,1{i:D2},T,T,0", new DateTime(2013, 10, 7)))
-                .ToArray();
-            return _converter.GetDataFrame(rawBars);
+                .Select(
+                    i =>
+                    {
+                        var time = new DateTime(2013, 10, 7).AddMilliseconds(14400000 + i * 10000);
+                        return new Slice(
+                            time,
+                            symbols.Select(
+                                symbol => new Tick
+                                {
+                                    Time = time,
+                                    Symbol = symbol,
+                                    Value = 167 + i / 10,
+                                    Quantity = 1 + i * 10,
+                                    Exchange = "T"
+                                }
+                            )
+                        );
+                    }
+                );
+            return _converter.GetDataFrame(slices);
         }
 
         internal class SubTradeBar : TradeBar
@@ -3214,6 +3322,15 @@ def Test(dataFrame, symbol):
 
             public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode) =>
                 new SubSubTradeBar((TradeBar) base.Reader(config, line, date, isLiveMode));
+        }
+
+        internal class NullableValueData : BaseData
+        {
+            public int? NullableInt { get; set; }
+
+            public DateTime? NullableTime { get; set; }
+
+            public double? NullableColumn { get; set; }
         }
     }
 }

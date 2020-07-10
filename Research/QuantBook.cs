@@ -92,7 +92,8 @@ namespace QuantConnect.Research
                         // if <= 0 we disable periodic persistence and make it synchronous
                         PersistenceIntervalSeconds = -1,
                         StorageLimitMB = Config.GetInt("storage-limit-mb", 5),
-                        StorageFileCount = Config.GetInt("storage-file-count", 100)
+                        StorageFileCount = Config.GetInt("storage-file-count", 100),
+                        StoragePermissions = (FileAccess) Config.GetInt("storage-permissions", (int)FileAccess.ReadWrite)
                     });
                 SetObjectStore(algorithmHandlers.ObjectStore);
 
@@ -109,12 +110,13 @@ namespace QuantConnect.Research
                 Securities.SetSecurityService(securityService);
                 SubscriptionManager.SetDataManager(
                     new DataManager(new NullDataFeed(),
-                        new UniverseSelection(this, securityService),
+                        new UniverseSelection(this, securityService, algorithmHandlers.DataPermissionsManager),
                         this,
                         TimeKeeper,
                         MarketHoursDatabase,
                         false,
-                        registeredTypes));
+                        registeredTypes,
+                        algorithmHandlers.DataPermissionsManager));
 
                 var mapFileProvider = algorithmHandlers.MapFileProvider;
                 HistoryProvider = composer.GetExportedValueByTypeName<IHistoryProvider>(Config.Get("history-provider", "SubscriptionDataReaderHistoryProvider"));
@@ -127,7 +129,8 @@ namespace QuantConnect.Research
                         mapFileProvider,
                         algorithmHandlers.FactorFileProvider,
                         null,
-                        true
+                        true,
+                        algorithmHandlers.DataPermissionsManager
                     )
                 );
 

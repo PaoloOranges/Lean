@@ -293,6 +293,7 @@
     <Compile Include="Algorithm\AlgorithmPlottingTests.cs" />
     <Compile Include="Algorithm\AlgorithmRegisterIndicatorTests.cs" />
     <Compile Include="Algorithm\AlgorithmResolveConsolidatorTests.cs" />
+    <Compile Include="Algorithm\AlgorithmAddSecurityTests.cs" />
     <Compile Include="Algorithm\AlgorithmSetBrokerageTests.cs" />
     <Compile Include="Algorithm\AlgorithmSetHoldingsTests.cs" />
     <Compile Include="Algorithm\AlgorithmSettingsTest.cs" />
@@ -360,6 +361,7 @@
     <Compile Include="Common\Orders\OrderSizingTests.cs" />
     <Compile Include="Common\ExpiryTests.cs" />
     <Compile Include="Common\Orders\Serialization\SerializedOrderJsonConverterTests.cs" />
+    <Compile Include="Common\Packets\ControlsTests.cs" />
     <Compile Include="Common\Securities\TestDefaultMarginCallModel.cs" />
     <Compile Include="Common\Statistics\AnnualPerformanceTests.cs" />
     <Compile Include="Common\Statistics\StatisticsBuilderTests.cs" />
@@ -426,6 +428,9 @@
     <Compile Include="Engine\Alphas\InsightAnalysisContextTests.cs" />
     <Compile Include="Engine\BrokerageTransactionHandlerTests\BacktestingTransactionHandlerTests.cs" />
     <Compile Include="Engine\DataFeeds\BacktestingFutureChainProviderTests.cs" />
+    <Compile Include="Engine\DataFeeds\DataPermissionManagerTests.cs" />
+    <Compile Include="Engine\DataFeeds\Enumerators\QuoteBarBuilderEnumeratorTests.cs" />
+    <Compile Include="Engine\DataFeeds\SubscriptionDataTests.cs" />
     <Compile Include="Engine\DataFeeds\DataManagerStub.cs" />
     <Compile Include="Engine\DataFeeds\DataManagerTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\ConcatEnumeratorTests.cs" />

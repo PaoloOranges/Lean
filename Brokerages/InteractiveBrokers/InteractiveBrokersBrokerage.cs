@@ -18,7 +18,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,29 +49,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
     [BrokerageFactory(typeof(InteractiveBrokersBrokerageFactory))]
     public sealed class InteractiveBrokersBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider
     {
-        private enum Region { America, Europe, Asia }
-
-        // Source: https://ibkr.info/article/2816
-        private readonly Dictionary<string, Region> _ibServerMap = new Dictionary<string, Region>
-        {
-            { "gdc1.ibllc.com", Region.America },
-            { "ndc1.ibllc.com", Region.America },
-            { "ndc1_hb1.ibllc.com", Region.America },
-            { "cdc1.ibllc.com", Region.America },
-            { "cdc1_hb1.ibllc.com", Region.America },
-
-            { "zdc1.ibllc.com", Region.Europe },
-            { "zdc1_hb1.ibllc.com", Region.Europe },
-
-            { "hdc1.ibllc.com", Region.Asia },
-            { "hdc1_hb1.ibllc.com", Region.Asia },
-            { "mcgw1.ibllc.com.cn", Region.Asia },
-            { "mcgw1_hb1.ibllc.com.cn", Region.Asia }
-        };
-
         private readonly IBAutomater.IBAutomater _ibAutomater;
-        private string _ibServerName;
-        private Region _ibServerRegion = Region.America;
 
         // Existing orders created in TWS can *only* be cancelled/modified when connected with ClientId = 0
         private const int ClientId = 0;
@@ -88,7 +65,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         private readonly int _port;
         private readonly string _account;
         private readonly string _host;
-        private readonly string _ibDirectory;
         private readonly IAlgorithm _algorithm;
         private readonly IOrderProvider _orderProvider;
         private readonly ISecurityProvider _securityProvider;
@@ -96,8 +72,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         private readonly string _agentDescription;
 
         private Thread _messageProcessingThread;
-        private readonly AutoResetEvent _resetEventRestartGateway = new AutoResetEvent(false);
-        private readonly CancellationTokenSource _ctsRestartGateway = new CancellationTokenSource();
 
         // Notifies the thread reading information from Gateway/TWS whenever there are messages ready to be consumed
         private readonly EReaderSignal _signal = new EReaderMonitorSignal();
@@ -143,9 +117,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
         // IB requests made through the IB-API must be limited to a maximum of 50 messages/second
         private readonly RateGate _messagingRateLimiter = new RateGate(50, TimeSpan.FromSeconds(1));
-
-        // used to limit logging
-        private bool _isWithinScheduledServerResetTimesLastValue;
 
         // additional IB request information, will be matched with errors in the handler, for better error reporting
         private readonly ConcurrentDictionary<int, string> _requestInformation = new ConcurrentDictionary<int, string>();
@@ -266,7 +237,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             _account = account;
             _host = host;
             _port = port;
-            _ibDirectory = ibDirectory;
             _agentDescription = agentDescription;
 
             Log.Trace("InteractiveBrokersBrokerage.InteractiveBrokersBrokerage(): Starting IB Automater...");
@@ -308,40 +278,15 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 }
             };
 
-            // handle requests to restart the IB gateway
-            new Thread(() =>
+            _client.ConnectAck += (sender, e) =>
             {
-                try
-                {
-                    Log.Trace("InteractiveBrokersBrokerage.ResetHandler(): thread started.");
+                Log.Trace("InteractiveBrokersBrokerage.HandleConnectAck(): API client connected.");
+            };
 
-                    while (!_ctsRestartGateway.IsCancellationRequested)
-                    {
-                        if (_resetEventRestartGateway.WaitOne(1000, _ctsRestartGateway.Token))
-                        {
-                            Log.Trace("InteractiveBrokersBrokerage.ResetHandler(): Reset sequence start.");
-
-                            try
-                            {
-                                ResetGatewayConnection();
-                            }
-                            catch (Exception exception)
-                            {
-                                Log.Error("InteractiveBrokersBrokerage.ResetHandler(): Error in ResetGatewayConnection: " + exception);
-                            }
-
-                            Log.Trace($"InteractiveBrokersBrokerage.ResetHandler(): Reset sequence end. Current IsConnected state: {IsConnected}");
-                        }
-                    }
-
-                    Log.Trace("InteractiveBrokersBrokerage.ResetHandler(): thread ended.");
-                }
-                catch (Exception exception)
-                {
-                    Log.Error("InteractiveBrokersBrokerage.ResetHandler(): Error in reset handler thread: " + exception);
-                }
-            })
-            { IsBackground = true }.Start();
+            _client.ConnectionClosed += (sender, e) =>
+            {
+                Log.Trace("InteractiveBrokersBrokerage.HandleConnectionClosed(): API client disconnected.");
+            };
         }
 
         /// <summary>
@@ -359,6 +304,16 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             try
             {
                 Log.Trace("InteractiveBrokersBrokerage.PlaceOrder(): Symbol: " + order.Symbol.Value + " Quantity: " + order.Quantity);
+
+                if (!IsConnected)
+                {
+                    OnMessage(
+                        new BrokerageMessageEvent(
+                            BrokerageMessageType.Warning,
+                            "PlaceOrderWhenDisconnected",
+                            "Orders cannot be submitted when disconnected."));
+                    return false;
+                }
 
                 IBPlaceOrder(order, true);
                 return true;
@@ -380,6 +335,17 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             try
             {
                 Log.Trace("InteractiveBrokersBrokerage.UpdateOrder(): Symbol: " + order.Symbol.Value + " Quantity: " + order.Quantity + " Status: " + order.Status);
+
+                if (!IsConnected)
+                {
+                    OnMessage(
+                        new BrokerageMessageEvent(
+                            BrokerageMessageType.Warning,
+                            "UpdateOrderWhenDisconnected",
+                            "Orders cannot be updated when disconnected."));
+                    return false;
+                }
+
                 _orderUpdates[order.Id] = order.Id;
                 IBPlaceOrder(order, false);
             }
@@ -403,6 +369,16 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             try
             {
                 Log.Trace("InteractiveBrokersBrokerage.CancelOrder(): Symbol: " + order.Symbol.Value + " Quantity: " + order.Quantity);
+
+                if (!IsConnected)
+                {
+                    OnMessage(
+                        new BrokerageMessageEvent(
+                            BrokerageMessageType.Warning,
+                            "CancelOrderWhenDisconnected",
+                            "Orders cannot be cancelled when disconnected."));
+                    return false;
+                }
 
                 // this could be better
                 foreach (var id in order.BrokerId)
@@ -570,7 +546,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         {
             if (!IsConnected)
             {
-                if (IsWithinScheduledServerResetTimes())
+                if (_ibAutomater.IsWithinScheduledServerResetTimes())
                 {
                     // Occasionally the disconnection due to the IB reset period might last
                     // much longer than expected during weekends (even up to the cash sync time).
@@ -789,11 +765,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                     // enable detailed logging
                     _client.ClientSocket.setServerLogLevel(5);
 
-                    // load server name and region
-                    LoadIbServerInformation();
-
-                    Log.Trace($"InteractiveBrokersBrokerage.Connect(): ServerName: {_ibServerName}, ServerRegion: {_ibServerRegion}");
-
                     break;
                 }
                 catch (Exception err)
@@ -931,8 +902,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             _ibAutomater?.Stop();
 
             _messagingRateLimiter.Dispose();
-
-            _ctsRestartGateway.Cancel(false);
         }
 
         /// <summary>
@@ -943,14 +912,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         /// <param name="exchange">The exchange to send the order to, defaults to "Smart" to use IB's smart routing</param>
         private void IBPlaceOrder(Order order, bool needsNewId, string exchange = null)
         {
-            // connect will throw if it fails
-            Connect();
-
-            if (!IsConnected)
-            {
-                throw new InvalidOperationException("InteractiveBrokersBrokerage.IBPlaceOrder(): Unable to place order while not connected.");
-            }
-
             // MOO/MOC require directed option orders
             if (exchange == null &&
                 order.Symbol.SecurityType == SecurityType.Option &&
@@ -1234,18 +1195,22 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                     return;
                 }
             }
-            else if (errorCode == 1102 || errorCode == 1101)
+            else if (errorCode == 1102)
             {
-                // we've reconnected
-                OnMessage(new BrokerageMessageEvent(brokerageMessageType, errorCode, errorMsg));
+                // Connectivity between IB and TWS has been restored - data maintained.
+                OnMessage(BrokerageMessageEvent.Reconnected(errorMsg));
 
-                // With IB Gateway v960.2a in the cloud, we are not receiving order fill events after the nightly reset,
-                // so we execute the following sequence:
-                // disconnect, kill IB Gateway, restart IB Gateway, reconnect, restore data subscriptions
-                Log.Trace("InteractiveBrokersBrokerage.HandleError(): Reconnect message received. Restarting...");
+                _stateManager.Disconnected1100Fired = false;
+                return;
+            }
+            else if (errorCode == 1101)
+            {
+                // Connectivity between IB and TWS has been restored - data lost.
+                OnMessage(BrokerageMessageEvent.Reconnected(errorMsg));
 
-                _resetEventRestartGateway.Set();
+                _stateManager.Disconnected1100Fired = false;
 
+                RestoreDataSubscriptions();
                 return;
             }
             else if (errorCode == 506)
@@ -1279,31 +1244,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         }
 
         /// <summary>
-        /// Restarts the IB Gateway and restores the connection
-        /// </summary>
-        public void ResetGatewayConnection()
-        {
-            // clear all error/status flags
-            _stateManager.Reset();
-
-            // notify the BrokerageMessageHandler before the restart, so it can stop polling
-            OnMessage(BrokerageMessageEvent.Reconnected(string.Empty));
-
-            Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): Disconnecting...");
-            Disconnect();
-
-            Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): Restarting IB Gateway...");
-            CheckIbAutomaterError(_ibAutomater.Restart());
-
-            Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): Reconnecting...");
-            Connect();
-
-            // notify the BrokerageMessageHandler after the restart, because
-            // it could have received a disconnect event during the steps above
-            OnMessage(BrokerageMessageEvent.Reconnected(string.Empty));
-        }
-
-        /// <summary>
         /// Restores data subscriptions existing before the IB Gateway restart
         /// </summary>
         private void RestoreDataSubscriptions()
@@ -1334,18 +1274,11 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 return;
             }
 
-            var isResetTime = IsWithinScheduledServerResetTimes();
+            var isResetTime = _ibAutomater.IsWithinScheduledServerResetTimes();
 
             if (!isResetTime)
             {
-                if (_stateManager.PreviouslyInResetTime)
-                {
-                    // reset time finished and we're still disconnected, restart IB client
-                    Log.Trace("InteractiveBrokersBrokerage.TryWaitForReconnect(): Reset time finished and still disconnected. Restarting...");
-
-                    _resetEventRestartGateway.Set();
-                }
-                else
+                if (!_stateManager.PreviouslyInResetTime)
                 {
                     // if we were disconnected and we're not within the reset times, send the error event
                     OnMessage(BrokerageMessageEvent.Disconnected("Connection with Interactive Brokers lost. " +
@@ -2288,83 +2221,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             return Interlocked.Increment(ref _nextTickerId);
         }
 
-        /// <summary>
-        /// This function is used to decide whether or not we should kill an algorithm
-        /// when we lose contact with IB servers. IB performs server resets nightly
-        /// and on Fridays they take everything down, so we'll prevent killing algos
-        /// during the scheduled reset times.
-        /// </summary>
-        private bool IsWithinScheduledServerResetTimes()
-        {
-            // Use schedule based on server region:
-            // https://www.interactivebrokers.com/en/index.php?f=2225
-
-            bool result;
-            var utcTime = DateTime.UtcNow;
-            var time = utcTime.ConvertFromUtc(TimeZones.NewYork);
-            var timeOfDay = time.TimeOfDay;
-
-            // Note: we add 15 minutes *before* and *after* all time ranges for safety margin
-
-            // During the Friday evening reset period, all services will be unavailable in all regions for the duration of the reset.
-            if (time.DayOfWeek == DayOfWeek.Friday && timeOfDay > new TimeSpan(22, 45, 0) ||
-                // Occasionally the disconnection due to the IB reset period might last
-                // much longer than expected during weekends (even up to the cash sync time).
-                time.DayOfWeek == DayOfWeek.Saturday)
-            {
-                // Friday: 23:00 - 03:00 ET for all regions
-                result = true;
-            }
-            else
-            {
-                switch (_ibServerRegion)
-                {
-                    case Region.Europe:
-                        {
-                            // Saturday - Thursday: 05:45 - 06:45 CET
-                            var euTime = utcTime.ConvertFromUtc(TimeZones.Zurich);
-                            var euTimeOfDay = euTime.TimeOfDay;
-                            result = euTimeOfDay > new TimeSpan(5, 30, 0) && euTimeOfDay < new TimeSpan(7, 0, 0);
-                        }
-                        break;
-
-                    case Region.Asia:
-                        {
-                            // Saturday - Thursday: First reset: 16:30 - 17:00 ET
-                            if (timeOfDay > new TimeSpan(16, 15, 0) && timeOfDay < new TimeSpan(17, 15, 0))
-                            {
-                                result = true;
-                            }
-                            else
-                            {
-                                // Saturday - Thursday: Second reset: 20:15 - 21:00 HKT
-                                var hkTime = utcTime.ConvertFromUtc(TimeZones.HongKong);
-                                var hkTimeOfDay = hkTime.TimeOfDay;
-                                result = hkTimeOfDay > new TimeSpan(20, 0, 0) && hkTimeOfDay < new TimeSpan(21, 15, 0);
-                            }
-                        }
-                        break;
-
-                    case Region.America:
-                    default:
-                        {
-                            // Saturday - Thursday: 23:45 - 00:45 ET
-                            result = timeOfDay > new TimeSpan(23, 30, 0) || timeOfDay < new TimeSpan(1, 0, 0);
-                        }
-                        break;
-                }
-            }
-
-            if (result != _isWithinScheduledServerResetTimesLastValue)
-            {
-                _isWithinScheduledServerResetTimesLastValue = result;
-
-                Log.Trace($"InteractiveBrokersBrokerage.IsWithinScheduledServerResetTimes(): {result}");
-            }
-
-            return result;
-        }
-
         private void HandleBrokerTime(object sender, IB.CurrentTimeUtcEventArgs e)
         {
             // keep track of clock drift
@@ -2887,7 +2743,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             if (securityType == SecurityType.Future)
             {
                 // we need to call the IB API only for futures
-                return !IsWithinScheduledServerResetTimes() && IsConnected;
+                return !_ibAutomater.IsWithinScheduledServerResetTimes() && IsConnected;
             }
 
             return true;
@@ -3106,7 +2962,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         public override bool ShouldPerformCashSync(DateTime currentTimeUtc)
         {
             return base.ShouldPerformCashSync(currentTimeUtc) &&
-                   !IsWithinScheduledServerResetTimes();
+                   !_ibAutomater.IsWithinScheduledServerResetTimes();
         }
 
         private void CheckRateLimiting()
@@ -3137,8 +2993,19 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         {
             Log.Trace($"InteractiveBrokersBrokerage.OnIbAutomaterExited(): Exit code: {e.ExitCode}");
 
-            // check if IBGateway was closed because of an existing session
-            CheckIbAutomaterError(_ibAutomater.GetLastStartResult(), false);
+            // check if IBGateway was closed because of an IBAutomater error
+            var result = _ibAutomater.GetLastStartResult();
+            CheckIbAutomaterError(result, false);
+
+            if (!result.HasError)
+            {
+                // IBGateway was closed by the v978+ automatic logoff or it was closed manually (less likely)
+                Log.Trace("InteractiveBrokersBrokerage.OnIbAutomaterExited(): IBGateway close detected, restarting IBAutomater and reconnecting...");
+
+                Disconnect();
+                CheckIbAutomaterError(_ibAutomater.Start(false));
+                Connect();
+            }
         }
 
         private void CheckIbAutomaterError(StartResult result, bool throwException = true)
@@ -3151,45 +3018,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 {
                     throw new Exception($"InteractiveBrokersBrokerage.CheckIbAutomaterError(): {result.ErrorCode} - {result.ErrorMessage}");
                 }
-            }
-        }
-
-        private void LoadIbServerInformation()
-        {
-            // After a successful login, IBGateway saves the connected/redirected host name to the Peer key in the jts.ini file.
-            var iniFileName = Path.Combine(_ibDirectory, "jts.ini");
-
-            // Note: Attempting to connect to a different server via jts.ini will not change anything.
-            // IB will route you back to the server they have set for you on their server side.
-            // You need to request a server change and only then will your system connect to the changed server address.
-
-            if (File.Exists(iniFileName))
-            {
-                const string key = "Peer=";
-                foreach (var line in File.ReadLines(iniFileName))
-                {
-                    if (line.StartsWith(key))
-                    {
-                        var value = line.Substring(key.Length);
-                        _ibServerName = value.Substring(0, value.IndexOf(':'));
-
-                        if (!_ibServerMap.TryGetValue(_ibServerName, out _ibServerRegion))
-                        {
-                            _ibServerRegion = Region.America;
-                            Log.Error($"InteractiveBrokersBrokerage.LoadIbServerInformation(): Unknown server name: {_ibServerName}, region set to {_ibServerRegion}");
-                        }
-
-                        // known server name and region
-                        return;
-                    }
-                }
-
-                _ibServerRegion = Region.America;
-                Log.Error($"InteractiveBrokersBrokerage.LoadIbServerInformation(): Unable to find the server name in the IB ini file: {iniFileName}, region set to {_ibServerRegion}");
-            }
-            else
-            {
-                Log.Error($"InteractiveBrokersBrokerage.LoadIbServerInformation(): IB ini file not found: {iniFileName}");
             }
         }
 

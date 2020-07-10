@@ -171,8 +171,8 @@
     <Compile Include="DataFeeds\CachingOptionChainProvider.cs" />
     <Compile Include="DataFeeds\CurrencySubscriptionDataConfigManager.cs" />
     <Compile Include="DataFeeds\DataChannelProvider.cs" />
+    <Compile Include="DataFeeds\DataPermissionManager.cs" />
     <Compile Include="DataFeeds\Enumerators\ConcatEnumerator.cs" />
-    <Compile Include="DataFeeds\IDataChannelProvider.cs" />
     <Compile Include="DataFeeds\IndexSubscriptionDataSourceReader.cs" />
     <Compile Include="DataFeeds\DataManager.cs" />
     <Compile Include="DataFeeds\Enumerators\DelistingEventProvider.cs" />
@@ -292,6 +292,7 @@
     <Compile Include="Alphas\IAlphaHandler.cs" />
     <Compile Include="Setup\SetupHandlerParameters.cs" />
     <Compile Include="Storage\LocalObjectStore.cs" />
+    <Compile Include="Storage\StorageLimitExceededException.cs" />
     <Compile Include="TransactionHandlers\BacktestingTransactionHandler.cs" />
     <Compile Include="TransactionHandlers\BrokerageTransactionHandler.cs" />
     <Compile Include="TransactionHandlers\CancelPendingOrders.cs" />

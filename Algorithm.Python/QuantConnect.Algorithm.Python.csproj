@@ -84,11 +84,13 @@
     <None Include="BasicTemplateOptionsPriceModel.py" />
     <Content Include="Benchmarks\SECReportBenchmarkAlgorithm.py" />
     <Content Include="Benchmarks\SmartInsiderEventBenchmarkAlgorithm.py" />
+    <Content Include="CoarseTiingoNewsUniverseSelectionAlgorithm.py" />
     <Content Include="ConsolidateRegressionAlgorithm.py" />
     <Content Include="CustomDataAddDataOnSecuritiesChangedRegressionAlgorithm.py" />
     <Content Include="CustomDataAddDataCoarseSelectionRegressionAlgorithm.py" />
     <Content Include="DynamicSecurityDataAlgorithm.py" />
     <Content Include="ConfidenceWeightedFrameworkAlgorithm.py" />
+    <Content Include="ExtendedMarketTradingRegressionAlgorithm.py" />
     <Content Include="FineFundamentalFilteredUniverseRegressionAlgorithm.py" />
     <Content Include="KerasNeuralNetworkAlgorithm.py" />
     <Content Include="CustomDataUsingMapFileRegressionAlgorithm.py" />
@@ -155,8 +157,12 @@
     <None Include="BasicTemplateOptionTradesAlgorithm.py" />
     <None Include="BrokerageModelAlgorithm.py" />
     <None Include="BubbleAlgorithm.py" />
-    <None Include="build.sh" />
-    <None Include="build.bat" />
+    <None Include="build.sh">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="build.bat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="CoarseFineFundamentalComboAlgorithm.py" />
     <None Include="CoarseFineFundamentalRegressionAlgorithm.py" />
     <None Include="CoarseFundamentalTop3Algorithm.py" />
@@ -181,6 +187,7 @@
     <None Include="DropboxBaseDataUniverseSelectionAlgorithm.py" />
     <None Include="DropboxUniverseSelectionAlgorithm.py" />
     <None Include="DropboxCoarseFineAlgorithm.py" />
+    <None Include="EmaCrossFuturesFrontMonthAlgorithm.py" />
     <None Include="EmaCrossUniverseSelectionAlgorithm.py" />
     <None Include="EmaCrossUniverseSelectionFrameworkAlgorithm.py" />
     <None Include="ETFGlobalRotationAlgorithm.py" />
