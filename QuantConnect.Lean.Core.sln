@@ -5,6 +5,11 @@ VisualStudioVersion = 16.0.30320.27
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Logging.core", "Logging\QuantConnect.Logging.core.csproj", "{A20F5718-765E-4ECE-AFC4-13B63F291970}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Configuration.core", "Configuration\QuantConnect.Configuration.core.csproj", "{EF8A230F-0A9E-4330-9573-F5DB90597EF6}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A20F5718-765E-4ECE-AFC4-13B63F291970} = {A20F5718-765E-4ECE-AFC4-13B63F291970}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +20,10 @@ Global
 		{A20F5718-765E-4ECE-AFC4-13B63F291970}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A20F5718-765E-4ECE-AFC4-13B63F291970}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A20F5718-765E-4ECE-AFC4-13B63F291970}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
