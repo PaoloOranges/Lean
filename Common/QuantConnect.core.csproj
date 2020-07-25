@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AssemblyName>QuantConnect.Common.core</AssemblyName>
+    <RootNamespace>QuantConnect</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CloneExtensions" Version="1.4.2" />
+    <PackageReference Include="fasterflect" Version="3.0.0" />
+    <PackageReference Include="MathNet.Numerics" Version="4.11.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="NodaTime" Version="3.0.0" />
+    <PackageReference Include="Python.Runtime.NETStandard" Version="3.7.1" />
+    <PackageReference Include="QLNet" Version="1.11.4" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="4.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Configuration\QuantConnect.Configuration.core.csproj" />
+    <ProjectReference Include="..\Logging\QuantConnect.Logging.core.csproj" />
+  </ItemGroup>
+
+</Project>
