@@ -3,18 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30320.27
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Logging.core", "Logging\QuantConnect.Logging.core.csproj", "{A20F5718-765E-4ECE-AFC4-13B63F291970}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Logging", "Logging\QuantConnect.Logging.csproj", "{A20F5718-765E-4ECE-AFC4-13B63F291970}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Configuration.core", "Configuration\QuantConnect.Configuration.core.csproj", "{EF8A230F-0A9E-4330-9573-F5DB90597EF6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Configuration", "Configuration\QuantConnect.Configuration.csproj", "{EF8A230F-0A9E-4330-9573-F5DB90597EF6}"
 	ProjectSection(ProjectDependencies) = postProject
 		{A20F5718-765E-4ECE-AFC4-13B63F291970} = {A20F5718-765E-4ECE-AFC4-13B63F291970}
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.core", "Common\QuantConnect.core.csproj", "{9F75E3B6-4B6B-454C-8260-E38DA86384F7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect", "Common\QuantConnect.csproj", "{9F75E3B6-4B6B-454C-8260-E38DA86384F7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Indicators.core", "Indicators\QuantConnect.Indicators.core.csproj", "{46627A03-043A-47D2-9D1C-06F1FBF58F2D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Indicators", "Indicators\QuantConnect.Indicators.csproj", "{46627A03-043A-47D2-9D1C-06F1FBF58F2D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Algorithm.core", "Algorithm\QuantConnect.Algorithm.core.csproj", "{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Algorithm", "Algorithm\QuantConnect.Algorithm.csproj", "{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Compression", "Compression\QuantConnect.Compression.csproj", "{D53E34CC-47D3-4951-B505-2FDBF5454684}"
 EndProject
