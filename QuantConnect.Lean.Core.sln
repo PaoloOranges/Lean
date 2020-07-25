@@ -12,6 +12,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Configuration.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.core", "Common\QuantConnect.core.csproj", "{9F75E3B6-4B6B-454C-8260-E38DA86384F7}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Indicators.core", "Indicators\QuantConnect.Indicators.core.csproj", "{46627A03-043A-47D2-9D1C-06F1FBF58F2D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,6 +32,10 @@ Global
 		{9F75E3B6-4B6B-454C-8260-E38DA86384F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F75E3B6-4B6B-454C-8260-E38DA86384F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F75E3B6-4B6B-454C-8260-E38DA86384F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
