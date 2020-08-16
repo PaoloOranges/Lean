@@ -356,7 +356,7 @@ namespace QuantConnect.Brokerages.Oanda
                 // so we only use a single session for all currently subscribed symbols
                 symbolsToSubscribe = symbolsToSubscribe.Union(SubscribedSymbols.ToList()).ToList();
 
-                SubscribedSymbols = symbolsToSubscribe.ToHashSet();
+                SubscribedSymbols = System.Linq.Enumerable.ToHashSet(symbolsToSubscribe);
 
                 ProcessSubscriptionRequest();
             }
@@ -383,7 +383,7 @@ namespace QuantConnect.Brokerages.Oanda
                 // so we only use a single session for all currently subscribed symbols
                 var symbolsToSubscribe = SubscribedSymbols.ToList().Where(x => !symbolsToUnsubscribe.Contains(x)).ToList();
 
-                SubscribedSymbols = symbolsToSubscribe.ToHashSet();
+                SubscribedSymbols = System.Linq.Enumerable.ToHashSet(symbolsToSubscribe);
 
                 ProcessSubscriptionRequest();
             }

@@ -1256,7 +1256,7 @@ namespace QuantConnect.Brokerages.Tradier
                     // wait a second and then check the order provider to see if we have these broker IDs, maybe they came in later (ex, symbol denied for short trading)
                     Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(t =>
                     {
-                        var localUnknownTradierOrderIDs = _unknownTradierOrderIDs.ToHashSet();
+                        var localUnknownTradierOrderIDs = System.Linq.Enumerable.ToHashSet(_unknownTradierOrderIDs);
                         _unknownTradierOrderIDs.Clear();
                         try
                         {
