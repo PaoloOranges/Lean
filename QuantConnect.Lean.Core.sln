@@ -30,6 +30,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.AlgorithmFacto
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Brokerages", "Brokerages\QuantConnect.Brokerages.csproj", "{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Algorithm.CSharp", "Algorithm.CSharp\QuantConnect.Algorithm.CSharp.csproj", "{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -84,6 +86,10 @@ Global
 		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
