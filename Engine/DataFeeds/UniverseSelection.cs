@@ -227,7 +227,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             }
 
             // materialize the enumerable into a set for processing
-            var selections = selectSymbolsResult.ToHashSet();
+            var selections = System.Linq.Enumerable.ToHashSet(selectSymbolsResult);
 
             var additions = new List<Security>();
             var removals = new List<Security>();
