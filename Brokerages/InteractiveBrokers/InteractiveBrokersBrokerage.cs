@@ -2735,7 +2735,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             {
                 if (securityType == SecurityType.Option || securityType == SecurityType.Future)
                 {
-                    var removedSymbols = symbols.Where(x => x.ID.Date < GetRealTimeTickTime(x).Date).ToHashSet();
+                    var removedSymbols = System.Linq.Enumerable.ToHashSet(symbols.Where(x => x.ID.Date < GetRealTimeTickTime(x).Date));
 
                     if (symbols.RemoveAll(x => removedSymbols.Contains(x)) > 0)
                     {

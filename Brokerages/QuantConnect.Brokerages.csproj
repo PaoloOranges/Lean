@@ -5,18 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Fxcm\**" />
-    <Compile Remove="InteractiveBrokers\**" />
+    <Compile Remove="Fxcm\**" />   
     <EmbeddedResource Remove="Fxcm\**" />
-    <EmbeddedResource Remove="InteractiveBrokers\**" />
     <None Remove="Fxcm\**" />
-    <None Remove="InteractiveBrokers\**" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="NodaTime" Version="3.0.0" />
-    <PackageReference Include="QuantConnect.IBAutomater" Version="1.0.29" />
     <PackageReference Include="RestSharp" Version="106.11.4" />
     <PackageReference Include="WebSocketSharp-netstandard" Version="1.0.1" />
   </ItemGroup>
@@ -24,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Api\QuantConnect.Api.csproj" />
     <ProjectReference Include="..\Common\QuantConnect.csproj" />
+    <ProjectReference Include="..\IBAutomater\QuantConnect.IBAutomater.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,6 +30,22 @@
     <Reference Include="QuantConnect.Fxcm">
       <HintPath>Fxcm\QuantConnect.Fxcm.dll</HintPath>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="C:\Users\paolo\.nuget\packages\quantconnect.ibautomater\1.0.29\build\IBAutomater.sh" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="C:\Users\paolo\.nuget\packages\quantconnect.ibautomater\1.0.29\build\IBAutomater.bat" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="C:\Users\paolo\.nuget\packages\quantconnect.ibautomater\1.0.29\build\IBAutomater.jar" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="C:\Users\paolo\.nuget\packages\quantconnect.ibautomater\1.0.29\build\commons-cli-1.4.jar" />
   </ItemGroup>
 
 </Project>
