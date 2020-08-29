@@ -50,6 +50,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Lean.Engine", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.IBAutomater", "IBAutomater\QuantConnect.IBAutomater.csproj", "{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.ToolBox", "ToolBox\QuantConnect.ToolBox.csproj", "{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Lean.Launcher", "Launcher\QuantConnect.Lean.Launcher.csproj", "{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -116,6 +120,14 @@ Global
 		{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
