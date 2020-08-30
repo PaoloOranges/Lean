@@ -20,7 +20,6 @@ using System.Linq;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Option;
-using QuantConnect.Util;
 
 namespace QuantConnect.Data.UniverseSelection
 {

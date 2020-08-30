@@ -151,7 +151,8 @@ namespace QuantConnect.Lean.Engine
                         new UniverseSelection(
                             algorithm,
                             securityService,
-                            AlgorithmHandlers.DataPermissionsManager),
+                            AlgorithmHandlers.DataPermissionsManager,
+                            AlgorithmHandlers.DataProvider),
                         algorithm,
                         algorithm.TimeKeeper,
                         marketHoursDatabase,
@@ -396,6 +397,8 @@ namespace QuantConnect.Lean.Engine
                     dataManager?.RemoveAllSubscriptions();
                     workerThread?.Dispose();
                 }
+
+                synchronizer.DisposeSafely();
                 // Close data feed, alphas. Could be running even if algorithm initialization failed
                 AlgorithmHandlers.DataFeed.Exit();
                 AlgorithmHandlers.Alphas.Exit();
@@ -480,6 +483,7 @@ namespace QuantConnect.Lean.Engine
         /// </summary>
         private IHistoryProvider GetHistoryProvider(string historyProvider)
         {
+            historyProvider = Config.Get("history-provider", historyProvider);
             if (historyProvider.IsNullOrEmpty())
             {
                 historyProvider = Config.Get("history-provider", "SubscriptionDataReaderHistoryProvider");

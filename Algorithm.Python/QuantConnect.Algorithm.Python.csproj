@@ -61,7 +61,6 @@
     <Content Include="Alphas\ShareClassMeanReversionAlpha.py" />
     <Content Include="Alphas\TripleLeverageETFPairVolatilityDecayAlpha.py" />
     <Content Include="Alphas\VIXDualThrustAlpha.py" />
-    <Content Include="AltData\RobintrackHoldingsAlgorithm.py" />
     <Content Include="AltData\CachedAlternativeDataAlgorithm.py" />
     <Content Include="AltData\BenzingaNewsAlgorithm.py" />
     <Content Include="AltData\SECReport8KAlgorithm.py" />
@@ -86,6 +85,7 @@
     <Content Include="Benchmarks\SmartInsiderEventBenchmarkAlgorithm.py" />
     <Content Include="CoarseTiingoNewsUniverseSelectionAlgorithm.py" />
     <Content Include="ConsolidateRegressionAlgorithm.py" />
+    <Content Include="CustomConsolidatorRegressionAlgorithm.py" />
     <Content Include="CustomDataAddDataOnSecuritiesChangedRegressionAlgorithm.py" />
     <Content Include="CustomDataAddDataCoarseSelectionRegressionAlgorithm.py" />
     <Content Include="DynamicSecurityDataAlgorithm.py" />

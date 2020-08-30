@@ -1,0 +1,138 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30320.27
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Logging", "Logging\QuantConnect.Logging.csproj", "{A20F5718-765E-4ECE-AFC4-13B63F291970}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Configuration", "Configuration\QuantConnect.Configuration.csproj", "{EF8A230F-0A9E-4330-9573-F5DB90597EF6}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A20F5718-765E-4ECE-AFC4-13B63F291970} = {A20F5718-765E-4ECE-AFC4-13B63F291970}
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect", "Common\QuantConnect.csproj", "{9F75E3B6-4B6B-454C-8260-E38DA86384F7}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Indicators", "Indicators\QuantConnect.Indicators.csproj", "{46627A03-043A-47D2-9D1C-06F1FBF58F2D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Algorithm", "Algorithm\QuantConnect.Algorithm.csproj", "{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Compression", "Compression\QuantConnect.Compression.csproj", "{D53E34CC-47D3-4951-B505-2FDBF5454684}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Api", "Api\QuantConnect.Api.csproj", "{D8D75DFB-A2F4-46C2-BB9D-51264B15248D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Algorithm.Framework", "Algorithm.Framework\QuantConnect.Algorithm.Framework.csproj", "{D9997EF8-66D0-41E9-A464-DC2751BDAF15}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Queues", "Queues\QuantConnect.Queues.csproj", "{C4621AB8-1024-4EE6-8F43-D62326C09FDB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Messaging", "Messaging\QuantConnect.Messaging.csproj", "{81280E52-1474-4971-9B14-BC4A05244837}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.AlgorithmFactory", "AlgorithmFactory\QuantConnect.AlgorithmFactory.csproj", "{1F08743D-D43A-4EDD-98CF-6A4A3DACE7DE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Brokerages", "Brokerages\QuantConnect.Brokerages.csproj", "{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Algorithm.CSharp", "Algorithm.CSharp\QuantConnect.Algorithm.CSharp.csproj", "{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Lean.Engine", "Engine\QuantConnect.Lean.Engine.csproj", "{F9A8EC8F-212C-42EC-B04E-9476508B190A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D} = {46627A03-043A-47D2-9D1C-06F1FBF58F2D}
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6} = {EF8A230F-0A9E-4330-9573-F5DB90597EF6}
+		{A20F5718-765E-4ECE-AFC4-13B63F291970} = {A20F5718-765E-4ECE-AFC4-13B63F291970}
+		{1F08743D-D43A-4EDD-98CF-6A4A3DACE7DE} = {1F08743D-D43A-4EDD-98CF-6A4A3DACE7DE}
+		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214} = {0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}
+		{81280E52-1474-4971-9B14-BC4A05244837} = {81280E52-1474-4971-9B14-BC4A05244837}
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1} = {ED7CEFA4-777F-4A06-83C6-7A9D869048C1}
+		{9F75E3B6-4B6B-454C-8260-E38DA86384F7} = {9F75E3B6-4B6B-454C-8260-E38DA86384F7}
+		{C4621AB8-1024-4EE6-8F43-D62326C09FDB} = {C4621AB8-1024-4EE6-8F43-D62326C09FDB}
+		{D53E34CC-47D3-4951-B505-2FDBF5454684} = {D53E34CC-47D3-4951-B505-2FDBF5454684}
+		{D8D75DFB-A2F4-46C2-BB9D-51264B15248D} = {D8D75DFB-A2F4-46C2-BB9D-51264B15248D}
+		{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2} = {07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.IBAutomater", "IBAutomater\QuantConnect.IBAutomater.csproj", "{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.ToolBox", "ToolBox\QuantConnect.ToolBox.csproj", "{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Lean.Launcher", "Launcher\QuantConnect.Lean.Launcher.csproj", "{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A20F5718-765E-4ECE-AFC4-13B63F291970}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A20F5718-765E-4ECE-AFC4-13B63F291970}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A20F5718-765E-4ECE-AFC4-13B63F291970}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A20F5718-765E-4ECE-AFC4-13B63F291970}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF8A230F-0A9E-4330-9573-F5DB90597EF6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F75E3B6-4B6B-454C-8260-E38DA86384F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F75E3B6-4B6B-454C-8260-E38DA86384F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F75E3B6-4B6B-454C-8260-E38DA86384F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F75E3B6-4B6B-454C-8260-E38DA86384F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46627A03-043A-47D2-9D1C-06F1FBF58F2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07C0A1FF-F6CD-4B75-AC8C-A27A9C4DEFD2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D53E34CC-47D3-4951-B505-2FDBF5454684}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D53E34CC-47D3-4951-B505-2FDBF5454684}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D53E34CC-47D3-4951-B505-2FDBF5454684}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D53E34CC-47D3-4951-B505-2FDBF5454684}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8D75DFB-A2F4-46C2-BB9D-51264B15248D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8D75DFB-A2F4-46C2-BB9D-51264B15248D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8D75DFB-A2F4-46C2-BB9D-51264B15248D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8D75DFB-A2F4-46C2-BB9D-51264B15248D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9997EF8-66D0-41E9-A464-DC2751BDAF15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9997EF8-66D0-41E9-A464-DC2751BDAF15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9997EF8-66D0-41E9-A464-DC2751BDAF15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9997EF8-66D0-41E9-A464-DC2751BDAF15}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4621AB8-1024-4EE6-8F43-D62326C09FDB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4621AB8-1024-4EE6-8F43-D62326C09FDB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4621AB8-1024-4EE6-8F43-D62326C09FDB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4621AB8-1024-4EE6-8F43-D62326C09FDB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{81280E52-1474-4971-9B14-BC4A05244837}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{81280E52-1474-4971-9B14-BC4A05244837}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{81280E52-1474-4971-9B14-BC4A05244837}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{81280E52-1474-4971-9B14-BC4A05244837}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F08743D-D43A-4EDD-98CF-6A4A3DACE7DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F08743D-D43A-4EDD-98CF-6A4A3DACE7DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F08743D-D43A-4EDD-98CF-6A4A3DACE7DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F08743D-D43A-4EDD-98CF-6A4A3DACE7DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CC3BE3D-9B52-4938-B2FF-B9B47F7D9214}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED7CEFA4-777F-4A06-83C6-7A9D869048C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9A8EC8F-212C-42EC-B04E-9476508B190A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9A8EC8F-212C-42EC-B04E-9476508B190A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9A8EC8F-212C-42EC-B04E-9476508B190A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9A8EC8F-212C-42EC-B04E-9476508B190A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{062DB22F-1AFB-4FEC-A27F-80F91DAF7754}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C4706EF-FC52-45EC-A6C9-5D99F2AC839F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D80E5741-49D6-4D83-B3ED-6D5F47B88B28}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {09E2F16E-2CA9-443A-8B3B-C8DE74DEB420}
+	EndGlobalSection
+EndGlobal
