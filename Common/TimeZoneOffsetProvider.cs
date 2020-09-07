@@ -61,7 +61,7 @@ namespace QuantConnect
             var zoneIntervals = _timeZone.GetZoneIntervals(start.ToInstant(), end.ToInstant()).ToList();
 
             // short circuit time zones with no discontinuities
-            if (zoneIntervals.Count == 1 && zoneIntervals[0].Start == Instant.MinValue && zoneIntervals[0].End == Instant.MaxValue)
+            if (zoneIntervals.Count == 1 && !zoneIntervals[0].HasStart && !zoneIntervals[0].HasEnd)
             {
                 // end of discontinuities
                 _discontinuities = new Queue<long>();
