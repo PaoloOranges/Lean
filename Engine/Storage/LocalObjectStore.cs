@@ -33,8 +33,6 @@ namespace QuantConnect.Lean.Engine.Storage
     /// </summary>
     public class LocalObjectStore : IObjectStore
     {
-        private static string StorageRoot => Path.GetFullPath(Config.Get("object-store-root", "./storage"));
-
         /// <summary>
         /// No read permissions error message
         /// </summary>
@@ -59,6 +57,7 @@ namespace QuantConnect.Lean.Engine.Storage
 
         private Timer _persistenceTimer;
         private TimeSpan _persistenceInterval;
+        private readonly string _storageRoot = Path.GetFullPath(Config.Get("object-store-root", "./storage"));
         private readonly ConcurrentDictionary<string, byte[]> _storage = new ConcurrentDictionary<string, byte[]>();
 
         /// <summary>
@@ -82,7 +81,7 @@ namespace QuantConnect.Lean.Engine.Storage
         public virtual void Initialize(string algorithmName, int userId, int projectId, string userToken, Controls controls)
         {
             // absolute path including algorithm name
-            AlgorithmStorageRoot = Path.Combine(StorageRoot, algorithmName);
+            AlgorithmStorageRoot = Path.Combine(_storageRoot, algorithmName);
 
             // create the root path if it does not exist
             Directory.CreateDirectory(AlgorithmStorageRoot);
@@ -249,6 +248,19 @@ namespace QuantConnect.Lean.Engine.Storage
             {
                 _dirty = true;
 
+                try
+                {
+                    var path = GetFilePathForKey(key);
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log.Error(exception);
+                }
+
                 // if <= 0 we disable periodic persistence and make it synchronous
                 if (Controls.PersistenceIntervalSeconds <= 0)
                 {
@@ -276,7 +288,7 @@ namespace QuantConnect.Lean.Engine.Storage
             var contents = ReadBytes(key);
 
             // write byte array to storage directory
-            var path = Path.Combine(AlgorithmStorageRoot, $"{key.ToMD5()}.dat");
+            var path = GetFilePathForKey(key);
             File.WriteAllBytes(path, contents);
 
             return path;
@@ -325,6 +337,14 @@ namespace QuantConnect.Lean.Engine.Storage
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        /// <summary>
+        /// Get's the file path for a giving object store key
+        /// </summary>
+        private string GetFilePathForKey(string key)
+        {
+            return Path.Combine(AlgorithmStorageRoot, $"{key.ToMD5()}.dat");
         }
 
         /// <summary>

@@ -22,6 +22,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -29,6 +30,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NodaTime;
+using ProtoBuf;
 using Python.Runtime;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Algorithm.Framework.Portfolio;
@@ -45,6 +47,9 @@ using QuantConnect.Securities;
 using QuantConnect.Util;
 using Timer = System.Timers.Timer;
 using static QuantConnect.StringExtensions;
+using System.Runtime.CompilerServices;
+using QuantConnect.Data.Auxiliary;
+using QuantConnect.Securities.Option;
 
 namespace QuantConnect
 {
@@ -55,6 +60,48 @@ namespace QuantConnect
     {
         private static readonly Dictionary<IntPtr, PythonActivator> PythonActivators
             = new Dictionary<IntPtr, PythonActivator>();
+
+        /// <summary>
+        /// Serialize a list of ticks using protobuf
+        /// </summary>
+        /// <param name="ticks">The list of ticks to serialize</param>
+        /// <returns>The resulting byte array</returns>
+        public static byte[] ProtobufSerialize(this List<Tick> ticks)
+        {
+            using (var stream = new MemoryStream())
+            {
+                Serializer.Serialize(stream, ticks);
+                return stream.ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Serialize a base data instance using protobuf
+        /// </summary>
+        /// <param name="baseData">The data point to serialize</param>
+        /// <returns>The resulting byte array</returns>
+        public static byte[] ProtobufSerialize(this IBaseData baseData)
+        {
+            using (var stream = new MemoryStream())
+            {
+                switch (baseData.DataType)
+                {
+                    case MarketDataType.Tick:
+                        Serializer.SerializeWithLengthPrefix(stream, baseData as Tick, PrefixStyle.Base128, 1);
+                        break;
+                    case MarketDataType.QuoteBar:
+                        Serializer.SerializeWithLengthPrefix(stream, baseData as QuoteBar, PrefixStyle.Base128, 1);
+                        break;
+                    case MarketDataType.TradeBar:
+                        Serializer.SerializeWithLengthPrefix(stream, baseData as TradeBar, PrefixStyle.Base128, 1);
+                        break;
+                    default:
+                        Serializer.SerializeWithLengthPrefix(stream, baseData as BaseData, PrefixStyle.Base128, 1);
+                        break;
+                }
+                return stream.ToArray();
+            }
+        }
 
         /// <summary>
         /// Extension method to get security price is 0 messages for users
@@ -473,7 +520,7 @@ namespace QuantConnect
         /// <summary>
         /// Lazy string to upper implementation.
         /// Will first verify the string is not already upper and avoid
-        /// the call to <see cref="string.ToUpper()"/> if possible.
+        /// the call to <see cref="string.ToUpperInvariant()"/> if possible.
         /// </summary>
         /// <param name="data">The string to upper</param>
         /// <returns>The upper string</returns>
@@ -627,7 +674,15 @@ namespace QuantConnect
         /// as a decimal, then the closest decimal value will be returned</returns>
         public static decimal SafeDecimalCast(this double input)
         {
-            if (input.IsNaNOrZero()) return 0;
+            if (double.IsNaN(input) || double.IsInfinity(input))
+            {
+                throw new ArgumentException(
+                    $"It is not possible to cast a non-finite floating-point value ({input}) as decimal. Please review math operations and verify the result is valid.",
+                    nameof(input),
+                    new NotFiniteNumberException(input)
+                );
+            }
+
             if (input <= (double) decimal.MinValue) return decimal.MinValue;
             if (input >= (double) decimal.MaxValue) return decimal.MaxValue;
             return (decimal) input;
@@ -908,6 +963,7 @@ namespace QuantConnect
         /// <param name="dateTime">Base DateTime object we're rounding down.</param>
         /// <param name="interval">Timespan interval to round to.</param>
         /// <returns>Rounded datetime</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DateTime RoundDown(this DateTime dateTime, TimeSpan interval)
         {
             if (interval == TimeSpan.Zero)
@@ -932,6 +988,7 @@ namespace QuantConnect
         /// <param name="sourceTimeZone">Time zone of the date time</param>
         /// <param name="roundingTimeZone">Time zone in which the rounding is performed</param>
         /// <returns>The rounded date time in the source time zone</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DateTime RoundDownInTimeZone(this DateTime dateTime, TimeSpan roundingInterval, DateTimeZone sourceTimeZone, DateTimeZone roundingTimeZone)
         {
             var dateTimeInRoundingTimeZone = dateTime.ConvertTo(sourceTimeZone, roundingTimeZone);
@@ -2010,6 +2067,16 @@ namespace QuantConnect
         }
 
         /// <summary>
+        /// Convert dictionary to query string
+        /// </summary>
+        /// <param name="pairs"></param>
+        /// <returns></returns>
+        public static string ToQueryString(this IDictionary<string, object> pairs)
+        {
+            return string.Join("&", pairs.Select(pair => $"{pair.Key}={pair.Value}"));
+        }
+
+        /// <summary>
         /// Returns a new string in which specified ending in the current instance is removed.
         /// </summary>
         /// <param name="s">original string value</param>
@@ -2025,6 +2092,251 @@ namespace QuantConnect
             {
                 return s;
             }
+        }
+
+        /// <summary>
+        /// Normalizes the specified price based on the DataNormalizationMode
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static decimal GetNormalizedPrice(this SubscriptionDataConfig config, decimal price)
+        {
+            switch (config.DataNormalizationMode)
+            {
+                case DataNormalizationMode.Raw:
+                    return price;
+
+                // the price scale factor will be set accordingly based on the mode in update scale factors
+                case DataNormalizationMode.Adjusted:
+                case DataNormalizationMode.SplitAdjusted:
+                    return price * config.PriceScaleFactor;
+
+                case DataNormalizationMode.TotalReturn:
+                    return (price * config.PriceScaleFactor) + config.SumOfDividends;
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        /// <summary>
+        /// Scale data based on factor function
+        /// </summary>
+        public static BaseData Scale(this BaseData data, Func<decimal, decimal> factor)
+        {
+            switch (data.DataType)
+            {
+                case MarketDataType.TradeBar:
+                    var tradeBar = data as TradeBar;
+                    if (tradeBar != null)
+                    {
+                        tradeBar.Open = factor(tradeBar.Open);
+                        tradeBar.High = factor(tradeBar.High);
+                        tradeBar.Low = factor(tradeBar.Low);
+                        tradeBar.Close = factor(tradeBar.Close);
+                    }
+                    break;
+                case MarketDataType.Tick:
+                    var securityType = data.Symbol.SecurityType;
+                    if (securityType != SecurityType.Equity &&
+                        securityType != SecurityType.Option &&
+                        securityType != SecurityType.Future)
+                    {
+                        break;
+                    }
+
+                    var tick = data as Tick;
+                    if (tick == null || tick.TickType == TickType.OpenInterest)
+                    {
+                        break;
+                    }
+
+                    if (tick.TickType == TickType.Trade)
+                    {
+                        tick.Value = factor(tick.Value);
+                        break;
+                    }
+
+                    tick.BidPrice = tick.BidPrice != 0 ? factor(tick.BidPrice) : 0;
+                    tick.AskPrice = tick.AskPrice != 0 ? factor(tick.AskPrice) : 0;
+
+                    if (tick.BidPrice == 0)
+                    {
+                        tick.Value = tick.AskPrice;
+                        break;
+                    }
+                    if (tick.AskPrice == 0)
+                    {
+                        tick.Value = tick.BidPrice;
+                        break;
+                    }
+
+                    tick.Value = (tick.BidPrice + tick.AskPrice) / 2m;
+                    break;
+                case MarketDataType.QuoteBar:
+                    var quoteBar = data as QuoteBar;
+                    if (quoteBar != null)
+                    {
+                        if (quoteBar.Ask != null)
+                        {
+                            quoteBar.Ask.Open = factor(quoteBar.Ask.Open);
+                            quoteBar.Ask.High = factor(quoteBar.Ask.High);
+                            quoteBar.Ask.Low = factor(quoteBar.Ask.Low);
+                            quoteBar.Ask.Close = factor(quoteBar.Ask.Close);
+                        }
+                        if (quoteBar.Bid != null)
+                        {
+                            quoteBar.Bid.Open = factor(quoteBar.Bid.Open);
+                            quoteBar.Bid.High = factor(quoteBar.Bid.High);
+                            quoteBar.Bid.Low = factor(quoteBar.Bid.Low);
+                            quoteBar.Bid.Close = factor(quoteBar.Bid.Close);
+                        }
+                        quoteBar.Value = quoteBar.Close;
+                    }
+                    break;
+                case MarketDataType.Auxiliary:
+                case MarketDataType.Base:
+                case MarketDataType.OptionChain:
+                case MarketDataType.FuturesChain:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+            return data;
+        }
+
+        /// <summary>
+        /// Normalize prices based on configuration
+        /// </summary>
+        /// <param name="data">Data to be normalized</param>
+        /// <param name="config">Price scale</param>
+        /// <returns></returns>
+        public static BaseData Normalize(this BaseData data, SubscriptionDataConfig config)
+        {
+            return data?.Scale(p => config.GetNormalizedPrice(p));
+        }
+
+        /// <summary>
+        /// Adjust prices based on price scale
+        /// </summary>
+        /// <param name="data">Data to be adjusted</param>
+        /// <param name="scale">Price scale</param>
+        /// <returns></returns>
+        public static BaseData Adjust(this BaseData data, decimal scale)
+        {
+            return data?.Scale(p => p * scale);
+        }
+
+        /// <summary>
+        /// Returns a hex string of the byte array.
+        /// </summary>
+        /// <param name="source">the byte array to be represented as string</param>
+        /// <returns>A new string containing the items in the enumerable</returns>
+        public static string ToHexString(this byte[] source)
+        {
+            if (source == null || source.Length == 0)
+            {
+                throw new ArgumentException($"Source cannot be null or empty.");
+            }
+
+            var hex = new StringBuilder(source.Length * 2);
+            foreach (var b in source)
+            {
+                hex.AppendFormat(CultureInfo.InvariantCulture, "{0:x2}", b);
+            }
+
+            return hex.ToString();
+        }
+
+        /// <summary>
+        /// Gets the option exercise order direction resulting from the specified <paramref name="right"/> and
+        /// whether or not we wrote the option (<paramref name="isShort"/> is <code>true</code>) or bought to
+        /// option (<paramref name="isShort"/> is <code>false</code>)
+        /// </summary>
+        /// <param name="right">The option right</param>
+        /// <param name="isShort">True if we wrote the option, false if we purchased the option</param>
+        /// <returns>The order direction resulting from an exercised option</returns>
+        public static OrderDirection GetExerciseDirection(this OptionRight right, bool isShort)
+        {
+            switch (right)
+            {
+                case OptionRight.Call:
+                    return isShort ? OrderDirection.Sell : OrderDirection.Buy;
+                default:
+                    return isShort ? OrderDirection.Buy : OrderDirection.Sell;
+            }
+        }
+
+        /// <summary>
+        /// Gets the <see cref="OrderDirection"/> for the specified <paramref name="quantity"/>
+        /// </summary>
+        public static OrderDirection GetOrderDirection(decimal quantity)
+        {
+            var sign = Math.Sign(quantity);
+            switch (sign)
+            {
+                case 1: return OrderDirection.Buy;
+                case 0: return OrderDirection.Hold;
+                case -1: return OrderDirection.Sell;
+                default:
+                    throw new ApplicationException(
+                        $"The skies are falling and the oceans are rising! Math.Sign({quantity}) returned {sign} :/"
+                    );
+            }
+        }
+
+        /// <summary>
+        /// Creates a <see cref="OptionChainUniverse"/> for a given symbol
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance to create universes for</param>
+        /// <param name="symbol">Symbol of the option</param>
+        /// <param name="filter">The option filter to use</param>
+        /// <param name="universeSettings">The universe settings, will use algorithm settings if null</param>
+        /// <returns><see cref="OptionChainUniverse"/> for the given symbol</returns>
+        public static OptionChainUniverse CreateOptionChain(this IAlgorithm algorithm, Symbol symbol, Func<OptionFilterUniverse, OptionFilterUniverse> filter, UniverseSettings universeSettings = null)
+        {
+            if (symbol.SecurityType != SecurityType.Option)
+            {
+                throw new ArgumentException("CreateOptionChain requires an option symbol.");
+            }
+
+            // rewrite non-canonical symbols to be canonical
+            var market = symbol.ID.Market;
+            var underlying = symbol.Underlying;
+            if (!symbol.IsCanonical())
+            {
+                var alias = $"?{underlying.Value}";
+                symbol = Symbol.Create(underlying.Value, SecurityType.Option, market, alias);
+            }
+
+            // resolve defaults if not specified
+            var settings = universeSettings ?? algorithm.UniverseSettings;
+
+            // create canonical security object, but don't duplicate if it already exists
+            Security security;
+            Option optionChain;
+            if (!algorithm.Securities.TryGetValue(symbol, out security))
+            {
+                var config = algorithm.SubscriptionManager.SubscriptionDataConfigService.Add(
+                    typeof(ZipEntryName),
+                    symbol,
+                    settings.Resolution,
+                    settings.FillForward,
+                    settings.ExtendedMarketHours,
+                    false);
+                optionChain = (Option)algorithm.Securities.CreateSecurity(symbol, config, settings.Leverage, false);
+            }
+            else
+            {
+                optionChain = (Option)security;
+            }
+
+            // set the option chain contract filter function
+            optionChain.SetFilter(filter);
+
+            // force option chain security to not be directly tradable AFTER it's configured to ensure it's not overwritten
+            optionChain.IsTradable = false;
+
+            return new OptionChainUniverse(optionChain, settings, algorithm.LiveMode);
         }
     }
 }

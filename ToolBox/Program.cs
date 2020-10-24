@@ -21,6 +21,7 @@ using QuantConnect.Configuration;
 using QuantConnect.ToolBox.AlgoSeekFuturesConverter;
 using QuantConnect.ToolBox.AlgoSeekOptionsConverter;
 using QuantConnect.ToolBox.Benzinga;
+using QuantConnect.ToolBox.BinanceDownloader;
 using QuantConnect.ToolBox.BitfinexDownloader;
 using QuantConnect.ToolBox.CoarseUniverseGenerator;
 using QuantConnect.ToolBox.CoinApiDataConverter;
@@ -38,6 +39,7 @@ using QuantConnect.ToolBox.KaikoDataConverter;
 using QuantConnect.ToolBox.KrakenDownloader;
 using QuantConnect.ToolBox.NseMarketDataConverter;
 using QuantConnect.ToolBox.OandaDownloader;
+using QuantConnect.ToolBox.Polygon;
 using QuantConnect.ToolBox.QuandlBitfinexDownloader;
 using QuantConnect.ToolBox.QuantQuoteConverter;
 using QuantConnect.ToolBox.RandomDataGenerator;
@@ -65,9 +67,7 @@ namespace QuantConnect.ToolBox
             {
                 var fromDate = Parse.DateTimeExact(GetParameterOrExit(optionsObject, "from-date"), "yyyyMMdd-HH:mm:ss");
                 var resolution = optionsObject.ContainsKey("resolution") ? optionsObject["resolution"].ToString() : "";
-                var tickers = optionsObject.ContainsKey("tickers")
-                    ? (optionsObject["tickers"] as Dictionary<string, object>)?.Keys.ToList()
-                    : new List<string>();
+                var tickers = ToolboxArgumentParser.GetTickers(optionsObject);
                 var toDate = optionsObject.ContainsKey("to-date")
                     ? Parse.DateTimeExact(optionsObject["to-date"].ToString(), "yyyyMMdd-HH:mm:ss")
                     : DateTime.UtcNow;
@@ -99,7 +99,7 @@ namespace QuantConnect.ToolBox
                         break;
                     case "iexdl":
                     case "iexdownloader":
-                        IEXDownloaderProgram.IEXDownloader(tickers, resolution, fromDate, toDate, GetParameterOrExit(optionsObject, "api-key"));
+                        IEXDownloaderProgram.IEXDownloader(tickers, resolution, fromDate, toDate);
                         break;
                     case "iqfdl":
                     case "iqfeeddownloader":
@@ -124,6 +124,10 @@ namespace QuantConnect.ToolBox
                     case "bfxdl":
                     case "bitfinexdownloader":
                         BitfinexDownloaderProgram.BitfinexDownloader(tickers, resolution, fromDate, toDate);
+                        break;
+                    case "mbxdl":
+                    case "binancedownloader":
+                        BinanceDownloaderProgram.DataDownloader(tickers, resolution, fromDate, toDate);
                         break;
                     case "secdl":
                     case "secdownloader":
@@ -170,6 +174,30 @@ namespace QuantConnect.ToolBox
                         TradingEconomicsDataDownloader.TradingEconomicsCalendarDownloaderProgram.TradingEconomicsCalendarDownloader();
                         break;
 
+                    case "pdl":
+                    case "polygondownloader":
+                        PolygonDownloaderProgram.PolygonDownloader(
+                            tickers,
+                            GetParameterOrExit(optionsObject, "security-type"),
+                            GetParameterOrExit(optionsObject, "market"),
+                            resolution, 
+                            fromDate, 
+                            toDate);
+                        break;
+
+                    default:
+                        PrintMessageAndExit(1, "ERROR: Unrecognized --app value");
+                        break;
+                }
+            }
+            else if (targetApp.Contains("updater") || targetApp.EndsWith("spu"))
+            {
+                switch (targetApp)
+                {
+                    case "mbxspu":
+                    case "binancesymbolpropertiesupdater":
+                        BinanceDownloaderProgram.ExchangeInfoDownloader();
+                        break;
                     default:
                         PrintMessageAndExit(1, "ERROR: Unrecognized --app value");
                         break;

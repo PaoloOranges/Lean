@@ -55,6 +55,7 @@ namespace QuantConnect.Tests.Common.Storage
             catch
             {
             }
+            Config.Reset();
         }
 
         [TestCase(FileAccess.Read, false)]
@@ -131,6 +132,18 @@ namespace QuantConnect.Tests.Common.Storage
             {
                 Assert.IsFalse(store.Delete("Jose"));
             }
+        }
+
+        [Test]
+        public void GetFilePathAndDelete()
+        {
+            var key = "ILove";
+            _store.SaveString(key, "Pizza");
+            var path = _store.GetFilePath(key);
+
+            Assert.IsTrue(File.Exists(path));
+            _store.Delete(key);
+            Assert.IsFalse(File.Exists(path));
         }
 
         [TestCase(FileAccess.Read, false)]

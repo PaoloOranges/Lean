@@ -27,12 +27,21 @@ using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Logging;
 using QuantConnect.Orders.Fees;
+using QuantConnect.Util;
 
 namespace QuantConnect.Brokerages.GDAX
 {
     public partial class GDAXBrokerage : BaseWebsocketsBrokerage
     {
         private const int MaxDataPointsPerHistoricalRequest = 300;
+
+        // These are the only currencies accepted for fiat deposits
+        private static readonly HashSet<string> FiatCurrencies = new List<string>
+        {
+            Currencies.EUR,
+            Currencies.GBP,
+            Currencies.USD
+        }.ToHashSet();
 
         #region IBrokerage
         /// <summary>
@@ -47,8 +56,6 @@ namespace QuantConnect.Brokerages.GDAX
         /// <returns></returns>
         public override bool PlaceOrder(Order order)
         {
-            LockStream();
-
             var req = new RestRequest("/orders", Method.POST);
 
             dynamic payload = new ExpandoObject();
@@ -104,7 +111,6 @@ namespace QuantConnect.Brokerages.GDAX
                     OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "GDAX Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, (int)response.StatusCode, errorMessage));
 
-                    UnlockStream();
                     return true;
                 }
 
@@ -114,7 +120,6 @@ namespace QuantConnect.Brokerages.GDAX
                     OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "GDAX Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, (int)response.StatusCode, errorMessage));
 
-                    UnlockStream();
                     return true;
                 }
 
@@ -136,7 +141,9 @@ namespace QuantConnect.Brokerages.GDAX
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "GDAX Order Event") { Status = OrderStatus.Submitted });
                 Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
 
-                UnlockStream();
+                _pendingOrders.TryAdd(brokerId, order);
+                _fillMonitorResetEvent.Set();
+
                 return true;
             }
 
@@ -144,7 +151,6 @@ namespace QuantConnect.Brokerages.GDAX
             OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "GDAX Order Event") { Status = OrderStatus.Invalid });
             OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, message));
 
-            UnlockStream();
             return true;
         }
 
@@ -179,6 +185,9 @@ namespace QuantConnect.Brokerages.GDAX
                         DateTime.UtcNow,
                         OrderFee.Zero,
                         "GDAX Order Event") { Status = OrderStatus.Canceled });
+
+                    Order orderRemoved;
+                    _pendingOrders.TryRemove(id, out orderRemoved);
                 }
             }
 
@@ -186,12 +195,24 @@ namespace QuantConnect.Brokerages.GDAX
         }
 
         /// <summary>
+        /// Connects the client to the broker's remote servers
+        /// </summary>
+        public override void Connect()
+        {
+            base.Connect();
+
+            AccountBaseCurrency = GetAccountBaseCurrency();
+        }
+
+        /// <summary>
         /// Closes the websockets connection
         /// </summary>
         public override void Disconnect()
         {
-            base.Disconnect();
-
+            if (!_canceller.IsCancellationRequested)
+            {
+                _canceller.Cancel();
+            }
             WebSocket.Close();
         }
 
@@ -431,10 +452,41 @@ namespace QuantConnect.Brokerages.GDAX
         #endregion
 
         /// <summary>
+        /// Gets the account base currency
+        /// </summary>
+        private string GetAccountBaseCurrency()
+        {
+            var req = new RestRequest("/accounts", Method.GET);
+            GetAuthenticationToken(req);
+            var response = ExecuteRestRequest(req, GdaxEndpointType.Private);
+
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                throw new Exception($"GDAXBrokerage.GetAccountBaseCurrency(): request failed: [{(int)response.StatusCode}] {response.StatusDescription}, Content: {response.Content}, ErrorMessage: {response.ErrorMessage}");
+            }
+
+            foreach (var item in JsonConvert.DeserializeObject<Messages.Account[]>(response.Content))
+            {
+                if (FiatCurrencies.Contains(item.Currency))
+                {
+                    return item.Currency;
+                }
+            }
+
+            return Currencies.USD;
+        }
+
+        /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
         public override void Dispose()
         {
+            _ctsFillMonitor.Cancel();
+            _fillMonitorTask.Wait(TimeSpan.FromSeconds(5));
+
+            _canceller.DisposeSafely();
+            _aggregator.DisposeSafely();
+
             _publicEndpointRateLimiter.Dispose();
             _privateEndpointRateLimiter.Dispose();
         }

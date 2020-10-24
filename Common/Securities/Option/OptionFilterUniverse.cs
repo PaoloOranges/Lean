@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using QuantConnect.Data;
 using System.Linq;
 using System.Collections;
+using Python.Runtime;
 using QuantConnect.Securities.Option;
 
 namespace QuantConnect.Securities
@@ -347,6 +348,17 @@ namespace QuantConnect.Securities
         /// This overrides and and all other methods of selecting symbols assuming it is called last.
         /// </summary>
         /// <param name="contracts">The option contract symbol objects to select</param>
+        public OptionFilterUniverse Contracts(PyObject contracts)
+        {
+            _allSymbols = contracts.ConvertToSymbolEnumerable();
+            return this;
+        }
+
+        /// <summary>
+        /// Explicitly sets the selected contract symbols for this universe.
+        /// This overrides and and all other methods of selecting symbols assuming it is called last.
+        /// </summary>
+        /// <param name="contracts">The option contract symbol objects to select</param>
         public OptionFilterUniverse Contracts(IEnumerable<Symbol> contracts)
         {
             _allSymbols = contracts.ToList();
@@ -441,6 +453,16 @@ namespace QuantConnect.Securities
         public static OptionFilterUniverse SelectMany(this OptionFilterUniverse universe, Func<Symbol, IEnumerable<Symbol>> mapFunc)
         {
             universe._allSymbols = universe._allSymbols.SelectMany(mapFunc).ToList();
+            universe._isDynamic = true;
+            return universe;
+        }
+
+        /// <summary>
+        /// Updates universe to only contain the symbols in the list
+        /// </summary>
+        public static OptionFilterUniverse WhereContains(this OptionFilterUniverse universe, List<Symbol> filterList)
+        {
+            universe._allSymbols = universe._allSymbols.Where(filterList.Contains).ToList();
             universe._isDynamic = true;
             return universe;
         }

@@ -258,7 +258,7 @@ namespace QuantConnect.Tests.Common.Securities
          TestCase("AUD", "GBP", "USD", "GBPAUD", "AUDUSD", SecurityType.Forex, Market.FXCM),
          TestCase("AUD", "JPY", "EUR", "AUDJPY", "EURAUD", SecurityType.Forex, Market.FXCM),
          TestCase("CHF", "JPY", "EUR", "CHFJPY", "EURCHF", SecurityType.Forex, Market.FXCM),
-         TestCase("SGD", "JPY", "EUR", "SGDJPY", "EURSGD", SecurityType.Forex, Market.FXCM),
+         TestCase("SGD", "JPY", "EUR", "SGDJPY", "EURSGD", SecurityType.Forex, Market.Oanda),
          TestCase("BTC", "USD", "EUR", "BTCUSD", "BTCEUR", SecurityType.Crypto, Market.Bitfinex),
          TestCase("EUR", "BTC", "ETH", "BTCEUR", "ETHEUR", SecurityType.Crypto, Market.Bitfinex),
          TestCase("USD", "BTC", "ETH", "BTCUSD", "ETHUSD", SecurityType.Crypto, Market.Bitfinex),
@@ -582,6 +582,23 @@ namespace QuantConnect.Tests.Common.Securities
             book.EnsureCurrencyDataFeeds(securities, subscriptions, MarketMap, SecurityChanges.None, dataManager.SecurityService);
 
             Assert.DoesNotThrow(() => JsonConvert.SerializeObject(book, Formatting.Indented));
+        }
+
+        [Test]
+        public void EnsureCurrencyDataFeedDoesNothingWithUnsupportedCurrency()
+        {
+            var book = new CashBook
+            {
+                {Currencies.USD, new Cash(Currencies.USD, 100, 1) },
+                {"ILS", new Cash("ILS", 0, 0.3m) }
+            };
+            var subscriptions = new SubscriptionManager();
+            var dataManager = new DataManagerStub(TimeKeeper);
+            subscriptions.SetDataManager(dataManager);
+            var securities = new SecurityManager(TimeKeeper);
+
+            var added = book.EnsureCurrencyDataFeeds(securities, subscriptions, MarketMap, SecurityChanges.None, dataManager.SecurityService);
+            Assert.IsEmpty(added);
         }
 
         private static TimeKeeper TimeKeeper

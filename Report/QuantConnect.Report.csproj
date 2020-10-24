@@ -35,6 +35,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>QuantConnect.Report.Program</StartupObject>
@@ -124,6 +125,7 @@
     <Compile Include="NullResultValueTypeJsonConverter.cs" />
     <Compile Include="PortfolioLooper\MockDataFeed.cs" />
     <Compile Include="PortfolioLooper\PortfolioLooperAlgorithm.cs" />
+    <Compile Include="ReportElements\DaysLiveReportElement.cs" />
     <Compile Include="ResultsUtil.cs" />
     <Compile Include="Metrics.cs" />
     <Compile Include="Rolling.cs" />

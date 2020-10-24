@@ -28,7 +28,7 @@
   // engine
   "data-folder": "../../../Data/",
 
-  // debugging configuration
+  // debugging configuration - options for debugging-method LocalCmdLine, VisualStudio, PTVSD, PyCharm
   "debugging": false,
   "debugging-method": "LocalCmdline",
 
@@ -44,6 +44,7 @@
   "alpha-handler": "QuantConnect.Lean.Engine.Alphas.DefaultAlphaHandler",
   "data-channel-provider": "DataChannelProvider",
   "object-store": "QuantConnect.Lean.Engine.Storage.LocalObjectStore",
+  "data-aggregator": "QuantConnect.Lean.Engine.DataFeeds.AggregationManager",
 
   // limits on number of symbols to allow
   "symbol-minute-limit": 10000,
@@ -78,6 +79,7 @@
   "ib-tws-dir": "C:\\Jts",
   "ib-trading-mode": "paper",
   "ib-enable-delayed-streaming-data": false,
+  "ib-version": "974",
 
   // tradier configuration
   "tradier-account-id": "",
@@ -100,6 +102,7 @@
   "fxcm-account-id": "",
 
   // iqfeed configuration
+  "iqfeed-host": "127.0.0.1",
   "iqfeed-username": "",
   "iqfeed-password": "",
   "iqfeed-productName": "",
@@ -114,6 +117,10 @@
   "bitfinex-api-secret": "",
   "bitfinex-api-key": "",
 
+    // binance configuration
+  "binance-api-secret": "",
+  "binance-api-key": "",
+
   // Required to access data from Quandl
   // To get your access token go to https://www.quandl.com/account/api
   "quandl-auth-token": "",
@@ -126,11 +133,18 @@
   // To get your access token go to https://www.eia.gov/opendata
   "us-energy-information-auth-token": "",
 
+  // Required for IEX history requests
+  "iex-cloud-api-key": "",
+
   // alpaca configuration
   // available trading mode: 'paper', 'live'
   "alpaca-key-id": "",
   "alpaca-secret-key": "",
   "alpaca-trading-mode": "paper",
+
+  // Required for streaming Polygon.io data
+  // To get your access token go to https://polygon.io
+  "polygon-api-key": "",
 
   // parameters to set in the algorithm (the below are just samples)
   "parameters": {
@@ -286,6 +300,20 @@
       // real brokerage implementations require the BrokerageTransactionHandler
       "live-mode-brokerage": "BitfinexBrokerage",
       "data-queue-handler": "BitfinexBrokerage",
+      "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
+      "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
+      "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
+      "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "history-provider": "BrokerageHistoryProvider"
+    },
+
+    "live-binance": {
+      "live-mode": true,
+
+      // real brokerage implementations require the BrokerageTransactionHandler
+      "live-mode-brokerage": "BinanceBrokerage",
+      "data-queue-handler": "BinanceBrokerage",
       "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
       "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
       "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
