@@ -60,19 +60,24 @@ namespace QuantConnect.Algorithm.CSharp
         {
             Resolution resolution = Resolution.Minute;
 
-            SetStartDate(2020, 12, 11); // Set Start Date
+            SetStartDate(2020, 12, 1); // Set Start Date
             SetEndDate(2020, 12, 12); // Set End Date
 
             SetCash(CashName, 300);
 
             SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
+            SetTimeZone(NodaTime.DateTimeZone.Utc);
 
             // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
 
-            _fast = EMA(_symbol, 15, resolution);
-            _slow = EMA(_symbol, 45, resolution);
-            _macd = MACD(_symbol, 10, 45, 15, MovingAverageType.Exponential, resolution);
+            const int fastValue = 30;
+            const int slowValue = 90;
+            const int signal = 30;
+
+            _fast = EMA(_symbol, fastValue, resolution);
+            _slow = EMA(_symbol, slowValue, resolution);
+            _macd = MACD(_symbol, fastValue, slowValue, signal, MovingAverageType.Exponential, resolution);
 
             _min_max_macd = new MinMaxMACD(15);
 
@@ -80,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             _isReadyToTrade = false;
 
-            SetWarmUp(120);
+            SetWarmUp(240);
         }
 
         /// <summary>
@@ -164,7 +169,7 @@ namespace QuantConnect.Algorithm.CSharp
             //}
             //else
             {
-                bool is_price_ok = current_price > 1.05m * _price_bought;
+                bool is_price_ok = current_price > 1.01m * _price_bought;
                 return /*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok;
             }
         }
