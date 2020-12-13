@@ -328,7 +328,7 @@ namespace QuantConnect.Lean.Engine
                 {
                     _algorithm.Status = AlgorithmStatus.RuntimeError;
                     Log.Trace($"AlgorithmManager.Run(): Algorithm encountered a runtime error at {timeSlice.Time.ToStringInvariant()}. Error: {algorithm.RunTimeError}");
-                    break;
+                    return;
                 }
 
                 // perform margin calls, in live mode we can also use realtime to emit these
@@ -499,6 +499,7 @@ namespace QuantConnect.Lean.Engine
                         var timeKeeper = algorithm.TimeKeeper;
                         foreach (var update in timeSlice.ConsolidatorUpdateData)
                         {
+                            var localTime = timeKeeper.GetLocalTimeKeeper(update.Target.ExchangeTimeZone).LocalTime;
                             var consolidators = update.Target.Consolidators;
                             foreach (var consolidator in consolidators)
                             {
@@ -512,7 +513,7 @@ namespace QuantConnect.Lean.Engine
                                 }
 
                                 // scan for time after we've pumped all the data through for this consolidator
-                                consolidator.Scan(timeKeeper.GetLocalTimeKeeper(update.Target.ExchangeTimeZone).LocalTime);
+                                consolidator.Scan(localTime);
                             }
                         }
                     }
@@ -586,16 +587,6 @@ namespace QuantConnect.Lean.Engine
                 //After we've fired all other events in this second, fire the pricing events:
                 try
                 {
-
-                    // TODO: For backwards compatibility only. Remove in 2017
-                    // For compatibility with Forex Trade data, moving
-                    if (timeSlice.Slice.QuoteBars.Count > 0)
-                    {
-                        foreach (var tradeBar in timeSlice.Slice.QuoteBars.Where(x => x.Key.ID.SecurityType == SecurityType.Forex))
-                        {
-                            timeSlice.Slice.Bars.Add(tradeBar.Value.Collapse());
-                        }
-                    }
                     if (hasOnDataTradeBars && timeSlice.Slice.Bars.Count > 0) methodInvokers[typeof(TradeBars)](algorithm, timeSlice.Slice.Bars);
                     if (hasOnDataQuoteBars && timeSlice.Slice.QuoteBars.Count > 0) methodInvokers[typeof(QuoteBars)](algorithm, timeSlice.Slice.QuoteBars);
                     if (hasOnDataOptionChains && timeSlice.Slice.OptionChains.Count > 0) methodInvokers[typeof(OptionChains)](algorithm, timeSlice.Slice.OptionChains);
@@ -1039,26 +1030,33 @@ namespace QuantConnect.Lean.Engine
         {
             for (var i = delistings.Count - 1; i >= 0; i--)
             {
-                // check if we are holding position
-                var security = algorithm.Securities[delistings[i].Symbol];
+                var delisting = delistings[i];
+                var security = algorithm.Securities[delisting.Symbol];
                 if (security.Holdings.Quantity == 0)
                 {
                     continue;
                 }
 
-                // check if the time has come for delisting
-                var delistingTime = delistings[i].Time;
-                var nextMarketOpen = security.Exchange.Hours.GetNextMarketOpen(delistingTime, false);
-                var nextMarketClose = security.Exchange.Hours.GetNextMarketClose(nextMarketOpen, false);
+                var delistingTime = delisting.Time;
+                if (!security.Exchange.Hours.IsOpen(delistingTime, false))
+                {
+                    // This exists as a defensive measure to ensure that the delisting time
+                    // does not get moved if the market is open. If the market is closed,
+                    // we get the next market open, which will be on the same day if the delisting
+                    // date is a trading day. If the delisting date is after market close, then
+                    // the delisting will be adjusted to the next market open.
+                    delistingTime = security.Exchange.Hours.GetNextMarketOpen(delistingTime, false);
+                    delistingTime = security.Exchange.Hours.GetNextMarketClose(delistingTime, false);
+                }
 
-                if (security.LocalTime < nextMarketClose)
+                if (security.LocalTime < delistingTime)
                 {
                     continue;
                 }
 
                 var orderType = OrderType.Market;
                 var tag = "Liquidate from delisting";
-                if (security.Type == SecurityType.Option)
+                if (security.Type == SecurityType.Option || security.Type == SecurityType.FutureOption)
                 {
                     // tx handler will determine auto exercise/assignment
                     tag = "Option Expired";
@@ -1147,7 +1145,7 @@ namespace QuantConnect.Lean.Engine
 
                 // fetch all option derivatives of the underlying with holdings (excluding the canonical security)
                 var derivatives = algorithm.Securities.Where(kvp => kvp.Key.HasUnderlying &&
-                    kvp.Key.SecurityType == SecurityType.Option &&
+                    (kvp.Key.SecurityType == SecurityType.Option || kvp.Key.SecurityType == SecurityType.FutureOption) &&
                     kvp.Key.Underlying == security.Symbol &&
                     !kvp.Key.Underlying.IsCanonical() &&
                     kvp.Value.HoldStock
@@ -1172,7 +1170,7 @@ namespace QuantConnect.Lean.Engine
                     // mark option contract as not tradable
                     optionContractSecurity.IsTradable = false;
 
-                    algorithm.Debug($"MarktetOnClose order submitted for option contract '{optionContractSymbol}' due to impending {split.Symbol.Value} split event. "
+                    algorithm.Debug($"MarketOnClose order submitted for option contract '{optionContractSymbol}' due to impending {split.Symbol.Value} split event. "
                         + "Option splits are not currently supported.");
                 }
 

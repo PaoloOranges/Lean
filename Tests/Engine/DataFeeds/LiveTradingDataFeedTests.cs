@@ -424,8 +424,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 }
                 else
                 {
-                    // should of remove trade and quote bar subscription and split/dividend for each
-                    Assert.AreEqual(currentSubscriptionCount - 6, _dataQueueHandler.SubscriptionDataConfigs.Count);
+                    // should of remove trade and quote bar subscription and split/dividend for trade bar
+                    Assert.AreEqual(currentSubscriptionCount - 4, _dataQueueHandler.SubscriptionDataConfigs.Count);
                     // internal subscription should still be there
                     Assert.AreEqual(0, _dataQueueHandler.SubscriptionDataConfigs
                         .Where(config => !config.IsInternalFeed)
@@ -471,8 +471,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 }
                 else
                 {
-                    // should of remove trade and quote bar subscription and split/dividend for each
-                    Assert.AreEqual(currentSubscriptionCount - 6, _dataQueueHandler.SubscriptionDataConfigs.Count);
+                    // should of remove trade and quote bar subscription and split/dividend for trade bar
+                    Assert.AreEqual(currentSubscriptionCount - 4, _dataQueueHandler.SubscriptionDataConfigs.Count);
                     // internal subscription should still be there
                     Assert.AreEqual(0, _dataQueueHandler.SubscriptionDataConfigs
                         .Where(config => !config.IsInternalFeed)
@@ -1923,7 +1923,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 },
 
                 // LookupSymbols
-                (lookupName, secType, includeExpired, securityCurrency, securityExchange) =>
+                (symbol, includeExpired, securityCurrency) =>
                 {
                     lookupCount++;
 
@@ -1941,7 +1941,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
 
                     time = utcTime.ConvertFromUtc(exchangeTimeZone);
 
-                    switch (secType)
+                    switch (symbol.SecurityType)
                     {
                         case SecurityType.Option:
                             return time.Day == 19
@@ -2023,7 +2023,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             else if (securityType == SecurityType.Future)
             {
                 var future = algorithm.AddFuture(Futures.Indices.SP500EMini, Resolution.Minute);
-                future.SetFilter(x => x);
+                // Must include weeklys because the contracts returned by the lookup, futureSymbol1 & futureSymbol2, are non-standard
+                future.SetFilter(x => x.IncludeWeeklys());
                 exchangeTimeZone = future.Exchange.TimeZone;
             }
             else

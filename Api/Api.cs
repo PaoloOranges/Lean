@@ -16,11 +16,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using QuantConnect.Interfaces;
+using QuantConnect.Logging;
 using QuantConnect.Orders;
 using RestSharp;
 using RestSharp.Extensions;
@@ -384,9 +384,15 @@ namespace QuantConnect.Api
                 backtestName
             }), ParameterType.RequestBody);
 
-            Backtest result;
+            BacktestResponseWrapper result;
             ApiConnection.TryRequest(request, out result);
-            return result;
+
+            // Use API Response values for Backtest Values
+            result.Backtest.Success = result.Success;
+            result.Backtest.Errors = result.Errors;
+
+            // Return only the backtest object
+            return result.Backtest;
         }
 
         /// <summary>
@@ -409,9 +415,58 @@ namespace QuantConnect.Api
                 backtestId
             }), ParameterType.RequestBody);
 
-            Backtest result;
+            BacktestResponseWrapper result;
             ApiConnection.TryRequest(request, out result);
-            return result;
+
+            // Go fetch the charts if the backtest is completed
+            if (result.Backtest.Completed)
+            {
+                // For storing our collected charts
+                var updatedCharts = new Dictionary<string, Chart>();
+
+                // Create backtest requests for each chart that is empty
+                foreach (var chart in result.Backtest.Charts)
+                {
+                    if (!chart.Value.Series.IsNullOrEmpty())
+                    {
+                        continue;
+                    }
+
+                    var chartRequest = new RestRequest("backtests/read", Method.POST)
+                    {
+                        RequestFormat = DataFormat.Json
+                    };
+
+                    chartRequest.AddParameter("application/json", JsonConvert.SerializeObject(new
+                    {
+                        projectId,
+                        backtestId,
+                        chart = chart.Key.Replace(' ', '+')
+                    }), ParameterType.RequestBody);
+
+                    BacktestResponseWrapper chartResponse;
+                    ApiConnection.TryRequest(chartRequest, out chartResponse);
+
+                    // Add this chart to our updated collection
+                    if (chartResponse.Success)
+                    {
+                        updatedCharts.Add(chart.Key, chartResponse.Backtest.Charts[chart.Key]);
+                    }
+                }
+
+                // Update our result
+                foreach(var updatedChart in updatedCharts)
+                {
+                    result.Backtest.Charts[updatedChart.Key] = updatedChart.Value;
+                }
+            }
+
+            // Use API Response values for Backtest Values
+            result.Backtest.Success = result.Success;
+            result.Backtest.Errors = result.Errors;
+
+            // Return only the backtest object
+            return result.Backtest;
         }
 
         /// <summary>
@@ -762,8 +817,17 @@ namespace QuantConnect.Api
             var uri     = new Uri(link.DataLink);
             var client  = new RestClient(uri.Scheme + "://" + uri.Host);
             var request = new RestRequest(uri.PathAndQuery, Method.GET);
-            client.DownloadData(request).SaveAs(path);
 
+            // If the response is not a zip then it is not data, don't write it.
+            var response = client.Execute(request);
+            if (response.ContentType != "application/zip")
+            {
+                var message = JObject.Parse(response.Content)["message"].Value<string>();
+                Log.Error($"Api.DownloadData(): Failed to download zip for {symbol} {resolution} data for date {date}, Api response: {message}");
+                return false;
+            }
+            
+            response.RawBytes.SaveAs(path);
             return true;
         }
 
@@ -996,6 +1060,27 @@ namespace QuantConnect.Api
             RestResponse result;
             ApiConnection.TryRequest(request, out result);
             return result;
+        }
+
+        /// <summary>
+        /// Will read the organization account status
+        /// </summary>
+        /// <param name="organizationId">The target organization id, if null will return default organization</param>
+        public Account ReadAccount(string organizationId = null)
+        {
+            var request = new RestRequest("account/read/", Method.POST)
+            {
+                RequestFormat = DataFormat.Json
+            };
+
+            if (organizationId != null)
+            {
+                request.AddParameter("application/json", JsonConvert.SerializeObject(new { organizationId }), ParameterType.RequestBody);
+            }
+
+            Account account;
+            ApiConnection.TryRequest(request, out account);
+            return account;
         }
     }
 }

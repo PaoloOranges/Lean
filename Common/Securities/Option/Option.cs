@@ -24,6 +24,7 @@ using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using System.Collections.Generic;
 using QuantConnect.Orders;
+using QuantConnect.Securities.Interfaces;
 
 namespace QuantConnect.Securities.Option
 {
@@ -127,6 +128,57 @@ namespace QuantConnect.Securities.Option
             PriceModel = new CurrentPriceOptionPriceModel();
             Holdings = new OptionHolding(this, currencyConverter);
             _symbolProperties = symbolProperties;
+            SetFilter(-1, 1, TimeSpan.Zero, TimeSpan.FromDays(35));
+        }
+
+        /// <summary>
+        /// Creates instance of the Option class.
+        /// </summary>
+        /// <remarks>
+        /// Allows for the forwarding of the security configuration to the
+        /// base Security constructor
+        /// </remarks>
+        protected Option(Symbol symbol,
+            Cash quoteCurrency,
+            SymbolProperties symbolProperties,
+            SecurityExchange exchange,
+            SecurityCache cache,
+            ISecurityPortfolioModel portfolioModel,
+            IFillModel fillModel,
+            IFeeModel feeModel,
+            ISlippageModel slippageModel,
+            ISettlementModel settlementModel,
+            IVolatilityModel volatilityModel,
+            IBuyingPowerModel buyingPowerModel,
+            ISecurityDataFilter dataFilter,
+            IPriceVariationModel priceVariationModel,
+            ICurrencyConverter currencyConverter,
+            IRegisteredSecurityDataTypesProvider registeredTypesProvider
+        ) : base(
+            symbol,
+            quoteCurrency,
+            symbolProperties,
+            exchange,
+            cache,
+            portfolioModel,
+            fillModel,
+            feeModel,
+            slippageModel,
+            settlementModel,
+            volatilityModel,
+            buyingPowerModel,
+            dataFilter,
+            priceVariationModel,
+            currencyConverter,
+            registeredTypesProvider
+        )
+        {
+            ExerciseSettlement = SettlementType.PhysicalDelivery;
+            SetDataNormalizationMode(DataNormalizationMode.Raw);
+            OptionExerciseModel = new DefaultExerciseModel();
+            PriceModel = new CurrentPriceOptionPriceModel();
+            Holdings = new OptionHolding(this, currencyConverter);
+            _symbolProperties = (OptionSymbolProperties)symbolProperties;
             SetFilter(-1, 1, TimeSpan.Zero, TimeSpan.FromDays(35));
         }
 
@@ -458,7 +510,7 @@ namespace QuantConnect.Securities.Option
             {
                 var optionUniverse = universe as OptionFilterUniverse;
                 var result = universeFunc(optionUniverse);
-                return result.ApplyOptionTypesFilter();
+                return result.ApplyTypesFilter();
             });
         }
 
@@ -496,7 +548,7 @@ namespace QuantConnect.Securities.Option
                             $"filter function is not a valid argument, please return either a OptionFilterUniverse or a list of symbols");
                     }
                 }
-                return optionUniverse.ApplyOptionTypesFilter();
+                return optionUniverse.ApplyTypesFilter();
             });
         }
 
