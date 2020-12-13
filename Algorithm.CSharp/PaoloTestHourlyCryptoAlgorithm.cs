@@ -51,15 +51,16 @@ namespace QuantConnect.Algorithm.CSharp
 
         private Symbol _symbol = null;
 
+        private decimal _sold_price = Decimal.MaxValue;
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
         public override void Initialize()
         {
-            Resolution resolution = Resolution.Hour;
+            Resolution resolution = Resolution.Minute;
 
-            SetStartDate(2019, 2, 8); // Set Start Date
-            SetEndDate(2020, 3, 30); // Set End Date
+            SetStartDate(2020, 9, 1); // Set Start Date
+            SetEndDate(2020, 9, 30); // Set End Date
 
             SetCash(CashName, 300);
 
@@ -100,8 +101,34 @@ namespace QuantConnect.Algorithm.CSharp
                 return;
             }
 
-            OnDataHourly(data);
+            OnDataDummy(data);
+            //OnDataHourly(data);
 
+        }
+
+        private void OnDataDummy(Slice data)
+        {
+            if (_bought < 0)
+            {
+                decimal btcPrice = Securities[SymbolName].Price;
+                if (btcPrice < 0.95m * _sold_price)
+                {
+                    decimal quantity = Math.Truncate(1000m * Portfolio.CashBook[CashName].Amount / btcPrice) / 1000m;
+
+                    Buy(_symbol, quantity);
+                }
+            }
+            else if (_bought > 0)
+            {
+                decimal holding_value = Portfolio[SymbolName].Price;
+                decimal current_price = data[SymbolName].Value;
+
+                bool is_price_ok = current_price > 1.1m * _price_bought;
+                if (is_price_ok)
+                {
+                    Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
+                }
+            }
         }
 
         private void OnDataHourly(Slice data)
@@ -116,7 +143,7 @@ namespace QuantConnect.Algorithm.CSharp
                 if (is_adx_ok && is_macd_ok && is_moving_averages_ok)
                 {
                     decimal btcPrice = Securities[SymbolName].Price;
-                    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / btcPrice, 2);
+                    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / btcPrice, 3, MidpointRounding.ToEven);
                     var order = Buy(_symbol, quantity);
                     _max_macd = Decimal.MinValue;
                     _max_adx = Decimal.MinValue;
@@ -142,7 +169,7 @@ namespace QuantConnect.Algorithm.CSharp
                 //}
                 //else
                 {
-                    bool is_price_ok = _price_bought < current_price;
+                    bool is_price_ok = current_price > 1.1m * _price_bought;
                     if (is_adx_ok && is_macd_ok && is_moving_averages_ok && is_price_ok)
                     {
                         Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
@@ -164,6 +191,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
             {
                 _bought = -1;
+                _sold_price = orderEvent.FillPrice;
             }
 
             if (orderEvent.Status == OrderStatus.Invalid)
@@ -172,6 +200,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
 
             if (orderEvent.Status == OrderStatus.Submitted)
+            
             {
                 _bought = 0;
             }

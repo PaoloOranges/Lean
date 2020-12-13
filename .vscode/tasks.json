@@ -106,6 +106,26 @@
             "options": {
                 "cwd": "${workspaceFolder}/Launcher/bin/Debug/"
             }
+        },
+        {
+            "label": "Get Data from GDAX",
+            "type": "process",
+            "command": "QuantConnect.ToolBox.exe",
+            "args" : [
+                "--app",
+                "GDAXDownloader",
+                "--tickers",
+                "BTC-USD",
+                "--resolution",
+                "Minute",
+                "--from-date",
+                "20201210-00:00:00",
+                "--to-date",
+                "20201212-23:59:59"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/Launcher/bin/Debug/"
+            }
         }
     ]
 }
