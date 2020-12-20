@@ -60,7 +60,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             Resolution resolution = Resolution.Minute;
 
-            SetStartDate(2020, 12, 1); // Set Start Date
+            SetStartDate(2020, 11, 1); // Set Start Date
             SetEndDate(2020, 12, 12); // Set End Date
 
             SetCash(CashName, 300);
@@ -85,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             _isReadyToTrade = false;
 
-            SetWarmUp(240);
+            SetWarmUp(30);
         }
 
         /// <summary>
@@ -117,6 +117,7 @@ namespace QuantConnect.Algorithm.CSharp
                 OnPrepareToTrade(data);
             }
 
+            Plot("A", "B", data[SymbolName].Value);
         }
 
         private void OnProcessData(Slice data)
