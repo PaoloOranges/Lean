@@ -37,7 +37,7 @@ namespace QuantConnect.Brokerages.Bitfinex
     /// </summary>
     public partial class BitfinexBrokerage : BaseWebsocketsBrokerage, IDataQueueHandler
     {
-        private readonly BitfinexSymbolMapper _symbolMapper = new BitfinexSymbolMapper();
+        private readonly SymbolPropertiesDatabaseSymbolMapper _symbolMapper = new SymbolPropertiesDatabaseSymbolMapper(Market.Bitfinex);
 
         #region IBrokerage
         /// <summary>
@@ -149,8 +149,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         public override void Disconnect()
         {
-            base.Disconnect();
-
             WebSocket.Close();
         }
 
@@ -203,7 +201,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                 order.Quantity = item.Amount;
                 order.BrokerId = new List<string> { item.Id.ToStringInvariant() };
-                order.Symbol = _symbolMapper.GetLeanSymbol(item.Symbol);
+                order.Symbol = _symbolMapper.GetLeanSymbol(item.Symbol, SecurityType.Crypto, Market.Bitfinex);
                 order.Time = Time.UnixMillisecondTimeStampToDateTime(item.MtsCreate);
                 order.Status = ConvertOrderStatus(item);
                 order.Price = item.Price;
@@ -282,7 +280,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 if (item.Balance > 0)
                 {
-                    list.Add(new CashAmount(item.Balance, item.Currency.ToUpperInvariant()));
+                    list.Add(new CashAmount(item.Balance, GetLeanCurrency(item.Currency)));
                 }
             }
 
@@ -427,7 +425,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         #endregion
 
         #region IDataQueueHandler
-        
+
         /// <summary>
         /// Sets the job we're subscribing for
         /// </summary>
@@ -444,8 +442,15 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns>The new enumerator for this subscription request</returns>
         public IEnumerator<BaseData> Subscribe(SubscriptionDataConfig dataConfig, EventHandler newDataAvailableHandler)
         {
+            var symbol = dataConfig.Symbol;
+            if (symbol.Value.Contains("UNIVERSE") ||
+                !_symbolMapper.IsKnownLeanSymbol(symbol))
+            {
+                return Enumerable.Empty<BaseData>().GetEnumerator();
+            }
+
             var enumerator = _aggregator.Add(dataConfig, newDataAvailableHandler);
-            Subscribe(new[] { dataConfig.Symbol });
+            SubscriptionManager.Subscribe(dataConfig);
 
             return enumerator;
         }
@@ -456,7 +461,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <param name="dataConfig">Subscription config to be removed</param>
         public void Unsubscribe(SubscriptionDataConfig dataConfig)
         {
-            Unsubscribe(new[] { dataConfig.Symbol });
+            SubscriptionManager.Unsubscribe(dataConfig);
             _aggregator.Remove(dataConfig);
         }
 
