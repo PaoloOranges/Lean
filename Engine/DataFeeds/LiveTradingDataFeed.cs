@@ -239,7 +239,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     EventHandler handler = (sender, args) => subscription?.OnNewDataAvailable();
                     enumerator = _dataQueueHandler.Subscribe(request.Configuration, handler);
 
-                    if (request.Configuration.Symbol.SecurityType == SecurityType.Equity && !request.Configuration.IsInternalFeed)
+                    if (request.Configuration.SecurityType == SecurityType.Equity && CorporateEventEnumeratorFactory.ShouldEmitAuxiliaryBaseData(request.Configuration))
                     {
                         var dividends = _dataQueueHandler.Subscribe(new SubscriptionDataConfig(request.Configuration, typeof(Dividend)), handler);
                         var splits = _dataQueueHandler.Subscribe(new SubscriptionDataConfig(request.Configuration, typeof(Split)), handler);
@@ -319,7 +319,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 // If lean is started today it will trigger initial coarse universe selection
                 var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider,
                     // we adjust time to the previous tradable date
-                    time => Time.GetStartTimeForTradeBars(request.Security.Exchange.Hours, time, Time.OneDay, 1, false)
+                    time => Time.GetStartTimeForTradeBars(request.Security.Exchange.Hours, time, Time.OneDay, 1, false, config.DataTimeZone)
                 );
                 var enumeratorStack = factory.CreateEnumerator(request, _dataProvider);
 
