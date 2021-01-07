@@ -60,8 +60,8 @@ namespace QuantConnect.Algorithm.CSharp
         {
             Resolution resolution = Resolution.Minute;
 
-            SetStartDate(2020, 11, 1); // Set Start Date
-            SetEndDate(2020, 12, 12); // Set End Date
+            SetStartDate(2020, 12, 12); // Set Start Date
+            SetEndDate(2020, 12, 18); // Set End Date
 
             SetCash(CashName, 300);
 
@@ -88,6 +88,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetWarmUp(30);
         }
 
+        private DateTime UtcTimeLast;
         /// <summary>
         /// OnData event is the primary entry point for your algorithm. Each new data point will be pumped in here.
         /// </summary>
@@ -117,7 +118,14 @@ namespace QuantConnect.Algorithm.CSharp
                 OnPrepareToTrade(data);
             }
 
-            Plot("A", "B", data[SymbolName].Value);
+            DateTime UtcTimeNow = UtcTime;
+            if((UtcTimeNow - UtcTimeLast).TotalSeconds > 60)
+            {
+                System.Console.WriteLine("WrongTime!");
+            }
+            UtcTimeLast = UtcTimeNow;
+
+            Plot("USDBTC", "Price", data[SymbolName].Value);
         }
 
         private void OnProcessData(Slice data)
@@ -143,8 +151,13 @@ namespace QuantConnect.Algorithm.CSharp
                     Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
                 }
             }
+
+            Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
+            Plot("Indicators", "FastMA", _fast);
+            Plot("Indicators", "SlowMA", _slow);
+
         }
-        
+
         private void OnPrepareToTrade(Slice data)
         {
             if (IsOkToSell(data))
