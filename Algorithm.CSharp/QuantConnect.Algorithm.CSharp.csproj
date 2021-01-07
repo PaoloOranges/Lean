@@ -142,6 +142,7 @@
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="AddAlphaModelAlgorithm.cs" />
+    <Compile Include="FillForwardEnumeratorOutOfOrderBarRegressionAlgorithm.cs" />
     <Compile Include="CustomBuyingPowerModelAlgorithm.cs" />
     <Compile Include="AddFutureOptionContractDataStreamingRegressionAlgorithm.cs" />
     <Compile Include="AddFutureOptionSingleOptionChainSelectedInUniverseFilterRegressionAlgorithm.cs" />
@@ -159,6 +160,8 @@
     <Compile Include="FutureOptionShortCallOTMExpiryRegressionAlgorithm.cs" />
     <Compile Include="FutureOptionShortPutOTMExpiryRegressionAlgorithm.cs" />
     <Compile Include="FutureOptionShortPutITMExpiryRegressionAlgorithm.cs" />
+    <Compile Include="OptionChainSubscriptionRemovalRegressionAlgorithm.cs" />
+    <Compile Include="OptionChainUniverseRemovalRegressionAlgorithm.cs" />
     <Compile Include="PaoloFastMinuteCryptoAlgorithm.cs" />
     <Compile Include="ScaledFillForwardDataRegressionAlgorithm.cs" />
     <Compile Include="DailyHistoryForDailyResolutionRegressionAlgorithm.cs" />
