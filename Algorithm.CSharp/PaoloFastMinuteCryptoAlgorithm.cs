@@ -103,7 +103,7 @@ namespace QuantConnect.Algorithm.CSharp
         public override void OnData(Slice data)
         {
             if (Portfolio.CashBook["USD"].ConversionRate == 0
-                || Portfolio.CashBook["BTC"].ConversionRate == 0)
+                || Portfolio.CashBook[CryptoName].ConversionRate == 0)
             {
                 Log($"{CashName} conversion rate: {Portfolio.CashBook[CashName].ConversionRate}");
                 Log($"{CryptoName} conversion rate: {Portfolio.CashBook[CryptoName].ConversionRate}");
@@ -153,11 +153,6 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / securityPrice, 3, MidpointRounding.ToZero);
                     var order = Buy(_symbol, quantity);
                 }
-                //else if (/*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok)
-                //{
-                //    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / securityPrice, 3, MidpointRounding.ToZero);
-                //    var order = Buy(_symbol, quantity);
-                //}
             }
             else if (_bought > 0)
             {
@@ -168,6 +163,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
 
             Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
+            Plot("Indicators", "VeryFastMA", _very_fast_ema);
             Plot("Indicators", "FastMA", _fast_ema);
             Plot("Indicators", "SlowMA", _slow_ema);
 
