@@ -145,12 +145,19 @@ namespace QuantConnect.Algorithm.CSharp
                 //bool is_adx_ok = _adx.NegativeDirectionalIndex > 24 && _adx.PositiveDirectionalIndex < 16;
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
                 bool is_moving_averages_ok = _fast_ema > _slow_ema;
+                bool is_very_fast_ema_ok = _very_fast_ema > _fast_ema;
                 bool is_price_ok = _sold_price > 0.05m * securityPrice;
-                if (/*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok)
+                bool is_roc_ok = _roc > 5;
+                if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
                 {
                     decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / securityPrice, 3, MidpointRounding.ToZero);
                     var order = Buy(_symbol, quantity);
                 }
+                //else if (/*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok)
+                //{
+                //    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / securityPrice, 3, MidpointRounding.ToZero);
+                //    var order = Buy(_symbol, quantity);
+                //}
             }
             else if (_bought > 0)
             {
