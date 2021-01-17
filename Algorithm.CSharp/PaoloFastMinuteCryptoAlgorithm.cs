@@ -32,10 +32,12 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="trading and orders" />
     public class PaoloFastMinuteCryptoAlgorithm : QCAlgorithm
     {
-        private ExponentialMovingAverage _fast;
-        private ExponentialMovingAverage _slow;
+        private ExponentialMovingAverage _very_fast_ema;
+        private ExponentialMovingAverage _fast_ema;
+        private ExponentialMovingAverage _slow_ema;
         private MovingAverageConvergenceDivergence _macd;
         private AverageDirectionalIndex _adx;
+        private RateOfChange _roc;
 
         private decimal _max_adx = Decimal.MinValue;
 
@@ -72,13 +74,17 @@ namespace QuantConnect.Algorithm.CSharp
             // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
 
+            const int veryFastValue = 5;
             const int fastValue = 10;
             const int slowValue = 30;
             const int signal = 8;
 
-            _fast = EMA(_symbol, fastValue, resolution);
-            _slow = EMA(_symbol, slowValue, resolution);
+            _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
+            _fast_ema = EMA(_symbol, fastValue, resolution);
+            _slow_ema = EMA(_symbol, slowValue, resolution);
             _macd = MACD(_symbol, fastValue, slowValue, signal, MovingAverageType.Exponential, resolution);
+            _adx = ADX(_symbol, 2, resolution);
+            _roc = ROC(_symbol, veryFastValue, resolution);
 
             _min_max_macd = new MinMaxMACD(15);
 
@@ -133,15 +139,16 @@ namespace QuantConnect.Algorithm.CSharp
         {
             _min_max_macd.OnData(_macd);
 
+            decimal securityPrice = Securities[SymbolName].Price;
             if (_bought < 0)
             {
                 //bool is_adx_ok = _adx.NegativeDirectionalIndex > 24 && _adx.PositiveDirectionalIndex < 16;
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
-                bool is_moving_averages_ok = _fast > _slow;
-                if (/*is_adx_ok && */is_macd_ok && is_moving_averages_ok)
+                bool is_moving_averages_ok = _fast_ema > _slow_ema;
+                bool is_price_ok = _sold_price > 0.05m * securityPrice;
+                if (/*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok)
                 {
-                    decimal btcPrice = Securities[SymbolName].Price;
-                    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / btcPrice, 3, MidpointRounding.ToZero);
+                    decimal quantity = Math.Round(Portfolio.CashBook[CashName].Amount / securityPrice, 3, MidpointRounding.ToZero);
                     var order = Buy(_symbol, quantity);
                 }
             }
@@ -154,8 +161,8 @@ namespace QuantConnect.Algorithm.CSharp
             }
 
             Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
-            Plot("Indicators", "FastMA", _fast);
-            Plot("Indicators", "SlowMA", _slow);
+            Plot("Indicators", "FastMA", _fast_ema);
+            Plot("Indicators", "SlowMA", _slow_ema);
 
         }
 
@@ -173,7 +180,7 @@ namespace QuantConnect.Algorithm.CSharp
             // check on gain
             //bool is_adx_ok = _adx.PositiveDirectionalIndex > 25 && _adx.NegativeDirectionalIndex < 20;
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _fast < _slow;
+            bool is_moving_averages_ok = _fast_ema < _slow_ema;
 
             decimal holding_value = Portfolio[SymbolName].Price;
             decimal current_price = data[SymbolName].Value;
