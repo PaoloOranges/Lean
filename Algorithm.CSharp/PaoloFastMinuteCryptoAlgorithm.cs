@@ -43,9 +43,9 @@ namespace QuantConnect.Algorithm.CSharp
         private int _bought = -1;
         private decimal _price_bought = 0;
 
-        private readonly string SymbolName = "BTCUSD";
-        private readonly string CashName = "USD";
-        private readonly string CryptoName = "BTC";
+        private const string CryptoName = "BTC";
+        private const string CashName = "EUR";
+        private const string SymbolName = CryptoName + CashName;
 
         private Symbol _symbol = null;
 
@@ -58,12 +58,13 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public override void Initialize()
         {
-            Resolution resolution = Resolution.Minute;
+            Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2020, 12, 12); // Set Start Date
-            SetEndDate(2020, 12, 18); // Set End Date
+            SetStartDate(2021, 01, 01); // Set Start Date
+            SetEndDate(2021, 01, 15); // Set End Date
 
-            SetCash(CashName, 300);
+            SetCash(CashName, 300, 1.21m);
+            SetCash("USD", 0);
 
             SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
             SetTimeZone(NodaTime.DateTimeZone.Utc);
@@ -71,9 +72,9 @@ namespace QuantConnect.Algorithm.CSharp
             // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
 
-            const int fastValue = 30;
-            const int slowValue = 90;
-            const int signal = 30;
+            const int fastValue = 10;
+            const int slowValue = 30;
+            const int signal = 8;
 
             _fast = EMA(_symbol, fastValue, resolution);
             _slow = EMA(_symbol, slowValue, resolution);
@@ -125,7 +126,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
             UtcTimeLast = UtcTimeNow;
 
-            Plot("USDBTC", "Price", data[SymbolName].Value);
+            Plot(SymbolName, "Price", data[SymbolName].Value);
         }
 
         private void OnProcessData(Slice data)
