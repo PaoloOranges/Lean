@@ -19,6 +19,11 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using NodaTime;
+using ProtoBuf;
+using QuantConnect.Data.Custom.Benzinga;
+using QuantConnect.Data.Custom.Estimize;
+using QuantConnect.Data.Custom.Tiingo;
+using QuantConnect.Data.Market;
 using QuantConnect.Util;
 
 namespace QuantConnect.Data
@@ -27,6 +32,17 @@ namespace QuantConnect.Data
     /// Abstract base data class of QuantConnect. It is intended to be extended to define
     /// generic user customizable data types while at the same time implementing the basics of data where possible
     /// </summary>
+    [ProtoContract(SkipConstructor = true)]
+    [ProtoInclude(8, typeof(Tick))]
+    [ProtoInclude(100, typeof(TradeBar))]
+    [ProtoInclude(200, typeof(QuoteBar))]
+    [ProtoInclude(300, typeof(Dividend))]
+    [ProtoInclude(400, typeof(Split))]
+    [ProtoInclude(500, typeof(TiingoNews))]
+    [ProtoInclude(600, typeof(BenzingaNews))]
+    [ProtoInclude(700, typeof(EstimizeEstimate))]
+    [ProtoInclude(800, typeof(EstimizeRelease))]
+    [ProtoInclude(900, typeof(EstimizeConsensus))]
     public abstract class BaseData : IBaseData
     {
         private decimal _value;
@@ -48,9 +64,15 @@ namespace QuantConnect.Data
         protected static readonly List<Resolution> MinuteResolution = new List<Resolution> { Resolution.Minute };
 
         /// <summary>
+        /// A list of high <see cref="Resolution"/>, including minute, second, and tick.
+        /// </summary>
+        protected static readonly List<Resolution> HighResolution = new List<Resolution> { Resolution.Minute, Resolution.Second, Resolution.Tick };
+
+        /// <summary>
         /// Market Data Type of this data - does it come in individual price packets or is it grouped into OHLC.
         /// </summary>
         /// <remarks>Data is classed into two categories - streams of instantaneous prices and groups of OHLC data.</remarks>
+        [ProtoMember(1)]
         public MarketDataType DataType { get; set; } = MarketDataType.Base;
 
         /// <summary>
@@ -62,6 +84,7 @@ namespace QuantConnect.Data
         /// Current time marker of this data packet.
         /// </summary>
         /// <remarks>All data is timeseries based.</remarks>
+        [ProtoMember(2)]
         public DateTime Time { get; set; }
 
         /// <summary>
@@ -83,6 +106,7 @@ namespace QuantConnect.Data
         /// Value representation of this data packet. All data requires a representative value for this moment in time.
         /// For streams of data this is the price now, for OHLC packets this is the closing price.
         /// </summary>
+        [ProtoMember(4)]
         public virtual decimal Value
         {
             get
@@ -179,7 +203,8 @@ namespace QuantConnect.Data
         /// <returns>True indicates mapping should be used</returns>
         public virtual bool RequiresMapping()
         {
-            return Symbol.SecurityType == SecurityType.Equity || Symbol.SecurityType == SecurityType.Option;
+            return Symbol.SecurityType == SecurityType.Equity ||
+                   Symbol.SecurityType == SecurityType.Option;
         }
 
         /// <summary>
@@ -213,9 +238,14 @@ namespace QuantConnect.Data
         /// custom data types can override it</remarks>
         public virtual List<Resolution> SupportedResolutions()
         {
-            if (Symbol.SecurityType == SecurityType.Option)
+            if (Symbol.SecurityType == SecurityType.Option || Symbol.SecurityType == SecurityType.FutureOption)
             {
                 return MinuteResolution;
+            }
+
+            if (Symbol.SecurityType == SecurityType.Future)
+            {
+                return HighResolution;
             }
 
             return AllResolutions;

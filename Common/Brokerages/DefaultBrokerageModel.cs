@@ -15,7 +15,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using QuantConnect.Benchmarks;
+using QuantConnect.Data;
 using QuantConnect.Data.Market;
+using QuantConnect.Data.Shortable;
+using QuantConnect.Interfaces;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.Fills;
@@ -43,10 +48,20 @@ namespace QuantConnect.Brokerages
             {SecurityType.Equity, Market.USA},
             {SecurityType.Option, Market.USA},
             {SecurityType.Future, Market.CME},
-            {SecurityType.Forex, Market.FXCM},
+            {SecurityType.FutureOption, Market.CME},
+            {SecurityType.Forex, Market.Oanda},
             {SecurityType.Cfd, Market.FXCM},
             {SecurityType.Crypto, Market.GDAX}
         }.ToReadOnlyDictionary();
+
+        /// <summary>
+        /// Determines whether the asset you want to short is shortable.
+        /// The default is set to <see cref="NullShortableProvider"/>,
+        /// which allows for infinite shorting of any asset. You can limit the
+        /// quantity you can short for an asset class by setting this variable to
+        /// your own implementation of <see cref="IShortableProvider"/>.
+        /// </summary>
+        protected IShortableProvider ShortableProvider { get; set; }
 
         /// <summary>
         /// Gets or sets the account type used by this model
@@ -79,6 +94,11 @@ namespace QuantConnect.Brokerages
         public DefaultBrokerageModel(AccountType accountType = AccountType.Margin)
         {
             AccountType = accountType;
+
+            // Shortable provider, responsible for loading the data that indicates how much
+            // quantity we can short for a given asset. The NullShortableProvider default will
+            // allow for infinite quantities of any asset to be shorted.
+            ShortableProvider = new NullShortableProvider();
         }
 
         /// <summary>
@@ -174,10 +194,22 @@ namespace QuantConnect.Brokerages
                 case SecurityType.Base:
                 case SecurityType.Commodity:
                 case SecurityType.Option:
+                case SecurityType.FutureOption:
                 case SecurityType.Future:
                 default:
                     return 1m;
             }
+        }
+
+        /// <summary>
+        /// Get the benchmark for this model
+        /// </summary>
+        /// <param name="securities">SecurityService to create the security with if needed</param>
+        /// <returns>The benchmark for this brokerage</returns>
+        public virtual IBenchmark GetBenchmark(SecurityManager securities)
+        {
+            var symbol = Symbol.Create("SPY", SecurityType.Equity, Market.USA);
+            return SecurityBenchmark.CreateInstance(securities, symbol);
         }
 
         /// <summary>
@@ -187,6 +219,30 @@ namespace QuantConnect.Brokerages
         /// <returns>The new fill model for this brokerage</returns>
         public virtual IFillModel GetFillModel(Security security)
         {
+            switch (security.Type)
+            {
+                case SecurityType.Base:
+                    break;
+                case SecurityType.Equity:
+                    return new EquityFillModel();
+                case SecurityType.Option:
+                    break;
+                case SecurityType.FutureOption:
+                    break;
+                case SecurityType.Commodity:
+                    break;
+                case SecurityType.Forex:
+                    break;
+                case SecurityType.Future:
+                    break;
+                case SecurityType.Cfd:
+                    break;
+                case SecurityType.Crypto:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException($"{GetType().Name}.GetFillModel: Invalid security type {security.Type}");
+            }
+
             return new ImmediateFillModel();
         }
 
@@ -208,6 +264,7 @@ namespace QuantConnect.Brokerages
                 case SecurityType.Equity:
                 case SecurityType.Option:
                 case SecurityType.Future:
+                case SecurityType.FutureOption:
                     return new InteractiveBrokersFeeModel();
 
                 case SecurityType.Commodity:
@@ -236,6 +293,7 @@ namespace QuantConnect.Brokerages
 
                 case SecurityType.Commodity:
                 case SecurityType.Option:
+                case SecurityType.FutureOption:
                 case SecurityType.Future:
                 default:
                     return new ConstantSlippageModel(0);
@@ -299,6 +357,9 @@ namespace QuantConnect.Brokerages
                 case SecurityType.Option:
                     model = new OptionMarginModel(RequiredFreeBuyingPowerPercent);
                     break;
+                case SecurityType.FutureOption:
+                    model = new FuturesOptionsMarginModel(RequiredFreeBuyingPowerPercent, (Option)security);
+                    break;
                 case SecurityType.Future:
                     model = new FutureMarginModel(RequiredFreeBuyingPowerPercent, security);
                     break;
@@ -307,6 +368,15 @@ namespace QuantConnect.Brokerages
                     break;
             }
             return model;
+        }
+
+        /// <summary>
+        /// Gets the shortable provider
+        /// </summary>
+        /// <returns>Shortable provider</returns>
+        public virtual IShortableProvider GetShortableProvider()
+        {
+            return ShortableProvider;
         }
 
         /// <summary>

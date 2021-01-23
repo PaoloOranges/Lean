@@ -23,6 +23,7 @@ using System.Threading.Tasks;
 using QuantConnect.Brokerages;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
+using QuantConnect.Data.Auxiliary;
 using QuantConnect.Exceptions;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds;
@@ -91,6 +92,7 @@ namespace QuantConnect.Lean.Engine
 
             try
             {
+                TextSubscriptionDataSourceReader.SetCacheSize((int) (job.RamAllocation * 0.4));
 
                 //Reset thread holders.
                 var initializeComplete = false;
@@ -136,14 +138,15 @@ namespace QuantConnect.Lean.Engine
                     brokerage = AlgorithmHandlers.Setup.CreateBrokerage(job, algorithm, out factory);
 
                     var symbolPropertiesDatabase = SymbolPropertiesDatabase.FromDataFolder();
-
+                    var mapFilePrimaryExchangeProvider = new MapFilePrimaryExchangeProvider(AlgorithmHandlers.MapFileProvider);
                     var registeredTypesProvider = new RegisteredSecurityDataTypesProvider();
                     var securityService = new SecurityService(algorithm.Portfolio.CashBook,
                         marketHoursDatabase,
                         symbolPropertiesDatabase,
                         algorithm,
                         registeredTypesProvider,
-                        new SecurityCacheProvider(algorithm.Portfolio));
+                        new SecurityCacheProvider(algorithm.Portfolio),
+                        mapFilePrimaryExchangeProvider);
 
                     algorithm.Securities.SetSecurityService(securityService);
 
@@ -151,7 +154,8 @@ namespace QuantConnect.Lean.Engine
                         new UniverseSelection(
                             algorithm,
                             securityService,
-                            AlgorithmHandlers.DataPermissionsManager),
+                            AlgorithmHandlers.DataPermissionsManager,
+                            AlgorithmHandlers.DataProvider),
                         algorithm,
                         algorithm.TimeKeeper,
                         marketHoursDatabase,
@@ -159,7 +163,6 @@ namespace QuantConnect.Lean.Engine
                         registeredTypesProvider,
                         AlgorithmHandlers.DataPermissionsManager);
 
-                    AlgorithmHandlers.Results.SetDataManager(dataManager);
                     algorithm.SubscriptionManager.SetDataManager(dataManager);
 
                     synchronizer.Initialize(algorithm, dataManager);
@@ -253,8 +256,12 @@ namespace QuantConnect.Lean.Engine
                 catch (Exception err)
                 {
                     Log.Error(err);
-                    var runtimeMessage = "Algorithm.Initialize() Error: " + err.Message + " Stack Trace: " + err;
-                    AlgorithmHandlers.Results.RuntimeError(runtimeMessage, err.ToString());
+
+                    // for python we don't add the ugly pythonNet stack trace
+                    var stackTrace = job.Language == Language.Python ? err.Message : err.ToString();
+
+                    var runtimeMessage = "Algorithm.Initialize() Error: " + err.Message + " Stack Trace: " + stackTrace;
+                    AlgorithmHandlers.Results.RuntimeError(runtimeMessage, stackTrace);
                     SystemHandlers.Api.SetAlgorithmStatus(job.AlgorithmId, AlgorithmStatus.RuntimeError, runtimeMessage);
                 }
 
@@ -396,6 +403,8 @@ namespace QuantConnect.Lean.Engine
                     dataManager?.RemoveAllSubscriptions();
                     workerThread?.Dispose();
                 }
+
+                synchronizer.DisposeSafely();
                 // Close data feed, alphas. Could be running even if algorithm initialization failed
                 AlgorithmHandlers.DataFeed.Exit();
                 AlgorithmHandlers.Alphas.Exit();
@@ -470,8 +479,12 @@ namespace QuantConnect.Lean.Engine
                 var message = "Runtime Error: " + _exceptionInterpreter.Value.GetExceptionMessageHeader(err);
                 Log.Trace("Engine.Run(): Sending runtime error to user...");
                 AlgorithmHandlers.Results.LogMessage(message);
-                AlgorithmHandlers.Results.RuntimeError(message, err.ToString());
-                SystemHandlers.Api.SetAlgorithmStatus(job.AlgorithmId, AlgorithmStatus.RuntimeError, message + " Stack Trace: " + err);
+
+                // for python we don't add the ugly pythonNet stack trace
+                var stackTrace = job.Language == Language.Python ? err.Message : err.ToString();
+
+                AlgorithmHandlers.Results.RuntimeError(message, stackTrace);
+                SystemHandlers.Api.SetAlgorithmStatus(job.AlgorithmId, AlgorithmStatus.RuntimeError, $"{message} Stack Trace: {stackTrace}");
             }
         }
 

@@ -1,4 +1,4 @@
-﻿﻿/*
+﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -15,6 +15,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -23,6 +25,42 @@ using static QuantConnect.StringExtensions;
 
 namespace QuantConnect
 {
+    /// <summary>
+    /// Equity US exchanges
+    /// </summary>
+    /// <remarks>
+    /// The byte value of each entry are the byte representation of the exchange single letter code.
+    /// E.g.
+    ///     - 'Q' byte representation is 81 and it maps to NASDAQ
+    ///     - 'Z' byte representation is 90 and it maps to BATS
+    /// </remarks>
+    public enum PrimaryExchange : byte
+    {
+        UNKNOWN=0,
+        NASDAQ=81,
+        BATS=90,
+        ARCA=80,
+        NYSE=78,
+        NSE=67,
+        FINRA=68,
+        ISE=73,
+        OPRA,
+        CSE=77,
+        CBOE=87,
+        AMEX=65,
+        SIAC,
+        EDGA=74,
+        EDGX=75,
+        NASDAQ_BX=66,
+        NASDAQ_PSX=88,
+        BATS_Y,
+        C2,
+        BOSTON,
+        MIAX,
+        ISE_GEMINI,
+        ISE_MERCURY,
+    }
+
     /// <summary>
     /// Shortcut date format strings
     /// </summary>
@@ -40,8 +78,14 @@ namespace QuantConnect
         public const string DB = "yyyy-MM-dd HH:mm:ss";
         /// QuantConnect UX Date Representation
         public const string UI = "yyyy-MM-dd HH:mm:ss";
+        /// en-US Short Date and Time Pattern
+        public const string USShort = "M/d/yy h:mm tt";
+        /// en-US Short Date Pattern
+        public const string USShortDateOnly = "M/d/yy";
         /// en-US format
         public const string US = "M/d/yyyy h:mm:ss tt";
+        /// en-US Date format
+        public const string USDateOnly = "M/d/yyyy";
         /// Date format of QC forex data
         public const string Forex = "yyyyMMdd HH:mm:ss.ffff";
         /// YYYYMM Year and Month Character Date Representation (used for futures)
@@ -98,7 +142,7 @@ namespace QuantConnect
         /// </summary>
         /// <param name="security">The security instance</param>
         public Holding(Security security)
-             : this()
+            : this()
         {
             var holding = security.Holdings;
 
@@ -141,7 +185,7 @@ namespace QuantConnect
                 MarketPrice = MarketPrice,
                 MarketValue = MarketValue,
                 UnrealizedPnL = UnrealizedPnL,
-                ConversionRate  = ConversionRate,
+                ConversionRate = ConversionRate,
                 CurrencySymbol = CurrencySymbol
             };
         }
@@ -152,8 +196,8 @@ namespace QuantConnect
         public override string ToString()
         {
             var value = Invariant($"{Symbol.Value}: {Quantity} @ ") +
-                        Invariant($"{CurrencySymbol}{AveragePrice} - ") +
-                        Invariant($"Market: {CurrencySymbol}{MarketPrice}");
+                Invariant($"{CurrencySymbol}{AveragePrice} - ") +
+                Invariant($"Market: {CurrencySymbol}{MarketPrice}");
 
             if (ConversionRate != 1m)
             {
@@ -307,7 +351,19 @@ namespace QuantConnect
         /// <summary>
         /// Cryptocurrency Security Type.
         /// </summary>
-        Crypto
+        Crypto,
+
+        /// <summary>
+        /// Futures Options Security Type.
+        /// </summary>
+        /// <remarks>
+        /// Futures options function similar to equity options, but with a few key differences.
+        /// Firstly, the contract unit of trade is 1x, rather than 100x. This means that each
+        /// option represents the right to buy or sell 1 future contract at expiry/exercise.
+        /// The contract multiplier for Futures Options plays a big part in determining the premium
+        /// of the option, which can also differ from the underlying future's multiplier.
+        /// </remarks>
+        FutureOption
     }
 
     /// <summary>
@@ -436,6 +492,27 @@ namespace QuantConnect
         Hour,
         /// Daily Resolution (5)
         Daily
+    }
+
+    /// <summary>
+    /// Specifies what side a position is on, long/short
+    /// </summary>
+    public enum PositionSide
+    {
+        /// <summary>
+        /// A short position, quantity less than zero
+        /// </summary>
+        Short = -1,
+
+        /// <summary>
+        /// No position, quantity equals zero
+        /// </summary>
+        None = 0,
+
+        /// <summary>
+        /// A long position, quantity greater than zero
+        /// </summary>
+        Long = 1
     }
 
     /// <summary>
@@ -626,7 +703,7 @@ namespace QuantConnect
         /// </summary>
         Raw,
         /// <summary>
-        /// The adjusted prices with splits and dividendends factored in
+        /// The adjusted prices with splits and dividends factored in
         /// </summary>
         Adjusted,
         /// <summary>
@@ -640,40 +717,102 @@ namespace QuantConnect
     }
 
     /// <summary>
-    /// Global Market Short Codes and their full versions: (used in tick objects)
+    /// Defines Lean exchanges codes and names
     /// </summary>
-    public static class MarketCodes
+    public static class Exchanges
     {
-        /// US Market Codes
-        public static Dictionary<string, string> US = new Dictionary<string, string>()
+        /// <summary>
+        /// Returns the main Exchange from the single character encoding.
+        /// </summary>
+        /// <param name="exchange"></param>
+        /// <returns></returns>
+        public static PrimaryExchange GetPrimaryExchange(char exchange)
         {
-            {"A", "American Stock Exchange"},
-            {"B", "Boston Stock Exchange"},
-            {"C", "National Stock Exchange"},
-            {"D", "FINRA ADF"},
-            {"I", "International Securities Exchange"},
-            {"J", "Direct Edge A"},
-            {"K", "Direct Edge X"},
-            {"M", "Chicago Stock Exchange"},
-            {"N", "New York Stock Exchange"},
-            {"P", "Nyse Arca Exchange"},
-            {"Q", "NASDAQ OMX"},
-            {"T", "NASDAQ OMX"},
-            {"U", "OTC Bulletin Board"},
-            {"u", "Over-the-Counter trade in Non-NASDAQ issue"},
-            {"W", "Chicago Board Options Exchange"},
-            {"X", "Philadelphia Stock Exchange"},
-            {"Y", "BATS Y-Exchange, Inc"},
-            {"Z", "BATS Exchange, Inc"},
-            {"IEX", "Investors Exchange"},
-        };
+            return (PrimaryExchange)exchange;
+        }
 
-        /// Canada Market Short Codes:
-        public static Dictionary<string, string> Canada = new Dictionary<string, string>()
+        /// <summary>
+        /// Gets the exchange as PrimaryExchange object.
+        /// </summary>
+        /// <remarks>Useful for performance</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static PrimaryExchange GetPrimaryExchange(this string exchange)
         {
-            {"T", "Toronto"},
-            {"V", "Venture"}
-        };
+            PrimaryExchange primaryExchange;
+            if (Enum.TryParse(exchange, true, out primaryExchange))
+            {
+                return primaryExchange;
+            }
+            
+            switch (exchange.LazyToUpper())
+            {
+                case "T":
+                case "Q":
+                case "NASDAQ":
+                case "NASDAQ OMX":
+                    return PrimaryExchange.NASDAQ;
+                case "Z":
+                case "BATS":
+                case "BATS Z":
+                    return PrimaryExchange.BATS;
+                case "P":
+                case "ARCA":
+                    return PrimaryExchange.ARCA;
+                case "N":
+                case "NYSE":
+                    return PrimaryExchange.NYSE;
+                case "C":
+                case "NSE":
+                    return PrimaryExchange.NSE;
+                case "D":
+                case "FINRA":
+                    return PrimaryExchange.FINRA;
+                case "I":
+                case "ISE":
+                    return PrimaryExchange.ISE;
+                case "OPRA":
+                    return PrimaryExchange.OPRA;
+                case "M":
+                case "CSE":
+                    return PrimaryExchange.CSE;
+                case "W":
+                case "CBOE":
+                    return PrimaryExchange.CBOE;
+                case "A":
+                case "AMEX":
+                    return PrimaryExchange.AMEX;
+                case "SIAC":
+                    return PrimaryExchange.SIAC;
+                case "J":
+                case "EDGA":
+                    return PrimaryExchange.EDGA;
+                case "K":
+                case "EDGX":
+                    return PrimaryExchange.EDGX;
+                case "B":
+                case "NASDAQ BX":
+                    return PrimaryExchange.NASDAQ_BX;
+                case "X":
+                case "NASDAQ PSX":
+                    return PrimaryExchange.NASDAQ_PSX;
+                case "Y":
+                case "BATS Y":
+                    return PrimaryExchange.BATS_Y;
+                case "C2":
+                    return PrimaryExchange.C2;
+                case "BOSTON":
+                    return PrimaryExchange.BOSTON;
+                case "MIAX":
+                    return PrimaryExchange.MIAX;
+                case "ISE_GEMINI":
+                    return PrimaryExchange.ISE_GEMINI;
+                case "ISE_MERCURY":
+                    return PrimaryExchange.ISE_MERCURY;
+                default:
+                case "UNKNOWN":
+                    return PrimaryExchange.UNKNOWN;
+            }
+        }
     }
 
     /// <summary>
@@ -685,6 +824,7 @@ namespace QuantConnect
         /// The channel is empty
         /// </summary>
         public const string Vacated = "channel_vacated";
+
         /// <summary>
         /// The channel has subscribers
         /// </summary>

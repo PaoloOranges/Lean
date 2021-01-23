@@ -16,6 +16,8 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
+using ProtoBuf;
 using QuantConnect.Logging;
 using QuantConnect.Util;
 using static QuantConnect.StringExtensions;
@@ -26,6 +28,7 @@ namespace QuantConnect.Data.Market
     /// QuoteBar class for second and minute resolution data:
     /// An OHLC implementation of the QuantConnect BaseData class with parameters for candles.
     /// </summary>
+    [ProtoContract(SkipConstructor = true)]
     public class QuoteBar : BaseData, IBaseDataBar
     {
         // scale factor used in QC equity/forex data files
@@ -34,21 +37,25 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Average bid size
         /// </summary>
+        [ProtoMember(201)]
         public decimal LastBidSize { get; set; }
 
         /// <summary>
         /// Average ask size
         /// </summary>
+        [ProtoMember(202)]
         public decimal LastAskSize { get; set; }
 
         /// <summary>
         /// Bid OHLC
         /// </summary>
+        [ProtoMember(203)]
         public Bar Bid { get; set; }
 
         /// <summary>
         /// Ask OHLC
         /// </summary>
+        [ProtoMember(204)]
         public Bar Ask { get; set; }
 
         /// <summary>
@@ -191,6 +198,7 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// The period of this quote bar, (second, minute, daily, ect...)
         /// </summary>
+        [ProtoMember(205)]
         public TimeSpan Period { get; set; }
 
         /// <summary>
@@ -239,14 +247,15 @@ namespace QuantConnect.Data.Market
         /// <param name="volume">Volume of this trade</param>
         /// <param name="bidSize">The size of the current bid, if available, if not, pass 0</param>
         /// <param name="askSize">The size of the current ask, if available, if not, pass 0</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void Update(decimal lastTrade, decimal bidPrice, decimal askPrice, decimal volume, decimal bidSize, decimal askSize)
         {
             // update our bid and ask bars - handle null values, this is to give good values for midpoint OHLC
-            if (Bid == null && bidPrice != 0) Bid = new Bar();
-            if (Bid != null) Bid.Update(bidPrice);
+            if (Bid == null && bidPrice != 0) Bid = new Bar(bidPrice, bidPrice, bidPrice, bidPrice);
+            else if (Bid != null) Bid.Update(ref bidPrice);
 
-            if (Ask == null && askPrice != 0) Ask = new Bar();
-            if (Ask != null) Ask.Update(askPrice);
+            if (Ask == null && askPrice != 0) Ask = new Bar(askPrice, askPrice, askPrice, askPrice);
+            else if (Ask != null) Ask.Update(ref askPrice);
 
             if (bidSize > 0)
             {
@@ -289,6 +298,7 @@ namespace QuantConnect.Data.Market
                         return ParseCfd(config, stream, date);
 
                     case SecurityType.Option:
+                    case SecurityType.FutureOption:
                         return ParseOption(config, stream, date);
 
                     case SecurityType.Future:
@@ -335,6 +345,7 @@ namespace QuantConnect.Data.Market
                         return ParseCfd(config, line, date);
 
                     case SecurityType.Option:
+                    case SecurityType.FutureOption:
                         return ParseOption(config, line, date);
 
                     case SecurityType.Future:
@@ -446,7 +457,7 @@ namespace QuantConnect.Data.Market
         /// <returns><see cref="QuoteBar"/> with the bid/ask set to same values</returns>
         public QuoteBar ParseOption(SubscriptionDataConfig config, string line, DateTime date)
         {
-            return ParseQuote(config, date, line, true);
+            return ParseQuote(config, date, line, config.Symbol.SecurityType == SecurityType.Option);
         }
 
         /// <summary>
@@ -458,7 +469,7 @@ namespace QuantConnect.Data.Market
         /// <returns><see cref="QuoteBar"/> with the bid/ask set to same values</returns>
         public QuoteBar ParseOption(SubscriptionDataConfig config, StreamReader streamReader, DateTime date)
         {
-            return ParseQuote(config, date, streamReader, true);
+            return ParseQuote(config, date, streamReader, config.Symbol.SecurityType == SecurityType.Option);
         }
 
         /// <summary>
@@ -543,6 +554,7 @@ namespace QuantConnect.Data.Market
         /// <returns><see cref="QuoteBar"/> with the bid/ask prices set appropriately</returns>
         private QuoteBar ParseQuote(SubscriptionDataConfig config, DateTime date, StreamReader streamReader, bool useScaleFactor)
         {
+            // Non-equity asset classes will not use scaling, including options that have a non-equity underlying asset class.
             var scaleFactor = useScaleFactor
                               ? _scaleFactor
                               : 1;
@@ -703,7 +715,8 @@ namespace QuantConnect.Data.Market
 
             var source = LeanData.GenerateZipFilePath(Globals.DataFolder, config.Symbol, date, config.Resolution, config.TickType);
             if (config.SecurityType == SecurityType.Option ||
-                config.SecurityType == SecurityType.Future)
+                config.SecurityType == SecurityType.Future ||
+                config.SecurityType == SecurityType.FutureOption)
             {
                 source += "#" + LeanData.GenerateZipEntryName(config.Symbol, date, config.Resolution, config.TickType);
             }

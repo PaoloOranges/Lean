@@ -24,13 +24,15 @@ using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using QuantConnect.Brokerages.Alpaca;
 using QuantConnect.Configuration;
+using QuantConnect.Data.Auxiliary;
 using QuantConnect.Interfaces;
+using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Brokerages.Alpaca
 {
-    [TestFixture, Ignore("This test requires a configured and testable Alpaca practice account")]
+    [TestFixture, Explicit("This test requires a configured and testable Alpaca practice account")]
     public class AlpacaBrokerageTests : BrokerageTests
     {
         /// <summary>
@@ -43,7 +45,13 @@ namespace QuantConnect.Tests.Brokerages.Alpaca
             var secretKey = Config.Get("alpaca-secret-key");
             var tradingMode = Config.Get("alpaca-trading-mode");
 
-            return new AlpacaBrokerage(orderProvider, securityProvider, keyId, secretKey, tradingMode, false);
+            return new AlpacaBrokerage(
+                orderProvider,
+                securityProvider,
+                new LocalDiskMapFileProvider(),
+                keyId,
+                secretKey,
+                tradingMode);
         }
 
         /// <summary>
@@ -162,12 +170,12 @@ namespace QuantConnect.Tests.Brokerages.Alpaca
             {
                 var order = new MarketOrder(symbol, 10, DateTime.UtcNow);
                 OrderProvider.Add(order);
-                Console.WriteLine("Buy Order");
+                Log.Trace("Buy Order");
                 alpaca.PlaceOrder(order);
 
                 var orderr = new MarketOrder(symbol, -10, DateTime.UtcNow);
                 OrderProvider.Add(orderr);
-                Console.WriteLine("Sell Order");
+                Log.Trace("Sell Order");
                 alpaca.PlaceOrder(orderr);
             }
 
@@ -291,9 +299,9 @@ namespace QuantConnect.Tests.Brokerages.Alpaca
 
             var tenMinutes = TimeSpan.FromMinutes(10);
 
-            Console.WriteLine("------");
-            Console.WriteLine("Waiting for internet disconnection ");
-            Console.WriteLine("------");
+            Log.Trace("------");
+            Log.Trace("Waiting for internet disconnection ");
+            Log.Trace("------");
 
             // spin while we manually disconnect the internet
             while (brokerage.IsConnected)
@@ -304,9 +312,9 @@ namespace QuantConnect.Tests.Brokerages.Alpaca
 
             var stopwatch = Stopwatch.StartNew();
 
-            Console.WriteLine("------");
-            Console.WriteLine("Trying to reconnect ");
-            Console.WriteLine("------");
+            Log.Trace("------");
+            Log.Trace("Trying to reconnect ");
+            Log.Trace("------");
 
             // spin until we're reconnected
             while (!brokerage.IsConnected && stopwatch.Elapsed < tenMinutes)

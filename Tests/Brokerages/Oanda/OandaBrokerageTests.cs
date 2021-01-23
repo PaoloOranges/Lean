@@ -22,9 +22,13 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using QuantConnect.Brokerages.Oanda;
 using QuantConnect.Configuration;
+using QuantConnect.Data;
 using QuantConnect.Interfaces;
+using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
+using QuantConnect.Util;
 using Environment = QuantConnect.Brokerages.Oanda.Environment;
 
 namespace QuantConnect.Tests.Brokerages.Oanda
@@ -41,8 +45,9 @@ namespace QuantConnect.Tests.Brokerages.Oanda
             var environment = Config.Get("oanda-environment").ConvertTo<Environment>();
             var accessToken = Config.Get("oanda-access-token");
             var accountId = Config.Get("oanda-account-id");
+            var aggregator = new AggregationManager();
 
-            return new OandaBrokerage(orderProvider, securityProvider, environment, accessToken, accountId);
+            return new OandaBrokerage(orderProvider, securityProvider, aggregator, environment, accessToken, accountId);
         }
 
         /// <summary>
@@ -209,9 +214,9 @@ namespace QuantConnect.Tests.Brokerages.Oanda
 
             var tenMinutes = TimeSpan.FromMinutes(10);
 
-            Console.WriteLine("------");
-            Console.WriteLine("Waiting for internet disconnection ");
-            Console.WriteLine("------");
+            Log.Trace("------");
+            Log.Trace("Waiting for internet disconnection ");
+            Log.Trace("------");
 
             // spin while we manually disconnect the internet
             while (brokerage.IsConnected)
@@ -222,9 +227,9 @@ namespace QuantConnect.Tests.Brokerages.Oanda
 
             var stopwatch = Stopwatch.StartNew();
 
-            Console.WriteLine("------");
-            Console.WriteLine("Trying to reconnect ");
-            Console.WriteLine("------");
+            Log.Trace("------");
+            Log.Trace("Trying to reconnect ");
+            Log.Trace("------");
 
             // spin until we're reconnected
             while (!brokerage.IsConnected && stopwatch.Elapsed < tenMinutes)

@@ -260,6 +260,7 @@ namespace QuantConnect.Lean.Engine
                     }
 
                     realtime.OnSecuritiesChanged(timeSlice.SecurityChanges);
+                    results.OnSecuritiesChanged(timeSlice.SecurityChanges);
                 }
 
                 //Update the securities properties: first before calling user code to avoid issues with data
@@ -315,7 +316,7 @@ namespace QuantConnect.Lean.Engine
                 ProcessDelistedSymbols(algorithm, delistings);
 
                 // process split warnings for options
-                ProcessSplitSymbols(algorithm, splitWarnings);
+                ProcessSplitSymbols(algorithm, splitWarnings, delistings);
 
                 //Check if the user's signalled Quit: loop over data until day changes.
                 if (algorithm.Status == AlgorithmStatus.Stopped)
@@ -327,7 +328,7 @@ namespace QuantConnect.Lean.Engine
                 {
                     _algorithm.Status = AlgorithmStatus.RuntimeError;
                     Log.Trace($"AlgorithmManager.Run(): Algorithm encountered a runtime error at {timeSlice.Time.ToStringInvariant()}. Error: {algorithm.RunTimeError}");
-                    break;
+                    return;
                 }
 
                 // perform margin calls, in live mode we can also use realtime to emit these
@@ -498,6 +499,7 @@ namespace QuantConnect.Lean.Engine
                         var timeKeeper = algorithm.TimeKeeper;
                         foreach (var update in timeSlice.ConsolidatorUpdateData)
                         {
+                            var localTime = timeKeeper.GetLocalTimeKeeper(update.Target.ExchangeTimeZone).LocalTime;
                             var consolidators = update.Target.Consolidators;
                             foreach (var consolidator in consolidators)
                             {
@@ -511,7 +513,7 @@ namespace QuantConnect.Lean.Engine
                                 }
 
                                 // scan for time after we've pumped all the data through for this consolidator
-                                consolidator.Scan(timeKeeper.GetLocalTimeKeeper(update.Target.ExchangeTimeZone).LocalTime);
+                                consolidator.Scan(localTime);
                             }
                         }
                     }
@@ -585,16 +587,6 @@ namespace QuantConnect.Lean.Engine
                 //After we've fired all other events in this second, fire the pricing events:
                 try
                 {
-
-                    // TODO: For backwards compatibility only. Remove in 2017
-                    // For compatibility with Forex Trade data, moving
-                    if (timeSlice.Slice.QuoteBars.Count > 0)
-                    {
-                        foreach (var tradeBar in timeSlice.Slice.QuoteBars.Where(x => x.Key.ID.SecurityType == SecurityType.Forex))
-                        {
-                            timeSlice.Slice.Bars.Add(tradeBar.Value.Collapse());
-                        }
-                    }
                     if (hasOnDataTradeBars && timeSlice.Slice.Bars.Count > 0) methodInvokers[typeof(TradeBars)](algorithm, timeSlice.Slice.Bars);
                     if (hasOnDataQuoteBars && timeSlice.Slice.QuoteBars.Count > 0) methodInvokers[typeof(QuoteBars)](algorithm, timeSlice.Slice.QuoteBars);
                     if (hasOnDataOptionChains && timeSlice.Slice.OptionChains.Count > 0) methodInvokers[typeof(OptionChains)](algorithm, timeSlice.Slice.OptionChains);
@@ -956,6 +948,8 @@ namespace QuantConnect.Lean.Engine
                     }
                 }
             }
+
+            Log.Trace("ProcessVolatilityHistoryRequirements(): finished.");
         }
 
         /// <summary>
@@ -984,13 +978,20 @@ namespace QuantConnect.Lean.Engine
         {
             foreach (var delisting in newDelistings.Values)
             {
+                Log.Trace($"AlgorithmManager.HandleDelistedSymbols(): Delisting {delisting.Type}: {delisting.Symbol.Value}, UtcTime: {algorithm.UtcTime}, DelistingTime: {delisting.Time}");
+                if (algorithm.LiveMode)
+                {
+                    // skip automatic handling of delisting event in live trading
+                    // Lean will not exercise, liquidate or cancel open orders
+                    continue;
+                }
+
                 // submit an order to liquidate on market close
                 if (delisting.Type == DelistingType.Warning)
                 {
-                    if (!delistings.Any(x => x.Symbol == delisting.Symbol && x.Type == delisting.Type))
+                    if (delistings.All(x => x.Symbol != delisting.Symbol))
                     {
                         delistings.Add(delisting);
-                        Log.Trace($"AlgorithmManager.Run(): Security delisting warning: {delisting.Symbol.Value}, UtcTime: {algorithm.UtcTime}, DelistingTime: {delisting.Time}");
                     }
                 }
                 else
@@ -1000,17 +1001,25 @@ namespace QuantConnect.Lean.Engine
                     security.IsTradable = false;
                     security.IsDelisted = true;
 
+                    // the subscription are getting removed from the data feed because they end
                     // remove security from all universes
                     foreach (var ukvp in algorithm.UniverseManager)
                     {
                         var universe = ukvp.Value;
                         if (universe.ContainsMember(security.Symbol))
                         {
-                            universe.RemoveMember(algorithm.UtcTime, security);
+                            var userUniverse = universe as UserDefinedUniverse;
+                            if (userUniverse != null)
+                            {
+                                userUniverse.Remove(security.Symbol);
+                            }
+                            else
+                            {
+                                universe.RemoveMember(algorithm.UtcTime, security);
+                            }
                         }
                     }
 
-                    Log.Trace($"AlgorithmManager.Run(): Security delisted: {delisting.Symbol.Value}, UtcTime: {algorithm.UtcTime}, DelistingTime: {delisting.Time}");
                     var cancelledOrders = algorithm.Transactions.CancelOpenOrders(delisting.Symbol);
                     foreach (var cancelledOrder in cancelledOrders)
                     {
@@ -1027,48 +1036,46 @@ namespace QuantConnect.Lean.Engine
         {
             for (var i = delistings.Count - 1; i >= 0; i--)
             {
-                // check if we are holding position
-                var security = algorithm.Securities[delistings[i].Symbol];
-                if (security.Holdings.Quantity == 0) continue;
+                var delisting = delistings[i];
+                var security = algorithm.Securities[delisting.Symbol];
+                if (security.Holdings.Quantity == 0)
+                {
+                    continue;
+                }
 
-                // check if the time has come for delisting
-                var delistingTime = delistings[i].Time;
-                var nextMarketOpen = security.Exchange.Hours.GetNextMarketOpen(delistingTime, false);
-                var nextMarketClose = security.Exchange.Hours.GetNextMarketClose(nextMarketOpen, false);
+                if (security.LocalTime < delisting.GetLiquidationTime(security.Exchange.Hours))
+                {
+                    continue;
+                }
 
-                if (security.LocalTime < nextMarketClose) continue;
+                // if there is any delisting event for a symbol that we are the underlying for and we are still invested retry
+                // they will by liquidated first
+                if (delistings.Any(delistingEvent => delistingEvent.Symbol.Underlying == security.Symbol
+                    && algorithm.Securities[delistingEvent.Symbol].Invested))
+                {
+                    // this case could happen for example if we have a future 'A' position open and a future option position with underlying 'A'
+                    // and both get delisted on the same date, we will allow the FOP exercise order to get handled first
+                    continue;
+                }
+
+                var orderType = OrderType.Market;
+                var tag = "Liquidate from delisting";
+                if (security.Type == SecurityType.Option || security.Type == SecurityType.FutureOption)
+                {
+                    // tx handler will determine auto exercise/assignment
+                    tag = "Option Expired";
+                    orderType = OrderType.OptionExercise;
+                }
 
                 // submit an order to liquidate on market close or exercise (for options)
-                SubmitOrderRequest request;
-
-                if (security.Type == SecurityType.Option)
-                {
-                    var option = (Option)security;
-
-                    if (security.Holdings.Quantity > 0)
-                    {
-                        request = new SubmitOrderRequest(OrderType.OptionExercise, security.Type, security.Symbol,
-                            security.Holdings.Quantity, 0, 0, algorithm.UtcTime, "Automatic option exercise on expiration");
-                    }
-                    else
-                    {
-                        var message = option.GetPayOff(option.Underlying.Price) > 0
-                            ? "Automatic option assignment on expiration"
-                            : "Option expiration";
-
-                        request = new SubmitOrderRequest(OrderType.OptionExercise, security.Type, security.Symbol,
-                            security.Holdings.Quantity, 0, 0, algorithm.UtcTime, message);
-                    }
-                }
-                else
-                {
-                    request = new SubmitOrderRequest(OrderType.Market, security.Type, security.Symbol,
-                        -security.Holdings.Quantity, 0, 0, algorithm.UtcTime, "Liquidate from delisting");
-                }
-
-                algorithm.Transactions.ProcessRequest(request);
+                var request = new SubmitOrderRequest(orderType, security.Type, security.Symbol,
+                    -security.Holdings.Quantity, 0, 0, algorithm.UtcTime, tag);
 
                 delistings.RemoveAt(i);
+                algorithm.Transactions.ProcessRequest(request);
+
+                // don't allow users to open a new position once we sent the liquidation order
+                security.IsTradable = false;
             }
         }
 
@@ -1097,7 +1104,7 @@ namespace QuantConnect.Lean.Engine
         /// <summary>
         /// Liquidate option contact holdings who's underlying security has split
         /// </summary>
-        private void ProcessSplitSymbols(IAlgorithm algorithm, List<Split> splitWarnings)
+        private void ProcessSplitSymbols(IAlgorithm algorithm, List<Split> splitWarnings, List<Delisting> delistings)
         {
             // NOTE: This method assumes option contracts have the same core trading hours as their underlying contract
             //       This is a small performance optimization to prevent scanning every contract on every time step,
@@ -1145,7 +1152,7 @@ namespace QuantConnect.Lean.Engine
 
                 // fetch all option derivatives of the underlying with holdings (excluding the canonical security)
                 var derivatives = algorithm.Securities.Where(kvp => kvp.Key.HasUnderlying &&
-                    kvp.Key.SecurityType == SecurityType.Option &&
+                    (kvp.Key.SecurityType == SecurityType.Option || kvp.Key.SecurityType == SecurityType.FutureOption) &&
                     kvp.Key.Underlying == security.Symbol &&
                     !kvp.Key.Underlying.IsCanonical() &&
                     kvp.Value.HoldStock
@@ -1155,6 +1162,13 @@ namespace QuantConnect.Lean.Engine
                 {
                     var optionContractSymbol = kvp.Key;
                     var optionContractSecurity = (Option) kvp.Value;
+
+                    if (delistings.Any(x => x.Symbol == optionContractSymbol
+                        && x.Time.Date == optionContractSecurity.LocalTime.Date))
+                    {
+                        // if the option is going to be delisted today we skip sending the market on close order
+                        continue;
+                    }
 
                     // close any open orders
                     algorithm.Transactions.CancelOpenOrders(optionContractSymbol, "Canceled due to impending split. Separate MarketOnClose order submitted to liquidate position.");
@@ -1170,7 +1184,7 @@ namespace QuantConnect.Lean.Engine
                     // mark option contract as not tradable
                     optionContractSecurity.IsTradable = false;
 
-                    algorithm.Debug($"MarktetOnClose order submitted for option contract '{optionContractSymbol}' due to impending {split.Symbol.Value} split event. "
+                    algorithm.Debug($"MarketOnClose order submitted for option contract '{optionContractSymbol}' due to impending {split.Symbol.Value} split event. "
                         + "Option splits are not currently supported.");
                 }
 

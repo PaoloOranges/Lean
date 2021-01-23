@@ -17,6 +17,7 @@ using Newtonsoft.Json;
 using System;
 using System.Globalization;
 using System.IO;
+using QuantConnect.Logging;
 
 namespace QuantConnect.Data.Custom.SmartInsider
 {
@@ -130,7 +131,20 @@ namespace QuantConnect.Data.Custom.SmartInsider
             var tsv = line.Split('\t');
 
             TransactionID = string.IsNullOrWhiteSpace(tsv[0]) ? null : tsv[0];
-            EventType = string.IsNullOrWhiteSpace(tsv[1]) ? (SmartInsiderEventType?)null : JsonConvert.DeserializeObject<SmartInsiderEventType>($"\"{tsv[1]}\"");
+
+            EventType = SmartInsiderEventType.NotSpecified;
+            if (!string.IsNullOrWhiteSpace(tsv[1]))
+            {
+                try
+                {
+                    EventType = JsonConvert.DeserializeObject<SmartInsiderEventType>($"\"{tsv[1]}\"");
+                }
+                catch (JsonSerializationException)
+                {
+                    Log.Error($"SmartInsiderIntention.FromRawData(): New unexpected entry found {tsv[1]}. Parsed as NotSpecified.");
+                }
+            }
+
             LastUpdate = DateTime.ParseExact(tsv[2], "yyyy-MM-dd", CultureInfo.InvariantCulture);
             LastIDsUpdate = string.IsNullOrWhiteSpace(tsv[3]) ? (DateTime?)null : DateTime.ParseExact(tsv[3], "yyyy-MM-dd", CultureInfo.InvariantCulture);
             ISIN = string.IsNullOrWhiteSpace(tsv[4]) ? null : tsv[4];
@@ -157,10 +171,54 @@ namespace QuantConnect.Data.Custom.SmartInsider
             TimeProcessedUtc = string.IsNullOrWhiteSpace(tsv[41]) ? (DateTime?)null : ParseDate(tsv[41]);
             AnnouncedIn = string.IsNullOrWhiteSpace(tsv[42]) ? null : tsv[42];
 
-            Execution = string.IsNullOrWhiteSpace(tsv[43]) ? (SmartInsiderExecution?)null : JsonConvert.DeserializeObject<SmartInsiderExecution>($"\"{tsv[43]}\"");
-            ExecutionEntity = string.IsNullOrWhiteSpace(tsv[44]) ? (SmartInsiderExecutionEntity?)null : JsonConvert.DeserializeObject<SmartInsiderExecutionEntity>($"\"{tsv[44]}\"");
-            ExecutionHolding = string.IsNullOrWhiteSpace(tsv[45]) ? (SmartInsiderExecutionHolding?)null : JsonConvert.DeserializeObject<SmartInsiderExecutionHolding>($"\"{tsv[45]}\"");
-            ExecutionHolding = ExecutionHolding == SmartInsiderExecutionHolding.Error ? SmartInsiderExecutionHolding.SatisfyStockVesting : ExecutionHolding;
+            Execution = null;
+            if (!string.IsNullOrWhiteSpace(tsv[43]))
+            {
+                try
+                {
+                    Execution = JsonConvert.DeserializeObject<SmartInsiderExecution>($"\"{tsv[43]}\"");
+                }
+                catch (JsonSerializationException)
+                {
+                    Log.Error($"SmartInsiderIntention.FromRawData(): New unexpected entry found for Execution: {tsv[43]}. Parsed as Error.");
+                    Execution = SmartInsiderExecution.Error;
+                }
+            }
+
+            ExecutionEntity = null;
+            if (!string.IsNullOrWhiteSpace(tsv[44]))
+            {
+                try
+                {
+                    ExecutionEntity = JsonConvert.DeserializeObject<SmartInsiderExecutionEntity>($"\"{tsv[44]}\"");
+                }
+                catch (JsonSerializationException)
+                {
+                    Log.Error($"SmartInsiderIntention.FromRawData(): New unexpected entry found for ExecutionEntity: {tsv[44]}. Parsed as Error.");
+                    ExecutionEntity = SmartInsiderExecutionEntity.Error;
+                }
+            }
+
+            ExecutionHolding = null;
+            if (!string.IsNullOrWhiteSpace(tsv[45]))
+            {
+                try
+                {
+                    ExecutionHolding = JsonConvert.DeserializeObject<SmartInsiderExecutionHolding>($"\"{tsv[45]}\"");
+                    if (ExecutionHolding == SmartInsiderExecutionHolding.Error)
+                    {
+                        // This error in particular represents a SatisfyStockVesting field.
+                        ExecutionHolding = SmartInsiderExecutionHolding.SatisfyStockVesting;
+                    }
+                }
+                catch (JsonSerializationException)
+                {
+                    Log.Error($"SmartInsiderIntention.FromRawData(): New unexpected entry found for ExecutionHolding: {tsv[45]}. Parsed as Error.");
+                    ExecutionHolding = SmartInsiderExecutionHolding.Error;
+
+                }
+            }
+
             Amount = string.IsNullOrWhiteSpace(tsv[46]) ? (int?)null : Convert.ToInt32(tsv[46], CultureInfo.InvariantCulture);
             ValueCurrency = string.IsNullOrWhiteSpace(tsv[47]) ? null : tsv[47];
             AmountValue = string.IsNullOrWhiteSpace(tsv[48]) ? (long?)null : Convert.ToInt64(tsv[48], CultureInfo.InvariantCulture);
@@ -279,7 +337,7 @@ namespace QuantConnect.Data.Custom.SmartInsider
             return string.Join("\t",
                 TimeProcessedUtc?.ToStringInvariant("yyyyMMdd HH:mm:ss"),
                 TransactionID,
-                JsonConvert.SerializeObject(EventType).Replace("\"", ""),
+                EventType == null ? null : JsonConvert.SerializeObject(EventType).Replace("\"", ""),
                 LastUpdate.ToStringInvariant("yyyyMMdd"),
                 LastIDsUpdate?.ToStringInvariant("yyyyMMdd"),
                 ISIN,
@@ -303,9 +361,9 @@ namespace QuantConnect.Data.Custom.SmartInsider
                 TimeProcessed?.ToStringInvariant("yyyyMMdd HH:mm:ss"),
                 TimeReleasedUtc?.ToStringInvariant("yyyyMMdd HH:mm:ss"),
                 AnnouncedIn,
-                JsonConvert.SerializeObject(Execution).Replace("\"", ""),
-                JsonConvert.SerializeObject(ExecutionEntity).Replace("\"", ""),
-                JsonConvert.SerializeObject(ExecutionHolding).Replace("\"", ""),
+                Execution == null ? null : JsonConvert.SerializeObject(Execution).Replace("\"", ""),
+                ExecutionEntity == null ? null : JsonConvert.SerializeObject(ExecutionEntity).Replace("\"", ""),
+                ExecutionHolding == null ? null : JsonConvert.SerializeObject(ExecutionHolding).Replace("\"", ""),
                 Amount,
                 ValueCurrency,
                 AmountValue,

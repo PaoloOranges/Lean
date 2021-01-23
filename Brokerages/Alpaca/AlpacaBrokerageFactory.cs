@@ -91,13 +91,13 @@ namespace QuantConnect.Brokerages.Alpaca
                 throw new Exception("Available trading mode: paper/live");
             }
 
-            var handlesMarketData = job.DataQueueHandler.EndsWith("AlpacaBrokerage");
-
-            var brokerage = new AlpacaBrokerage(algorithm.Transactions, algorithm.Portfolio, keyId, secretKey, tradingMode, handlesMarketData);
-            Composer.Instance.AddPart<IDataQueueHandler>(brokerage);
-
-            return brokerage;
+            return new AlpacaBrokerage(
+                algorithm.Transactions, 
+                algorithm.Portfolio,
+                Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider")),
+                keyId, 
+                secretKey, 
+                tradingMode);
         }
-
     }
 }

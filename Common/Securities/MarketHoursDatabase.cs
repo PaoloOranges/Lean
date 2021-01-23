@@ -21,6 +21,7 @@ using Newtonsoft.Json;
 using NodaTime;
 using QuantConnect.Data;
 using QuantConnect.Logging;
+using QuantConnect.Securities.Future;
 using QuantConnect.Util;
 
 namespace QuantConnect.Securities
@@ -32,6 +33,7 @@ namespace QuantConnect.Securities
     public class MarketHoursDatabase
     {
         private static MarketHoursDatabase _dataFolderMarketHoursDatabase;
+        private static MarketHoursDatabase _alwaysOpenMarketHoursDatabase;
         private static readonly object DataFolderMarketHoursDatabaseLock = new object();
 
         private readonly Dictionary<SecurityDatabaseKey, Entry> _entries;
@@ -44,7 +46,18 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Gets a <see cref="MarketHoursDatabase"/> that always returns <see cref="SecurityExchangeHours.AlwaysOpen"/>
         /// </summary>
-        public static MarketHoursDatabase AlwaysOpen { get; } = new AlwaysOpenMarketHoursDatabaseImpl();
+        public static MarketHoursDatabase AlwaysOpen
+        {
+            get
+            {
+                if (_alwaysOpenMarketHoursDatabase == null)
+                {
+                    _alwaysOpenMarketHoursDatabase = new AlwaysOpenMarketHoursDatabaseImpl();
+                }
+
+                return _alwaysOpenMarketHoursDatabase;
+            }
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MarketHoursDatabase"/> class
@@ -189,7 +202,12 @@ namespace QuantConnect.Securities
         public virtual Entry GetEntry(string market, string symbol, SecurityType securityType)
         {
             Entry entry;
-            if (!TryGetEntry(market, symbol, securityType, out entry))
+            // Fall back on the Futures MHDB entry if the FOP lookup failed.
+            // Some FOPs have the same symbol properties as their futures counterparts.
+            // So, to save ourselves some space, we can fall back on the existing entries
+            // so that we don't duplicate the information.
+            if (!TryGetEntry(market, symbol, securityType, out entry) &&
+                !(securityType == SecurityType.FutureOption && TryGetEntry(market, FuturesOptionsSymbolMappings.MapFromOption(symbol), SecurityType.Future, out entry)))
             {
                 var key = new SecurityDatabaseKey(market, symbol, securityType);
                 var keys = string.Join(", ", _entries.Keys);
@@ -274,12 +292,13 @@ namespace QuantConnect.Securities
                     case SecurityType.Option:
                         stringSymbol = symbol.HasUnderlying ? symbol.Underlying.Value : string.Empty;
                         break;
-
+                    case SecurityType.FutureOption:
+                        stringSymbol = symbol.HasUnderlying ? symbol.ID.Symbol : string.Empty;
+                        break;
                     case SecurityType.Base:
                     case SecurityType.Future:
                         stringSymbol = symbol.ID.Symbol;
                         break;
-
                     default:
                         stringSymbol = symbol.Value;
                         break;

@@ -48,6 +48,8 @@ namespace QuantConnect.Securities
         // using concurrent bag to avoid list enumeration threading issues
         protected readonly ConcurrentBag<SubscriptionDataConfig> SubscriptionsBag;
 
+        protected IShortableProvider ShortableProvider { get; private set; }
+
         /// <summary>
         /// A null security leverage value
         /// </summary>
@@ -608,20 +610,6 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Update any security properties based on the latest realtime data and time
-        /// </summary>
-        /// <param name="data">New data packet from LEAN</param>
-        public void SetRealTimePrice(BaseData data)
-        {
-            //Add new point to cache:
-            if (data == null) return;
-            Cache.AddData(data);
-
-            if (data is OpenInterest || data.Price == 0m) return;
-            Holdings.UpdateMarketPrice(Price);
-        }
-
-        /// <summary>
         /// Returns true if the security contains at least one subscription that represents custom data
         /// </summary>
         [Obsolete("This method is obsolete. Use the 'SubscriptionDataConfig' exposed by" +
@@ -643,7 +631,8 @@ namespace QuantConnect.Securities
         public void SetLeverage(decimal leverage)
         {
             if (Symbol.ID.SecurityType == SecurityType.Future ||
-                Symbol.ID.SecurityType == SecurityType.Option)
+                Symbol.ID.SecurityType == SecurityType.Option ||
+                Symbol.ID.SecurityType == SecurityType.FutureOption)
                 return;
 
             BuyingPowerModel.SetLeverage(this, leverage);
@@ -782,6 +771,11 @@ namespace QuantConnect.Securities
         public void SetMarginModel(PyObject pyObject)
         {
             SetMarginModel(new BuyingPowerModelPythonWrapper(pyObject));
+        }
+
+        public void SetShortableProvider(IShortableProvider shortableProvider)
+        {
+            ShortableProvider = shortableProvider;
         }
 
         /// <summary>

@@ -18,6 +18,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Deedle;
+using Newtonsoft.Json;
+using QuantConnect.Configuration;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
 using QuantConnect.Report.ReportElements;
@@ -38,7 +40,8 @@ namespace QuantConnect.Report
         /// <param name="version">Version number of the strategy</param>
         /// <param name="backtest">Backtest result object</param>
         /// <param name="live">Live result object</param>
-        public Report(string name, string description, string version, BacktestResult backtest, LiveResult live)
+        /// <param name="pointInTimePortfolioDestination">Point in time portfolio json output base filename</param>
+        public Report(string name, string description, string version, BacktestResult backtest, LiveResult live, string pointInTimePortfolioDestination = null)
         {
             var backtestCurve = new Series<DateTime, double>(ResultsUtil.EquityPoints(backtest));
             var liveCurve = new Series<DateTime, double>(ResultsUtil.EquityPoints(live));
@@ -51,16 +54,50 @@ namespace QuantConnect.Report
             Log.Trace($"QuantConnect.Report.Report(): Processing live orders");
             var livePortfolioInTime = PortfolioLooper.FromOrders(liveCurve, liveOrders, liveSeries: true).ToList();
 
-            _elements = new List<ReportElement>
+            var destination = pointInTimePortfolioDestination ?? Config.Get("report-destination");
+            if (!string.IsNullOrWhiteSpace(destination))
+            {
+                if (backtestPortfolioInTime.Count != 0)
+                {
+                    var dailyBacktestPortfolioInTime = backtestPortfolioInTime
+                        .Select(x => new PointInTimePortfolio(x, x.Time.Date).NoEmptyHoldings())
+                        .GroupBy(x => x.Time.Date)
+                        .Select(kvp => kvp.Last())
+                        .OrderBy(x => x.Time)
+                        .ToList();
+
+                    var outputFile = destination.Replace(".html", string.Empty) + "-backtesting-portfolio.json";
+                    Log.Trace($"Report.Report(): Writing backtest point-in-time portfolios to JSON file: {outputFile}");
+                    var backtestPortfolioOutput = JsonConvert.SerializeObject(dailyBacktestPortfolioInTime);
+                    File.WriteAllText(outputFile, backtestPortfolioOutput);
+                }
+                if (livePortfolioInTime.Count != 0)
+                {
+                    var dailyLivePortfolioInTime = livePortfolioInTime
+                        .Select(x => new PointInTimePortfolio(x, x.Time.Date).NoEmptyHoldings())
+                        .GroupBy(x => x.Time.Date)
+                        .Select(kvp => kvp.Last())
+                        .OrderBy(x => x.Time)
+                        .ToList();
+
+                    var outputFile = destination.Replace(".html", string.Empty) + "-live-portfolio.json";
+                    Log.Trace($"Report.Report(): Writing live point-in-time portfolios to JSON file: {outputFile}");
+                    var livePortfolioOutput = JsonConvert.SerializeObject(dailyLivePortfolioInTime);
+                    File.WriteAllText(outputFile, livePortfolioOutput);
+                }
+            }
+
+            _elements = new List<IReportElement>
             {
                 //Basics
                 new TextReportElement("strategy name", ReportKey.StrategyName, name),
                 new TextReportElement("description", ReportKey.StrategyDescription, description),
                 new TextReportElement("version", ReportKey.StrategyVersion, version),
                 new TextReportElement("stylesheet", ReportKey.Stylesheet, File.ReadAllText("css/report.css")),
+                new TextReportElement("live marker key", ReportKey.LiveMarker, live == null ? string.Empty : "Live "),
 
                 //KPI's Backtest:
-                new EstimatedCapacityReportElement("estimated capacity kpi", ReportKey.EstimatedCapacity, backtest, live),
+                new DaysLiveReportElement("days live kpi", ReportKey.DaysLive, live),
                 new CAGRReportElement("cagr kpi", ReportKey.CAGR, backtest, live),
                 new TurnoverReportElement("turnover kpi", ReportKey.Turnover, backtest, live),
                 new MaxDrawdownReportElement("max drawdown kpi", ReportKey.MaxDrawdown, backtest, live),
@@ -88,6 +125,7 @@ namespace QuantConnect.Report
                 new CrisisReportElement("crisis page", ReportKey.CrisisPageStyle, backtest, live),
                 new CrisisReportElement("crisis plots", ReportKey.CrisisPlots, backtest, live)
             };
+
         }
 
         /// <summary>

@@ -45,9 +45,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators
         /// <param name="subscriptionEndTime">The end time of the subscription, once passing this date the enumerator will stop</param>
         /// <param name="dataResolution">The source enumerator's data resolution</param>
         /// <param name="dataTimeZone">Time zone of the underlying source data</param>
-        /// <param name="subscriptionStartTime">The start time of the subscription</param>
-        public LiveFillForwardEnumerator(ITimeProvider timeProvider, IEnumerator<BaseData> enumerator, SecurityExchange exchange, IReadOnlyRef<TimeSpan> fillForwardResolution, bool isExtendedMarketHours, DateTime subscriptionEndTime, TimeSpan dataResolution, DateTimeZone dataTimeZone, DateTime subscriptionStartTime)
-            : base(enumerator, exchange, fillForwardResolution, isExtendedMarketHours, subscriptionEndTime, dataResolution, dataTimeZone, subscriptionStartTime)
+        public LiveFillForwardEnumerator(ITimeProvider timeProvider, IEnumerator<BaseData> enumerator, SecurityExchange exchange, IReadOnlyRef<TimeSpan> fillForwardResolution, bool isExtendedMarketHours, DateTime subscriptionEndTime, TimeSpan dataResolution, DateTimeZone dataTimeZone)
+            : base(enumerator, exchange, fillForwardResolution, isExtendedMarketHours, subscriptionEndTime, dataResolution, dataTimeZone)
         {
             _timeProvider = timeProvider;
         }
@@ -64,6 +63,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators
         {
             // convert times to UTC for accurate comparisons and differences across DST changes
             fillForward = null;
+            // Add a delay to the time we expect a data point if we've configured a delay for batching
             var nextExpectedDataPointTimeUtc = previous.EndTime.ConvertToUtc(Exchange.TimeZone) + fillForwardResolution;
             if (next != null)
             {

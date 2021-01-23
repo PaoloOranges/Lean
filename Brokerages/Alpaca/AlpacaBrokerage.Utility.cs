@@ -31,7 +31,6 @@ namespace QuantConnect.Brokerages.Alpaca
     /// </summary>
     public partial class AlpacaBrokerage
     {
-
         /// <summary>
         /// Retrieves the current quotes for an instrument
         /// </summary>
@@ -46,13 +45,14 @@ namespace QuantConnect.Brokerages.Alpaca
 
             return new Tick
             {
-                Symbol = Symbol.Create(response.Symbol, SecurityType.Equity, Market.USA),
+                Symbol = _symbolMapper.GetLeanSymbol(response.Symbol, SecurityType.Equity, Market.USA),
                 BidPrice = response.BidPrice,
                 AskPrice = response.AskPrice,
                 Time = response.Time,
                 TickType = TickType.Quote
             };
         }
+
         private IOrder GenerateAndPlaceOrder(Order order)
         {
             var quantity = (long)order.Quantity;
@@ -95,7 +95,7 @@ namespace QuantConnect.Brokerages.Alpaca
             }
 
             CheckRateLimiting();
-            var task = _alpacaTradingClient.PostOrderAsync(new NewOrderRequest(order.Symbol.Value, quantity, side, type, timeInForce)
+            var task = _alpacaTradingClient.PostOrderAsync(new NewOrderRequest(_symbolMapper.GetBrokerageSymbol(order.Symbol), quantity, side, type, timeInForce)
             {
                 LimitPrice = limitPrice,
                 StopPrice = stopPrice
@@ -172,14 +172,9 @@ namespace QuantConnect.Brokerages.Alpaca
             }
         }
 
-        private static void OnPolygonStreamingClientError(Exception exception)
-        {
-            Log.Error(exception, $"PolygonStreamingClient error");
-        }
-
         private static void OnSockClientError(Exception exception)
         {
-            Log.Error(exception, "SockClient error");
+            Log.Error($"SockClient error: {exception.Message}");
         }
 
         /// <summary>
@@ -193,6 +188,12 @@ namespace QuantConnect.Brokerages.Alpaca
         /// <returns>The list of bars</returns>
         private IEnumerable<TradeBar> DownloadTradeBars(Symbol symbol, DateTime startTimeUtc, DateTime endTimeUtc, Resolution resolution, DateTimeZone requestedTimeZone)
         {
+            // Only equities supported
+            if (symbol.SecurityType != SecurityType.Equity)
+            {
+                yield break;
+            }
+
             // Only minute/hour/daily resolutions supported
             if (resolution < Resolution.Minute)
             {
@@ -210,7 +211,7 @@ namespace QuantConnect.Brokerages.Alpaca
 
                 var task = _polygonDataClient.ListAggregatesAsync(
                     new AggregatesRequest(
-                        symbol.Value,
+                        _symbolMapper.GetBrokerageSymbol(symbol),
                         new AggregationPeriod(
                             1,
                             resolution == Resolution.Daily ? AggregationPeriodUnit.Day : AggregationPeriodUnit.Minute
@@ -295,7 +296,7 @@ namespace QuantConnect.Brokerages.Alpaca
 
                 var dateUtc = startTimeUtc.Date;
                 var date = startTimeUtc.ConvertFromUtc(requestedTimeZone).Date;
-                var task = _polygonDataClient.ListHistoricalTradesAsync(new HistoricalRequest(symbol.Value, date)
+                var task = _polygonDataClient.ListHistoricalTradesAsync(new HistoricalRequest(_symbolMapper.GetBrokerageSymbol(symbol), date)
                 {
                     Timestamp = previousTimestamp
                 });
@@ -395,7 +396,7 @@ namespace QuantConnect.Brokerages.Alpaca
             var instrument = order.Symbol;
             var id = order.OrderId.ToString();
 
-            qcOrder.Symbol = Symbol.Create(instrument, SecurityType.Equity, Market.USA);
+            qcOrder.Symbol = _symbolMapper.GetLeanSymbol(instrument, SecurityType.Equity, Market.USA);
 
             if (order.SubmittedAt != null)
             {
@@ -428,15 +429,12 @@ namespace QuantConnect.Brokerages.Alpaca
         /// <summary>
         /// Converts an Alpaca position into a LEAN holding.
         /// </summary>
-        private static Holding ConvertHolding(IPosition position)
+        private Holding ConvertHolding(IPosition position)
         {
-            const SecurityType securityType = SecurityType.Equity;
-            var symbol = Symbol.Create(position.Symbol, securityType, Market.USA);
-
             return new Holding
             {
-                Symbol = symbol,
-                Type = securityType,
+                Symbol = _symbolMapper.GetLeanSymbol(position.Symbol, SecurityType.Equity, Market.USA),
+                Type = SecurityType.Equity,
                 AveragePrice = position.AverageEntryPrice,
                 MarketPrice = position.AssetCurrentPrice,
                 MarketValue = position.MarketValue,

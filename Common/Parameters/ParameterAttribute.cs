@@ -87,6 +87,12 @@ namespace QuantConnect.Parameters
                 string parameterValue;
                 if (!parameters.TryGetValue(parameterName, out parameterValue)) continue;
 
+                if (string.IsNullOrEmpty(parameterValue))
+                {
+                    Log.Error($"ParameterAttribute.ApplyAttributes(): parameter '{parameterName}' provided value is null/empty, skipping");
+                    continue;
+                }
+
                 // if it's a read-only property with a parameter value we can't really do anything, bail
                 if (propertyInfo != null && !propertyInfo.CanWrite)
                 {
@@ -122,7 +128,6 @@ namespace QuantConnect.Parameters
             var parameters = new Dictionary<string, string>();
             foreach (var type in assembly.GetTypes())
             {
-                Log.Debug($"ParameterAttribute.GetParametersFromAssembly(): Checking type {type.Name}");
                 foreach (var kvp in GetParametersFromType(type))
                 {
                     parameters[kvp.Key] = kvp.Value;

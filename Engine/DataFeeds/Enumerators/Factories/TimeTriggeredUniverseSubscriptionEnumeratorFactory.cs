@@ -71,11 +71,27 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories
                 // Trigger universe selection when security added/removed after Initialize
                 universe.CollectionChanged += (sender, args) =>
                 {
-                    var items =
-                        args.Action == NotifyCollectionChangedAction.Add ? args.NewItems :
-                        args.Action == NotifyCollectionChangedAction.Remove ? args.OldItems : null;
-
-                    var time = _timeProvider.GetUtcNow();
+                    // If it is an add we will set time 1 tick ahead to properly sync data
+                    // with next timeslice, if it is a remove then we will set time to now
+                    IList items;
+                    DateTime time;
+                    if (args.Action == NotifyCollectionChangedAction.Add)
+                    {
+                        items = args.NewItems;
+                        time = _timeProvider.GetUtcNow().AddTicks(1);
+                    }
+                    else if (args.Action == NotifyCollectionChangedAction.Remove)
+                    {
+                        items = args.OldItems;
+                        time = _timeProvider.GetUtcNow();
+                    }
+                    else 
+                    {
+                        items = null;
+                        time = DateTime.MinValue;
+                    }
+                    
+                    // Check that we have our items and time
                     if (items == null || time == DateTime.MinValue) return;
 
                     var symbol = items.OfType<Symbol>().FirstOrDefault();
@@ -86,7 +102,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories
                     time = time.ConvertFromUtc(request.Configuration.ExchangeTimeZone);
 
                     var collection = new BaseDataCollection(time, symbol);
-
                     ((InjectionEnumerator) enumerator).InjectDataPoint(collection);
                 };
             }
@@ -96,7 +111,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories
 
         private class InjectionEnumerator : IEnumerator<BaseData>
         {
-            private bool _wasInjected;
+            private volatile bool _wasInjected;
             private readonly IEnumerator<BaseData> _underlyingEnumerator;
 
             public BaseData Current { get; private set; }
@@ -110,8 +125,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories
 
             public void InjectDataPoint(BaseData baseData)
             {
-                _wasInjected = true;
-                Current = baseData;
+                // we use a lock because the main algorithm thread is the one injecting and the base exchange is the thread pulling MoveNext()
+                lock (_underlyingEnumerator)
+                {
+                    _wasInjected = true;
+                    Current = baseData;
+                }
             }
 
             public void Dispose()
@@ -121,14 +140,17 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories
 
             public bool MoveNext()
             {
-                if (_wasInjected)
+                lock (_underlyingEnumerator)
                 {
-                    _wasInjected = false;
+                    if (_wasInjected)
+                    {
+                        _wasInjected = false;
+                        return true;
+                    }
+                    _underlyingEnumerator.MoveNext();
+                    Current = _underlyingEnumerator.Current;
                     return true;
                 }
-                _underlyingEnumerator.MoveNext();
-                Current = _underlyingEnumerator.Current;
-                return true;
             }
 
             public void Reset()

@@ -21,6 +21,8 @@ using NUnit.Framework;
 using QuantConnect.Brokerages.Fxcm;
 using QuantConnect.Configuration;
 using QuantConnect.Interfaces;
+using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
 
@@ -41,7 +43,7 @@ namespace QuantConnect.Tests.Brokerages.Fxcm
             var password = Config.Get("fxcm-password");
             var accountId = Config.Get("fxcm-account-id");
 
-            return new FxcmBrokerage(orderProvider, securityProvider, server, terminal, userName, password, accountId);
+            return new FxcmBrokerage(orderProvider, securityProvider, new AggregationManager(), server, terminal, userName, password, accountId);
         }
 
         /// <summary>
@@ -113,9 +115,9 @@ namespace QuantConnect.Tests.Brokerages.Fxcm
 
             var tenMinutes = TimeSpan.FromMinutes(10);
 
-            Console.WriteLine("------");
-            Console.WriteLine("Waiting for internet disconnection ");
-            Console.WriteLine("------");
+            Log.Trace("------");
+            Log.Trace("Waiting for internet disconnection ");
+            Log.Trace("------");
 
             // spin while we manually disconnect the internet
             while (brokerage.IsConnected)
@@ -126,9 +128,9 @@ namespace QuantConnect.Tests.Brokerages.Fxcm
 
             var stopwatch = Stopwatch.StartNew();
 
-            Console.WriteLine("------");
-            Console.WriteLine("Trying to reconnect ");
-            Console.WriteLine("------");
+            Log.Trace("------");
+            Log.Trace("Trying to reconnect ");
+            Log.Trace("------");
 
             // spin until we're reconnected
             while (!brokerage.IsConnected && stopwatch.Elapsed < tenMinutes)

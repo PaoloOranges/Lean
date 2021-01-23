@@ -16,8 +16,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using NodaTime;
 using QuantConnect.Brokerages.Alpaca.Markets;
 using QuantConnect.Data;
 using QuantConnect.Interfaces;
@@ -34,21 +32,15 @@ namespace QuantConnect.Brokerages.Alpaca
     /// Alpaca Brokerage implementation
     /// </summary>
     [BrokerageFactory(typeof(AlpacaBrokerageFactory))]
-    public partial class AlpacaBrokerage : Brokerage, IDataQueueHandler
+    public partial class AlpacaBrokerage : Brokerage
     {
-        private bool _isConnected;
-        private Thread _connectionMonitorThread;
-        private volatile bool _connectionLost;
-        private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-
         // Rest API requests must be limited to a maximum of 200 messages/minute
         private readonly RateGate _messagingRateLimiter = new RateGate(200, TimeSpan.FromMinutes(1));
 
         private readonly AlpacaTradingClient _alpacaTradingClient;
         private readonly PolygonDataClient _polygonDataClient;
         private readonly SockClient _sockClient;
-        private readonly PolygonStreamingClient _polygonStreamingClient;
-        private readonly bool _handlesMarketData;
+        private readonly ISymbolMapper _symbolMapper;
 
         /// <summary>
         /// This lock is used to sync 'PlaceOrder' and callback 'OnTradeUpdate'
@@ -70,22 +62,18 @@ namespace QuantConnect.Brokerages.Alpaca
         /// </summary>
         private readonly MarketHoursDatabase _marketHours;
 
-        private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new Dictionary<Symbol, DateTimeZone>();
-
         /// <summary>
         /// Initializes a new instance of the <see cref="AlpacaBrokerage"/> class.
         /// </summary>
         /// <param name="orderProvider">The order provider.</param>
         /// <param name="securityProvider">The holdings provider.</param>
+        /// <param name="mapFileProvider">representing all the map files</param>
         /// <param name="accountKeyId">The Alpaca api key id</param>
         /// <param name="secretKey">The api secret key</param>
         /// <param name="tradingMode">The Alpaca trading mode. paper/live</param>
-        /// <param name="handlesMarketData">true if market data subscriptions will be handled by Alpaca</param>
-        public AlpacaBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider, string accountKeyId, string secretKey, string tradingMode, bool handlesMarketData)
+        public AlpacaBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider, IMapFileProvider mapFileProvider, string accountKeyId, string secretKey, string tradingMode)
             : base("Alpaca Brokerage")
         {
-            _handlesMarketData = handlesMarketData;
-
             var httpScheme = "https://";
             var alpacaBaseUrl = "api.alpaca.markets";
 
@@ -95,7 +83,7 @@ namespace QuantConnect.Brokerages.Alpaca
 
             _orderProvider = orderProvider;
             _securityProvider = securityProvider;
-
+            _symbolMapper = new AlpacaSymbolMapper(mapFileProvider);
             _marketHours = MarketHoursDatabase.FromDataFolder();
 
             // Alpaca trading client
@@ -104,6 +92,7 @@ namespace QuantConnect.Brokerages.Alpaca
                 ApiEndpoint = tradingMode.Equals("paper") ? Environments.Paper.AlpacaTradingApi : Environments.Live.AlpacaTradingApi,
                 SecurityId = new SecretKey(accountKeyId, secretKey)
             });
+
             // api client for alpaca data
             _polygonDataClient = new PolygonDataClient(new PolygonDataClientConfiguration
             {
@@ -115,17 +104,6 @@ namespace QuantConnect.Brokerages.Alpaca
             _sockClient = new SockClient(accountKeyId, secretKey, httpAlpacaBaseUrl);
             _sockClient.OnTradeUpdate += OnTradeUpdate;
             _sockClient.OnError += OnSockClientError;
-
-            // Polygon Streaming client for Alpaca (streams trade and quote data)
-            _polygonStreamingClient = new PolygonStreamingClient(new PolygonStreamingClientConfiguration
-            {
-                ApiEndpoint = Environments.Live.PolygonStreamingApi,
-                KeyId = accountKeyId,
-                WebSocketFactory = new WebSocketSharpFactory()
-            });
-            _polygonStreamingClient.QuoteReceived += OnQuoteReceived;
-            _polygonStreamingClient.TradeReceived += OnTradeReceived;
-            _polygonStreamingClient.OnError += OnPolygonStreamingClientError;
         }
 
         #region IBrokerage implementation
@@ -133,7 +111,12 @@ namespace QuantConnect.Brokerages.Alpaca
         /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
-        public override bool IsConnected => _isConnected && !_connectionLost;
+        public override bool IsConnected => _sockClient.IsConnected;
+
+        /// <summary>
+        /// Returns the brokerage account's base currency
+        /// </summary>
+        public override string AccountBaseCurrency => Currencies.USD;
 
         /// <summary>
         /// Connects the client to the broker's remote servers
@@ -142,86 +125,9 @@ namespace QuantConnect.Brokerages.Alpaca
         {
             if (IsConnected) return;
 
-            _sockClient.ConnectAsync().SynchronouslyAwaitTask();
+            AccountBaseCurrency = GetAccountBaseCurrency();
 
-            if (_handlesMarketData)
-            {
-                _polygonStreamingClient.ConnectAndAuthenticateAsync().SynchronouslyAwaitTask();
-            }
-
-            _isConnected = true;
-
-            // create new thread to manage disconnections and reconnections
-            var connectionMonitorStartedEvent = new AutoResetEvent(false);
-            _cancellationTokenSource = new CancellationTokenSource();
-            _connectionMonitorThread = new Thread(() =>
-            {
-                connectionMonitorStartedEvent.Set();
-
-                var nextReconnectionAttemptSeconds = 1;
-
-                try
-                {
-                    while (!_cancellationTokenSource.IsCancellationRequested)
-                    {
-                        var isAlive = true;
-                        try
-                        {
-                            isAlive = _sockClient.IsAlive;
-                        }
-                        catch (Exception)
-                        {
-                            // ignored
-                        }
-
-                        if (isAlive && _connectionLost)
-                        {
-                            _connectionLost = false;
-                            nextReconnectionAttemptSeconds = 1;
-
-                            OnMessage(BrokerageMessageEvent.Reconnected("Connection with Alpaca server restored."));
-                        }
-                        else if (!isAlive)
-                        {
-                            if (_connectionLost)
-                            {
-                                try
-                                {
-                                    Thread.Sleep(TimeSpan.FromSeconds(nextReconnectionAttemptSeconds));
-
-                                    _sockClient.ConnectAsync().SynchronouslyAwaitTask();
-                                }
-                                catch (Exception exception)
-                                {
-                                    // double the interval between attempts (capped to 1 minute)
-                                    nextReconnectionAttemptSeconds = Math.Min(nextReconnectionAttemptSeconds * 2, 60);
-
-                                    Log.Error(exception);
-                                }
-                            }
-                            else
-                            {
-                                _connectionLost = true;
-
-                                OnMessage(
-                                    BrokerageMessageEvent.Disconnected(
-                                        "Connection with Alpaca server lost. " +
-                                        "This could be because of internet connectivity issues. "));
-                            }
-                        }
-
-                        Thread.Sleep(1000);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    Log.Error(exception);
-                }
-            })
-            { IsBackground = true };
-            _connectionMonitorThread.Start();
-
-            connectionMonitorStartedEvent.WaitOne();
+            _sockClient.Connect();
         }
 
         /// <summary>
@@ -229,20 +135,8 @@ namespace QuantConnect.Brokerages.Alpaca
         /// </summary>
         public override void Disconnect()
         {
-            // request and wait for thread to stop
-            _cancellationTokenSource.Cancel();
-            _connectionMonitorThread?.Join();
-
-            _sockClient.DisconnectAsync().SynchronouslyAwaitTask();
-
-            if (_handlesMarketData)
-            {
-                _polygonStreamingClient.DisconnectAsync().SynchronouslyAwaitTask();
-            }
-
-            _isConnected = false;
+            _sockClient.Disconnect();
         }
-
 
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
@@ -251,9 +145,7 @@ namespace QuantConnect.Brokerages.Alpaca
         {
             Log.Trace("AlpacaBrokerage.Dispose(): Disposing of Alpaca brokerage resources.");
 
-            _cancellationTokenSource.Dispose();
             _sockClient?.Dispose();
-            _polygonStreamingClient?.Dispose();
 
             _messagingRateLimiter.Dispose();
         }
@@ -271,8 +163,7 @@ namespace QuantConnect.Brokerages.Alpaca
 
             return new List<CashAmount>
             {
-                new CashAmount(balance.TradableCash,
-                    Currencies.USD)
+                new CashAmount(balance.TradableCash, balance.Currency)
             };
         }
 
@@ -409,6 +300,19 @@ namespace QuantConnect.Brokerages.Alpaca
             {
                 yield return item;
             }
+        }
+
+        /// <summary>
+        /// Gets the account base currency
+        /// </summary>
+        private string GetAccountBaseCurrency()
+        {
+            CheckRateLimiting();
+
+            var task = _alpacaTradingClient.GetAccountAsync();
+            var balance = task.SynchronouslyAwaitTaskResult();
+
+            return balance.Currency;
         }
 
         #endregion

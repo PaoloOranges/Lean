@@ -115,7 +115,7 @@ namespace QuantConnect.Indicators
 
         /// <summary>
         /// Computes the next value of the following sub-indicators from the given state:
-        /// StandardDeviation, MiddleBand, UpperBand, LowerBand
+        /// StandardDeviation, MiddleBand, UpperBand, LowerBand, BandWidth, %B
         /// </summary>
         /// <param name="input">The input given to the indicator</param>
         /// <returns>The input is returned unmodified.</returns>
@@ -125,11 +125,11 @@ namespace QuantConnect.Indicators
             MiddleBand.Update(input);
             Price.Update(input);
 
-            return input;
+            return input.Value;
         }
 
         /// <summary>
-        /// Resets this indicator and all sub-indicators (StandardDeviation, LowerBand, MiddleBand, UpperBand)
+        /// Resets this indicator and all sub-indicators (StandardDeviation, LowerBand, MiddleBand, UpperBand, BandWidth, %B)
         /// </summary>
         public override void Reset()
         {

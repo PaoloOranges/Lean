@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+using Python.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +22,7 @@ using QuantConnect.Data.Consolidators;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Util;
+using QuantConnect.Python;
 
 namespace QuantConnect.Data
 {
@@ -172,6 +174,17 @@ namespace QuantConnect.Data
         }
 
         /// <summary>
+        /// Add a custom python consolidator for the symbol
+        /// </summary>
+        /// <param name="symbol">Symbol of the asset to consolidate</param>
+        /// <param name="pyConsolidator">The custom python consolidator</param>
+        public void AddConsolidator(Symbol symbol, PyObject pyConsolidator)
+        {
+            IDataConsolidator consolidator = new DataConsolidatorPythonWrapper(pyConsolidator);
+            AddConsolidator(symbol, consolidator);
+        }
+
+        /// <summary>
         ///     Removes the specified consolidator for the symbol
         /// </summary>
         /// <param name="symbol">The symbol the consolidator is receiving data from</param>
@@ -199,6 +212,7 @@ namespace QuantConnect.Data
                 {SecurityType.Forex, new List<TickType> {TickType.Quote}},
                 {SecurityType.Equity, new List<TickType> {TickType.Trade, TickType.Quote}},
                 {SecurityType.Option, new List<TickType> {TickType.Quote, TickType.Trade, TickType.OpenInterest}},
+                {SecurityType.FutureOption, new List<TickType> {TickType.Quote, TickType.Trade, TickType.OpenInterest}},
                 {SecurityType.Cfd, new List<TickType> {TickType.Quote}},
                 {SecurityType.Future, new List<TickType> {TickType.Quote, TickType.Trade, TickType.OpenInterest}},
                 {SecurityType.Commodity, new List<TickType> {TickType.Trade}},
