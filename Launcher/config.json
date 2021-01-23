@@ -6,10 +6,10 @@
   // two predefined environments, 'backtesting' and 'live', feel free
   // to add more!
 
-  "environment": "paper-gdax", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed", "paper-gdax"
+  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed", "paper-gdax"
 
   // algorithm class selector
-  "algorithm-type-name": "PaoloTestHourlyCryptoAlgorithm",
+  "algorithm-type-name": "PaoloFastMinuteCryptoAlgorithm",
   //"algorithm-type-name": "IndicatorWarmupAlgorithm",
 
   // Algorithm language selector - options CSharp, Python
@@ -114,7 +114,7 @@
   "bitfinex-api-secret": "",
   "bitfinex-api-key": "",
 
-    // binance configuration
+  // binance configuration
   "binance-api-secret": "",
   "binance-api-key": "",
 
@@ -198,7 +198,7 @@
       "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
       "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
       "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
-      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BacktestingTransactionHandler",
       "history-provider": "BrokerageHistoryProvider"
     },
 
