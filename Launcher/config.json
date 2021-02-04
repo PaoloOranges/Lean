@@ -6,7 +6,7 @@
   // two predefined environments, 'backtesting' and 'live', feel free
   // to add more!
 
-  "environment": "paper-gdax", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed", "paper-gdax"
+  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed", "paper-gdax"
 
   // algorithm class selector
   "algorithm-type-name": "PaoloFastMinuteCryptoAlgorithm",

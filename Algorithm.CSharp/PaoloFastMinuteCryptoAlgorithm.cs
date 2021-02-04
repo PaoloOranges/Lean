@@ -68,6 +68,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             SetCash(CashName, 900, 1.21m);
             SetCash("USD", 0);
+            SetCash(CryptoName, 10);
 
             SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
             SetTimeZone(NodaTime.DateTimeZone.Utc);
@@ -89,11 +90,18 @@ namespace QuantConnect.Algorithm.CSharp
 
             _min_max_macd = new MinMaxMACD(15);
 
-            _bought = -1;
+            if (Portfolio.CashBook[CryptoName].Amount > 0)
+            {
+                _bought = 1;
+            }
+            else
+            {
+                _bought = -1;
+            }
 
             _isReadyToTrade = false;
 
-            SetWarmUp(30);
+            SetWarmUp(30);           
 
         }
 
