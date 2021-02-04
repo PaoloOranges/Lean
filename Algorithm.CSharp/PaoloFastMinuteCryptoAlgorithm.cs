@@ -134,7 +134,9 @@ namespace QuantConnect.Algorithm.CSharp
             }
             UtcTimeLast = UtcTimeNow;
 
+#if DEBUG
             Plot(SymbolName, "Price", data[SymbolName].Value);
+#endif
         }
 
         private void OnProcessData(Slice data)
@@ -166,10 +168,13 @@ namespace QuantConnect.Algorithm.CSharp
                 }
             }
 
+#if DEBUG
+
             Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
             Plot("Indicators", "VeryFastMA", _very_fast_ema);
             Plot("Indicators", "FastMA", _fast_ema);
             Plot("Indicators", "SlowMA", _slow_ema);
+#endif
 
         }
 
