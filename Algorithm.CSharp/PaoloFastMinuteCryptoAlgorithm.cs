@@ -56,6 +56,8 @@ namespace QuantConnect.Algorithm.CSharp
         private bool _isReadyToTrade = false;
 
         private const decimal _amount_to_buy = 0.75m;
+
+        private const string EmailAddress = "paolo.oranges@gmail.com";
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
@@ -160,6 +162,14 @@ namespace QuantConnect.Algorithm.CSharp
                 bool is_very_fast_ema_ok = _very_fast_ema > _fast_ema;
                 bool is_price_ok = _sold_price > 0.05m * securityPrice;
                 bool is_roc_ok = _roc > 5;
+
+                // notify
+                if(is_price_ok)
+                {
+                    string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_very_fast_ema_ok + "\nAsset price is " + securityPrice + " and sold price is " + _sold_price ;
+                    Notify.Email(EmailAddress, "Price Ok for buy", body);
+                }
+
                 if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
                 {
                     const decimal round_multiplier = 1000m;
