@@ -64,11 +64,11 @@ namespace QuantConnect.Algorithm.CSharp
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2021, 01, 01); // Set Start Date
-            SetEndDate(2021, 01, 15); // Set End Date
+            SetEndDate(2021, 02, 5); // Set End Date
 
-            SetCash(CashName, 900, 1.21m);
+            SetCash(CashName, 1000, 1.21m);
             SetCash("USD", 0);
-            SetCash(CryptoName, 10);
+            //SetCash(CryptoName, 0.08m);
 
             SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
             SetTimeZone(NodaTime.DateTimeZone.Utc);
