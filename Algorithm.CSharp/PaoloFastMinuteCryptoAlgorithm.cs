@@ -167,7 +167,7 @@ namespace QuantConnect.Algorithm.CSharp
                 if(is_price_ok)
                 {
                     string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_very_fast_ema_ok + "\nAsset price is " + securityPrice + " and sold price is " + _sold_price ;
-                    Notify.Email(EmailAddress, "Price Ok for buy", body);
+                    Notify.Email(EmailAddress, "Price Ok for BUY", body);
                 }
 
                 if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
@@ -176,6 +176,7 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal amount_to_buy = Portfolio.CashBook[CashName].Amount * _amount_to_buy;
                     decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / securityPrice) / round_multiplier;
                     var order = Buy(_symbol, quantity);
+                                        
                 }
             }
             else if (_bought > 0)
@@ -212,7 +213,6 @@ namespace QuantConnect.Algorithm.CSharp
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
             bool is_moving_averages_ok = _fast_ema < _slow_ema;
 
-            decimal holding_value = Portfolio[SymbolName].Price;
             decimal current_price = data[SymbolName].Value;
 
             //if(1.5m * holding_value < current_value)
@@ -222,6 +222,13 @@ namespace QuantConnect.Algorithm.CSharp
             //else
             {
                 bool is_price_ok = current_price > 1.01m * _price_bought;
+
+                if(is_price_ok)
+                {
+                    string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _price_bought;
+                    Notify.Email(EmailAddress, "Price Ok for SELL", body);
+                }
+
                 return /*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok;
             }
         }
