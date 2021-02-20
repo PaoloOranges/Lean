@@ -21,6 +21,7 @@ using QuantConnect.Brokerages;
 using QuantConnect.Indicators;
 using QuantConnect.Orders;
 using QuantConnect.Interfaces;
+using System.Globalization;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -45,7 +46,7 @@ namespace QuantConnect.Algorithm.CSharp
         private int _bought = -1;
         private decimal _price_bought = 0;
 
-        private const string CryptoName = "BTC";
+        private const string CryptoName = "ETH";
         private const string CashName = "EUR";
         private const string SymbolName = CryptoName + CashName;
 
@@ -57,6 +58,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private const decimal _amount_to_buy = 0.75m;
 
+        private double resolutionInSeconds = 60.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
@@ -65,8 +67,12 @@ namespace QuantConnect.Algorithm.CSharp
         {
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2021, 01, 01); // Set Start Date
-            SetEndDate(2021, 02, 5); // Set End Date
+            if(resolution == Resolution.Hour)
+            {
+                resolutionInSeconds = 3600.0;
+            }
+            SetStartDate(2020, 01, 6); // Set Start Date
+            SetEndDate(2021, 02, 15); // Set End Date
 
             SetCash(CashName, 1000, 1.21m);
             SetCash("USD", 0);
@@ -117,7 +123,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (Portfolio.CashBook["USD"].ConversionRate == 0
                 || Portfolio.CashBook[CryptoName].ConversionRate == 0)
             {
-                Log($"{CashName} conversion rate: {Portfolio.CashBook[CashName].ConversionRate}");
+                Log($"{CashName} conversion rate: {Portfolio.CashBook["USD"].ConversionRate}");
                 Log($"{CryptoName} conversion rate: {Portfolio.CashBook[CryptoName].ConversionRate}");
 
                 throw new Exception("Conversion rate is 0");
@@ -138,9 +144,11 @@ namespace QuantConnect.Algorithm.CSharp
             }
 
             DateTime UtcTimeNow = UtcTime;
-            if((UtcTimeNow - UtcTimeLast).TotalSeconds > 60)
+            
+            if ((UtcTimeNow - UtcTimeLast).TotalSeconds > resolutionInSeconds)
             {
-                System.Console.WriteLine("WrongTime!");
+                CultureInfo cultureInfo = CultureInfo.CreateSpecificCulture("en-GB");
+                Log("WrongTime! Last: " + UtcTimeLast.ToString(cultureInfo) + " Now: " + UtcTimeNow.ToString(cultureInfo));
             }
             UtcTimeLast = UtcTimeNow;
 
@@ -202,6 +210,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (IsOkToSell(data))
             {
                 _isReadyToTrade = true;
+                Notify.Email(EmailAddress, "Algorithm Ready to Trade", "Ready to trade");
             }
         }
         
