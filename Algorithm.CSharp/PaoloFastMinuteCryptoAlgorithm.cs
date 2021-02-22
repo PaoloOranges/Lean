@@ -13,6 +13,8 @@
  * limitations under the License.
 */
 
+#define LIVE_NO_TRADE
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -65,21 +67,21 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public override void Initialize()
         {
+            SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
+            SetTimeZone(NodaTime.DateTimeZone.Utc);
+
             Resolution resolution = Resolution.Hour;
 
             if(resolution == Resolution.Hour)
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2020, 01, 6); // Set Start Date
-            SetEndDate(2021, 02, 15); // Set End Date
+            SetStartDate(2020, 01, 15); // Set Start Date
+            SetEndDate(2021, 02, 20); // Set End Date
 
             SetCash(CashName, 1000, 1.21m);
             SetCash("USD", 0);
             //SetCash(CryptoName, 0.08m);
-
-            SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
-            SetTimeZone(NodaTime.DateTimeZone.Utc);
 
             // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
@@ -98,6 +100,15 @@ namespace QuantConnect.Algorithm.CSharp
 
             _min_max_macd = new MinMaxMACD(15);
 
+
+
+            SetWarmUp(30);           
+
+        }
+
+        public override void PostInitialize()
+        {
+
             if (Portfolio.CashBook[CryptoName].Amount > 0)
             {
                 _bought = 1;
@@ -109,8 +120,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             _isReadyToTrade = false;
 
-            SetWarmUp(30);           
-
+            base.PostInitialize();
         }
 
         private DateTime UtcTimeLast;
@@ -120,14 +130,14 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            if (Portfolio.CashBook["USD"].ConversionRate == 0
-                || Portfolio.CashBook[CryptoName].ConversionRate == 0)
-            {
-                Log($"{CashName} conversion rate: {Portfolio.CashBook["USD"].ConversionRate}");
-                Log($"{CryptoName} conversion rate: {Portfolio.CashBook[CryptoName].ConversionRate}");
+            //if (Portfolio.CashBook["USD"].ConversionRate == 0
+            //    || Portfolio.CashBook[CryptoName].ConversionRate == 0)
+            //{
+            //    Log($"{CashName} conversion rate: {Portfolio.CashBook["USD"].ConversionRate}");
+            //    Log($"{CryptoName} conversion rate: {Portfolio.CashBook[CryptoName].ConversionRate}");
 
-                throw new Exception("Conversion rate is 0");
-            }
+            //    throw new Exception("Conversion rate is 0");
+            //}
 
             if (IsWarmingUp)
             {
@@ -183,15 +193,22 @@ namespace QuantConnect.Algorithm.CSharp
                     const decimal round_multiplier = 1000m;
                     decimal amount_to_buy = Portfolio.CashBook[CashName].Amount * _amount_to_buy;
                     decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / securityPrice) / round_multiplier;
+#if !(LIVE_NO_TRADE)
                     var order = Buy(_symbol, quantity);
-                                        
+#else
+                    _bought = 1;
+#endif
                 }
             }
             else if (_bought > 0)
             {
                 if (IsOkToSell(data))
                 {
+#if !(LIVE_NO_TRADE)
                     Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
+#else
+                    _bought = 1;
+#endif
                 }
             }
 
