@@ -47,7 +47,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private readonly CircularQueue<OrderType> _orderTypesQueue = new CircularQueue<OrderType>(Enum.GetValues(typeof(OrderType))
                                                                         .OfType<OrderType>()
-                                                                        .Where (x => x != OrderType.OptionExercise));
+                                                                        .Where (x => x != OrderType.OptionExercise && x != OrderType.LimitIfTouched));
         private readonly List<OrderTicket> _tickets = new List<OrderTicket>();
 
         /// <summary>
@@ -233,7 +233,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
             {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "1536869386"}
+            {"OrderListHash", "cb0f1f47ba319fcb17c030fcca594265"}
         };
     }
 }
