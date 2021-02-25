@@ -13,7 +13,7 @@
  * limitations under the License.
 */
 
-#define LIVE_NO_TRADE
+//#define LIVE_NO_TRADE
 
 using System;
 using System.Collections.Generic;
@@ -70,13 +70,13 @@ namespace QuantConnect.Algorithm.CSharp
             SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
             SetTimeZone(NodaTime.DateTimeZone.Utc);
 
-            Resolution resolution = Resolution.Hour;
+            Resolution resolution = Resolution.Minute;
 
             if(resolution == Resolution.Hour)
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2020, 01, 15); // Set Start Date
+            SetStartDate(2021, 01, 15); // Set Start Date
             SetEndDate(2021, 02, 20); // Set End Date
 
             SetCash(CashName, 1000, 1.21m);
@@ -99,8 +99,6 @@ namespace QuantConnect.Algorithm.CSharp
             _roc = ROC(_symbol, veryFastValue, resolution);
 
             _min_max_macd = new MinMaxMACD(15);
-
-
 
             SetWarmUp(30);           
 
@@ -247,7 +245,7 @@ namespace QuantConnect.Algorithm.CSharp
             //}
             //else
             {
-                bool is_price_ok = current_price > 1.01m * _price_bought;
+                bool is_price_ok = current_price > 1.05m * _price_bought;
 
                 if(is_price_ok)
                 {
