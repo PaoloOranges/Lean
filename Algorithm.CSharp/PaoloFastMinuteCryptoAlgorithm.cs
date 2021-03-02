@@ -49,8 +49,8 @@ namespace QuantConnect.Algorithm.CSharp
         private decimal _price_bought = 0;
 
         private const string CryptoName = "ETH";
-        private const string CashName = "EUR";
-        private const string SymbolName = CryptoName + CashName;
+        private const string CurrencyName = "EUR";
+        private const string SymbolName = CryptoName + CurrencyName;
 
         private Symbol _symbol = null;
 
@@ -62,6 +62,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private double resolutionInSeconds = 60.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
+
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
@@ -76,15 +77,15 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2021, 01, 15); // Set Start Date
+            SetStartDate(2021, 02, 15); // Set Start Date
             SetEndDate(2021, 02, 20); // Set End Date
 
-            SetCash(CashName, 1000, 1.21m);
-            SetCash("USD", 0);
+            SetCash(CurrencyName, 1000, 1.21m);
+            //SetCash("USD", 0);
             //SetCash(CryptoName, 0.08m);
 
-            // Find more symbols here: http://quantconnect.com/data
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
+            SetBenchmark(_symbol);
 
             const int veryFastValue = 5;
             const int fastValue = 10;
@@ -189,7 +190,7 @@ namespace QuantConnect.Algorithm.CSharp
                 if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
                 {
                     const decimal round_multiplier = 1000m;
-                    decimal amount_to_buy = Portfolio.CashBook[CashName].Amount * _amount_to_buy;
+                    decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
                     decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / securityPrice) / round_multiplier;
 #if !(LIVE_NO_TRADE)
                     var order = Buy(_symbol, quantity);
