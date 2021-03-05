@@ -77,12 +77,12 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2021, 02, 15); // Set Start Date
+            SetStartDate(2020, 02, 15); // Set Start Date
             SetEndDate(2021, 02, 20); // Set End Date
 
-            SetCash(CurrencyName, 1000, 1.21m);
+            SetCash(CurrencyName, 000, 1.21m);
             //SetCash("USD", 0);
-            //SetCash(CryptoName, 0.08m);
+            SetCash(CryptoName, 0.08m);
 
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
             SetBenchmark(_symbol);
@@ -110,10 +110,13 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (Portfolio.CashBook[CryptoName].Amount > 0)
             {
+                Log(CryptoName + " amount in Portfolio: " + Portfolio.CashBook[CryptoName].Amount + " - Initialized to Bought");
                 _bought = 1;
+                //_price_bought = Portfolio.CashBook[CryptoName];
             }
             else
             {
+                Log(CurrencyName + " amount in Portfolio: " + Portfolio.CashBook[CurrencyName].Amount + " - Initialized to Sold");
                 _bought = -1;
             }
 
@@ -129,15 +132,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            //if (Portfolio.CashBook["USD"].ConversionRate == 0
-            //    || Portfolio.CashBook[CryptoName].ConversionRate == 0)
-            //{
-            //    Log($"{CashName} conversion rate: {Portfolio.CashBook["USD"].ConversionRate}");
-            //    Log($"{CryptoName} conversion rate: {Portfolio.CashBook[CryptoName].ConversionRate}");
-
-            //    throw new Exception("Conversion rate is 0");
-            //}
-
             if (IsWarmingUp)
             {
                 return;
@@ -154,7 +148,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             DateTime UtcTimeNow = UtcTime;
             
-            if ((UtcTimeNow - UtcTimeLast).TotalSeconds > resolutionInSeconds)
+            if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > resolutionInSeconds)
             {
                 CultureInfo cultureInfo = CultureInfo.CreateSpecificCulture("en-GB");
                 Log("WrongTime! Last: " + UtcTimeLast.ToString(cultureInfo) + " Now: " + UtcTimeNow.ToString(cultureInfo));
@@ -184,7 +178,8 @@ namespace QuantConnect.Algorithm.CSharp
                 if(is_price_ok)
                 {
                     string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_very_fast_ema_ok + "\nAsset price is " + securityPrice + " and sold price is " + _sold_price ;
-                    Notify.Email(EmailAddress, "Price Ok for BUY", body);
+                    //Notify.Email(EmailAddress, "Price Ok for BUY", body);
+                    Log(body);
                 }
 
                 if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
@@ -226,7 +221,8 @@ namespace QuantConnect.Algorithm.CSharp
             if (IsOkToSell(data))
             {
                 _isReadyToTrade = true;
-                Notify.Email(EmailAddress, "Algorithm Ready to Trade", "Ready to trade");
+                //Notify.Email(EmailAddress, "Algorithm Ready to Trade", "Ready to trade");
+                Log("Algorithm Ready to Trade");
             }
         }
         
@@ -251,7 +247,8 @@ namespace QuantConnect.Algorithm.CSharp
                 if(is_price_ok)
                 {
                     string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _price_bought;
-                    Notify.Email(EmailAddress, "Price Ok for SELL", body);
+                    //Notify.Email(EmailAddress, "Price Ok for SELL", body);
+                    Log(body);
                 }
 
                 return /*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok;
