@@ -14,6 +14,7 @@
 */
 
 //#define LIVE_NO_TRADE
+//#define PLOT_CHART
 
 using System;
 using System.Collections.Generic;
@@ -54,7 +55,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private Symbol _symbol = null;
 
-        private decimal _sold_price = Decimal.MaxValue;
+        private decimal _sold_price = 0m;
 
         private bool _isReadyToTrade = false;
 
@@ -71,7 +72,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
             SetTimeZone(NodaTime.DateTimeZone.Utc);
 
-            Resolution resolution = Resolution.Minute;
+            Resolution resolution = Resolution.Hour;
 
             if(resolution == Resolution.Hour)
             {
@@ -80,9 +81,9 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2020, 02, 15); // Set Start Date
             SetEndDate(2021, 02, 20); // Set End Date
 
-            SetCash(CurrencyName, 000, 1.21m);
-            //SetCash("USD", 0);
-            SetCash(CryptoName, 0.08m);
+            SetCash(CurrencyName, 1000, 1.21m);
+            SetCash("USD", 0);
+            //SetCash(CryptoName, 0.08m);
 
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
             SetBenchmark(_symbol);
@@ -155,7 +156,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
             UtcTimeLast = UtcTimeNow;
 
-#if DEBUG
+#if DEBUG && PLOT_CHART
             Plot(SymbolName, "Price", data[SymbolName].Value);
 #endif
         }
@@ -171,7 +172,7 @@ namespace QuantConnect.Algorithm.CSharp
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
                 bool is_moving_averages_ok = _fast_ema > _slow_ema;
                 bool is_very_fast_ema_ok = _very_fast_ema > _fast_ema;
-                bool is_price_ok = _sold_price > 0.05m * securityPrice;
+                bool is_price_ok = 0.95m * _sold_price <= securityPrice;
                 bool is_roc_ok = _roc > 5;
 
                 // notify
@@ -206,7 +207,7 @@ namespace QuantConnect.Algorithm.CSharp
                 }
             }
 
-#if DEBUG
+#if DEBUG && PLOT_CHART
 
             Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
             Plot("Indicators", "VeryFastMA", _very_fast_ema);
