@@ -41,9 +41,8 @@ namespace QuantConnect.Algorithm.CSharp
         private ExponentialMovingAverage _slow_ema;
         private MovingAverageConvergenceDivergence _macd;
         private AverageDirectionalIndex _adx;
-        private RateOfChange _roc;
 
-        private decimal _max_adx = Decimal.MinValue;
+        private Maximum _maximumPrice;
 
         private MinMaxMACD _min_max_macd;
         private int _bought = -1;
@@ -57,10 +56,12 @@ namespace QuantConnect.Algorithm.CSharp
 
         private decimal _sold_price = 0m;
 
-        private bool _isReadyToTrade = false;
+        private bool _is_ready_to_trade = false;
 
         private const decimal _amount_to_buy = 0.75m;
+        private const decimal _percentage_price_gain = 0.05m;
 
+        private const int WarmUpTime = 60;
         private double resolutionInSeconds = 60.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
 
@@ -78,8 +79,8 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2020, 02, 15); // Set Start Date
-            SetEndDate(2021, 02, 20); // Set End Date
+            SetStartDate(2020, 01, 1); // Set Start Date
+            SetEndDate(2021, 03, 07); // Set End Date
 
             SetCash(CurrencyName, 1000, 1.21m);
             SetCash("USD", 0);
@@ -98,11 +99,10 @@ namespace QuantConnect.Algorithm.CSharp
             _slow_ema = EMA(_symbol, slowValue, resolution);
             _macd = MACD(_symbol, fastValue, slowValue, signal, MovingAverageType.Exponential, resolution);
             _adx = ADX(_symbol, 2, resolution);
-            _roc = ROC(_symbol, veryFastValue, resolution);
-
+            _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
             _min_max_macd = new MinMaxMACD(15);
 
-            SetWarmUp(30);           
+            SetWarmUp(WarmUpTime);           
 
         }
 
@@ -121,7 +121,7 @@ namespace QuantConnect.Algorithm.CSharp
                 _bought = -1;
             }
 
-            _isReadyToTrade = false;
+            _is_ready_to_trade = false;
 
             base.PostInitialize();
         }
@@ -135,10 +135,14 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (IsWarmingUp)
             {
+                if(_bought < 0)
+                {
+                    _sold_price = _maximumPrice;
+                }
                 return;
             }
 
-            if(_isReadyToTrade)
+            if(_is_ready_to_trade)
             {
                 OnProcessData(data);
             }
@@ -172,15 +176,14 @@ namespace QuantConnect.Algorithm.CSharp
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
                 bool is_moving_averages_ok = _fast_ema > _slow_ema;
                 bool is_very_fast_ema_ok = _very_fast_ema > _fast_ema;
-                bool is_price_ok = 0.95m * _sold_price <= securityPrice;
-                bool is_roc_ok = _roc > 5;
+                bool is_price_ok = (1m - _percentage_price_gain) * _sold_price <= securityPrice;
 
                 // notify
                 if(is_price_ok)
                 {
                     string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_very_fast_ema_ok + "\nAsset price is " + securityPrice + " and sold price is " + _sold_price ;
                     //Notify.Email(EmailAddress, "Price Ok for BUY", body);
-                    Log(body);
+                    //Log(body);
                 }
 
                 if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
@@ -221,7 +224,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (IsOkToSell(data))
             {
-                _isReadyToTrade = true;
+                _is_ready_to_trade = true;
                 //Notify.Email(EmailAddress, "Algorithm Ready to Trade", "Ready to trade");
                 Log("Algorithm Ready to Trade");
             }
@@ -243,13 +246,13 @@ namespace QuantConnect.Algorithm.CSharp
             //}
             //else
             {
-                bool is_price_ok = current_price > 1.05m * _price_bought;
+                bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _price_bought;
 
                 if(is_price_ok)
                 {
                     string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _price_bought;
                     //Notify.Email(EmailAddress, "Price Ok for SELL", body);
-                    Log(body);
+                    //Log(body);
                 }
 
                 return /*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok;
