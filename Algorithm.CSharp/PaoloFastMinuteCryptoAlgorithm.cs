@@ -69,7 +69,7 @@ namespace QuantConnect.Algorithm.CSharp
         private double resolutionInSeconds = 60.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
 
-        private CultureInfo _cultureInfo = CultureInfo.CreateSpecificCulture("en-GB");
+        private CultureInfo _culture_info = CultureInfo.CreateSpecificCulture("en-GB");
 
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
@@ -119,12 +119,19 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 Log(CryptoName + " amount in Portfolio: " + Portfolio.CashBook[CryptoName].Amount + " - Initialized to Bought");
                 _bought = 1;
-                //_price_bought = Portfolio.CashBook[CryptoName];
+                if (ObjectStore.ContainsKey(LastBoughtObjectStoreKey) && LiveMode)
+                {
+                    _bought_price = Convert.ToDecimal(ObjectStore.Read(LastBoughtObjectStoreKey), _culture_info);
+                }
             }
             else
             {
                 Log(CurrencyName + " amount in Portfolio: " + Portfolio.CashBook[CurrencyName].Amount + " - Initialized to Sold");
                 _bought = -1;
+                if(ObjectStore.ContainsKey(LastSoldObjectStoreKey) && LiveMode)
+                {
+                    _sold_price = Convert.ToDecimal(ObjectStore.Read(LastSoldObjectStoreKey), _culture_info);
+                }
             }
 
             _is_ready_to_trade = false;
@@ -162,7 +169,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > resolutionInSeconds)
             {
                 
-                Log("WrongTime! Last: " + UtcTimeLast.ToString(_cultureInfo) + " Now: " + UtcTimeNow.ToString(_cultureInfo));
+                Log("WrongTime! Last: " + UtcTimeLast.ToString(_culture_info) + " Now: " + UtcTimeNow.ToString(_culture_info));
             }
             UtcTimeLast = UtcTimeNow;
 
@@ -277,14 +284,14 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 _bought = 1;
                 _bought_price = orderEvent.FillPrice;
-                ObjectStore.Save(LastBoughtObjectStoreKey, _bought_price.ToString(_cultureInfo));
+                ObjectStore.Save(LastBoughtObjectStoreKey, _bought_price.ToString(_culture_info));
             }
 
             if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
             {
                 _bought = -1;
                 _sold_price = orderEvent.FillPrice;
-                ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_cultureInfo));
+                ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_culture_info));
             }
 
             if (orderEvent.Status == OrderStatus.Invalid)
