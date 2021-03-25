@@ -46,11 +46,15 @@ namespace QuantConnect.Algorithm.CSharp
 
         private MinMaxMACD _min_max_macd;
         private int _bought = -1;
-        private decimal _price_bought = 0;
+        private decimal _bought_price = 0;
 
         private const string CryptoName = "ETH";
         private const string CurrencyName = "EUR";
         private const string SymbolName = CryptoName + CurrencyName;
+
+        // Objsect store to save last buy and sell price for different deploy
+        private const string LastBoughtObjectStoreKey = SymbolName + "-last-buy";
+        private const string LastSoldObjectStoreKey = SymbolName + "-last-sell";
 
         private Symbol _symbol = null;
 
@@ -64,6 +68,8 @@ namespace QuantConnect.Algorithm.CSharp
         private const int WarmUpTime = 60;
         private double resolutionInSeconds = 60.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
+
+        private CultureInfo _cultureInfo = CultureInfo.CreateSpecificCulture("en-GB");
 
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
@@ -155,8 +161,8 @@ namespace QuantConnect.Algorithm.CSharp
             
             if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > resolutionInSeconds)
             {
-                CultureInfo cultureInfo = CultureInfo.CreateSpecificCulture("en-GB");
-                Log("WrongTime! Last: " + UtcTimeLast.ToString(cultureInfo) + " Now: " + UtcTimeNow.ToString(cultureInfo));
+                
+                Log("WrongTime! Last: " + UtcTimeLast.ToString(_cultureInfo) + " Now: " + UtcTimeNow.ToString(_cultureInfo));
             }
             UtcTimeLast = UtcTimeNow;
 
@@ -246,11 +252,11 @@ namespace QuantConnect.Algorithm.CSharp
             //}
             //else
             {
-                bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _price_bought;
+                bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
 
                 if(is_price_ok)
                 {
-                    string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _price_bought;
+                    string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _bought_price;
                     //Notify.Email(EmailAddress, "Price Ok for SELL", body);
                     //Log(body);
                 }
@@ -261,17 +267,24 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void OnOrderEvent(OrderEvent orderEvent)
         {
+            if(orderEvent == null)
+            {
+                return;
+            }
+
             Debug(Time + " " + orderEvent);
             if (orderEvent.Direction == OrderDirection.Buy && orderEvent.Status == OrderStatus.Filled)
             {
                 _bought = 1;
-                _price_bought = orderEvent.FillPrice;
+                _bought_price = orderEvent.FillPrice;
+                ObjectStore.Save(LastBoughtObjectStoreKey, _bought_price.ToString(_cultureInfo));
             }
 
             if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
             {
                 _bought = -1;
                 _sold_price = orderEvent.FillPrice;
+                ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_cultureInfo));
             }
 
             if (orderEvent.Status == OrderStatus.Invalid)
