@@ -119,7 +119,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 Log(CryptoName + " amount in Portfolio: " + Portfolio.CashBook[CryptoName].Amount + " - Initialized to Bought");
                 _bought = 1;
-                if (ObjectStore.ContainsKey(LastBoughtObjectStoreKey) && LiveMode)
+                if (HasBoughtPriceFromPreviousSession)
                 {
                     _bought_price = Convert.ToDecimal(ObjectStore.Read(LastBoughtObjectStoreKey), _culture_info);
                 }
@@ -128,7 +128,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 Log(CurrencyName + " amount in Portfolio: " + Portfolio.CashBook[CurrencyName].Amount + " - Initialized to Sold");
                 _bought = -1;
-                if(ObjectStore.ContainsKey(LastSoldObjectStoreKey) && LiveMode)
+                if(HasSoldPriceFromPreviousSession)
                 {
                     _sold_price = Convert.ToDecimal(ObjectStore.Read(LastSoldObjectStoreKey), _culture_info);
                 }
@@ -137,6 +137,22 @@ namespace QuantConnect.Algorithm.CSharp
             _is_ready_to_trade = false;
 
             base.PostInitialize();
+        }
+
+        private bool HasBoughtPriceFromPreviousSession
+        {
+            get
+            {
+                return ObjectStore.ContainsKey(LastBoughtObjectStoreKey) && LiveMode;
+            }
+        }
+
+        private bool HasSoldPriceFromPreviousSession
+        {
+            get
+            {
+                return ObjectStore.ContainsKey(LastSoldObjectStoreKey) && LiveMode;
+            }
         }
 
         private DateTime UtcTimeLast;
@@ -148,10 +164,10 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (IsWarmingUp)
             {
-                if(_bought < 0)
+                if(_bought < 0 && !HasSoldPriceFromPreviousSession)
                 {
                     _sold_price = _maximumPrice;
-                }
+                }               
                 return;
             }
 
