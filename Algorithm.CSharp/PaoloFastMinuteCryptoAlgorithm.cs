@@ -206,8 +206,7 @@ namespace QuantConnect.Algorithm.CSharp
                 //bool is_adx_ok = _adx.NegativeDirectionalIndex > 24 && _adx.PositiveDirectionalIndex < 16;
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
                 bool is_moving_averages_ok = _fast_ema > _slow_ema;
-                bool is_very_fast_ema_ok = _fast_ema > _slow_ema; //_very_fast_ema > _fast_ema;
-                bool is_price_ok = true; // (1m - _percentage_price_gain) * _sold_price <= securityPrice;
+                bool is_very_fast_ema_ok = _very_fast_ema > _fast_ema;
 
                 ////// notify
                 ////if(is_price_ok)
@@ -217,7 +216,7 @@ namespace QuantConnect.Algorithm.CSharp
                 ////    //Log(body);
                 //}
 
-                if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
+                if (is_moving_averages_ok && is_macd_ok)
                 {
                     const decimal round_multiplier = 1000m;
                     decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
