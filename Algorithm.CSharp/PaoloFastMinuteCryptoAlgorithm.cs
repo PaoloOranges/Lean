@@ -86,10 +86,12 @@ namespace QuantConnect.Algorithm.CSharp
                 resolutionInSeconds = 3600.0;
             }
             SetStartDate(2020, 01, 1); // Set Start Date
-            SetEndDate(2021, 03, 07); // Set End Date
+            SetEndDate(2021, 04, 6); // Set End Date
 
             SetCash(CurrencyName, 1000, 1.21m);
+#if DEBUG
             SetCash("USD", 0);
+#endif
             //SetCash(CryptoName, 0.08m);
 
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
@@ -204,16 +206,16 @@ namespace QuantConnect.Algorithm.CSharp
                 //bool is_adx_ok = _adx.NegativeDirectionalIndex > 24 && _adx.PositiveDirectionalIndex < 16;
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
                 bool is_moving_averages_ok = _fast_ema > _slow_ema;
-                bool is_very_fast_ema_ok = _very_fast_ema > _fast_ema;
-                bool is_price_ok = (1m - _percentage_price_gain) * _sold_price <= securityPrice;
+                bool is_very_fast_ema_ok = _fast_ema > _slow_ema; //_very_fast_ema > _fast_ema;
+                bool is_price_ok = true; // (1m - _percentage_price_gain) * _sold_price <= securityPrice;
 
-                // notify
-                if(is_price_ok)
-                {
-                    string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_very_fast_ema_ok + "\nAsset price is " + securityPrice + " and sold price is " + _sold_price ;
-                    //Notify.Email(EmailAddress, "Price Ok for BUY", body);
-                    //Log(body);
-                }
+                ////// notify
+                ////if(is_price_ok)
+                ////{
+                ////    string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_very_fast_ema_ok + "\nAsset price is " + securityPrice + " and sold price is " + _sold_price ;
+                ////    //Notify.Email(EmailAddress, "Price Ok for BUY", body);
+                ////    //Log(body);
+                //}
 
                 if (is_very_fast_ema_ok && is_macd_ok && is_price_ok )
                 {
@@ -265,7 +267,7 @@ namespace QuantConnect.Algorithm.CSharp
             // check on gain
             //bool is_adx_ok = _adx.PositiveDirectionalIndex > 25 && _adx.NegativeDirectionalIndex < 20;
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _fast_ema < _slow_ema;
+            bool is_moving_averages_ok = _very_fast_ema < _fast_ema; //_fast_ema < _slow_ema;
 
             decimal current_price = data[SymbolName].Value;
 
