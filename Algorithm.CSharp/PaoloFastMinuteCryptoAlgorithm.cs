@@ -89,7 +89,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2020, 3, 1); // Set Start Date
+            SetStartDate(2021, 3, 1); // Set Start Date
             SetEndDate(2021, 4, 18); // Set End Date
 
             SetCash(CurrencyName, 1000, 1.21m);
@@ -103,7 +103,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             const int veryFastValue = 5;
             const int fastValue = 10;
-            const int slowValue = 30;
+            const int slowValue = 25;
             const int signal = 8;
 
             _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
