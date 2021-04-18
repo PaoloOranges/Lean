@@ -219,7 +219,8 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / current_price) / round_multiplier;
 #if !(LIVE_NO_TRADE)
                     var order = Buy(_symbol, quantity);
-                    _stop_loss_order = StopLimitOrder(_symbol, -quantity, current_price * (1m - _percentage_stop_loss), current_price * (1m - _percentage_stop_loss));
+                    decimal stopLossPrice = current_price * (1m - _percentage_stop_loss);
+                    _stop_loss_order = StopLimitOrder(_symbol, -quantity, stopLossPrice, stopLossPrice);
 #else
                     _bought = 1;
 #endif
