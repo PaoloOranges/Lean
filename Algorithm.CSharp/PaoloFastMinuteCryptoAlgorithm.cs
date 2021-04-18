@@ -201,6 +201,11 @@ namespace QuantConnect.Algorithm.CSharp
 #endif
         }
 
+        private decimal ComputeStopLossPrice(decimal current_price)
+        {
+            return Math.Round(current_price * (1m - _percentage_stop_loss), 2);
+        }
+
         private void OnProcessData(Slice data)
         {
             _min_max_macd.OnData(_macd);
@@ -219,7 +224,7 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / current_price) / round_multiplier;
 #if !(LIVE_NO_TRADE)
                     var order = Buy(_symbol, quantity);
-                    decimal stopLossPrice = current_price * (1m - _percentage_stop_loss);
+                    decimal stopLossPrice = ComputeStopLossPrice(current_price);
                     _stop_loss_order = StopLimitOrder(_symbol, -quantity, stopLossPrice, stopLossPrice);
 #else
                     _bought = 1;
@@ -240,7 +245,7 @@ namespace QuantConnect.Algorithm.CSharp
                 else if(current_price > _highest_price_after_buy)
                 {
                     _highest_price_after_buy = current_price;
-                    _stop_loss_order.Update(new UpdateOrderFields { StopPrice = current_price * (1m - _percentage_stop_loss) });
+                    _stop_loss_order.Update(new UpdateOrderFields { StopPrice = ComputeStopLossPrice(current_price) });
                 }
             }
 
