@@ -14,7 +14,7 @@
 */
 
 //#define LIVE_NO_TRADE
-//#define PLOT_CHART
+#define PLOT_CHART
 
 using System;
 using System.Collections.Generic;
@@ -59,13 +59,11 @@ namespace QuantConnect.Algorithm.CSharp
         private Symbol _symbol = null;
 
         private decimal _sold_price = 0m;
-        private decimal _highest_price_after_buy = 0m;
 
         private bool _is_ready_to_trade = false;
 
         private const decimal _amount_to_buy = 0.75m;
-        private const decimal _percentage_price_gain = 0.05m;
-        private const decimal _percentage_stop_loss = 0.02m;
+        private const decimal _percentage_price_gain = 0.1m;
 
         private const int WarmUpTime = 60;
         private double resolutionInSeconds = 60.0;
@@ -73,7 +71,6 @@ namespace QuantConnect.Algorithm.CSharp
 
         private CultureInfo _culture_info = CultureInfo.CreateSpecificCulture("en-GB");
 
-        private OrderTicket _stop_loss_order;
 
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
@@ -89,8 +86,8 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2021, 3, 1); // Set Start Date
-            SetEndDate(2021, 4, 18); // Set End Date
+            SetStartDate(2020, 3, 1); // Set Start Date
+            SetEndDate(2021, 4, 21); // Set End Date
 
             SetCash(CurrencyName, 1000, 1.21m);
 #if DEBUG
@@ -112,6 +109,7 @@ namespace QuantConnect.Algorithm.CSharp
             _macd = MACD(_symbol, fastValue, slowValue, signal, MovingAverageType.Exponential, resolution);
             _adx = ADX(_symbol, 2, resolution);
             _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
+            
             _min_max_macd = new MinMaxMACD(15);
 
             SetWarmUp(WarmUpTime);           
@@ -128,7 +126,6 @@ namespace QuantConnect.Algorithm.CSharp
                 if (HasBoughtPriceFromPreviousSession)
                 {
                     _bought_price = Convert.ToDecimal(ObjectStore.Read(LastBoughtObjectStoreKey), _culture_info);
-                    _highest_price_after_buy = _bought_price;
                 }
             }
             else
@@ -201,11 +198,6 @@ namespace QuantConnect.Algorithm.CSharp
 #endif
         }
 
-        private decimal ComputeStopLossPrice(decimal current_price)
-        {
-            return Math.Round(current_price * (1m - _percentage_stop_loss), 2);
-        }
-
         private void OnProcessData(Slice data)
         {
             _min_max_macd.OnData(_macd);
@@ -224,8 +216,6 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / current_price) / round_multiplier;
 #if !(LIVE_NO_TRADE)
                     var order = Buy(_symbol, quantity);
-                    decimal stopLossPrice = ComputeStopLossPrice(current_price);
-                    _stop_loss_order = StopLimitOrder(_symbol, -quantity, stopLossPrice, stopLossPrice);
 #else
                     _bought = 1;
 #endif
@@ -236,16 +226,10 @@ namespace QuantConnect.Algorithm.CSharp
                 if (IsOkToSell(data))
                 {
 #if !(LIVE_NO_TRADE)
-                    Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
-                    _stop_loss_order = null;
+                    Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);                    
 #else
-                    _bought = 1;
+                    _bought = -1;
 #endif
-                }
-                else if(current_price > _highest_price_after_buy)
-                {
-                    _highest_price_after_buy = current_price;
-                    _stop_loss_order.Update(new UpdateOrderFields { StopPrice = ComputeStopLossPrice(current_price) });
                 }
             }
 
@@ -279,23 +263,18 @@ namespace QuantConnect.Algorithm.CSharp
 
             decimal current_price = data[SymbolName].Value;
 
-            //if(1.5m * holding_value < current_value)
-            //{
-            //    return true;
-            //}
-            //else
+            bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
+
+            if (is_price_ok)
             {
-                bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
-
-                if(is_price_ok)
-                {
-                    string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _bought_price;
-                    //Notify.Email(EmailAddress, "Price Ok for SELL", body);
-                    //Log(body);
-                }
-
-                return /*is_adx_ok && */is_macd_ok && is_moving_averages_ok && is_price_ok;
+                string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _bought_price;
+                //Notify.Email(EmailAddress, "Price Ok for SELL", body);
+                //Log(body);
             }
+
+            bool is_gain_ok = is_macd_ok && is_moving_averages_ok && is_price_ok;
+            return is_gain_ok;
+
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
@@ -306,11 +285,11 @@ namespace QuantConnect.Algorithm.CSharp
             }
 
             Debug(Time + " " + orderEvent);
+
             if (orderEvent.Direction == OrderDirection.Buy && orderEvent.Status == OrderStatus.Filled)
             {
                 _bought = 1;
                 _bought_price = orderEvent.FillPrice;
-                _highest_price_after_buy = _bought_price;
                 ObjectStore.Save(LastBoughtObjectStoreKey, _bought_price.ToString(_culture_info));
             }
 
