@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+
 //#define LIVE_NO_TRADE
 #define PLOT_CHART
 
@@ -25,6 +26,7 @@ using QuantConnect.Indicators;
 using QuantConnect.Orders;
 using QuantConnect.Interfaces;
 using System.Globalization;
+
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -40,7 +42,7 @@ namespace QuantConnect.Algorithm.CSharp
         private ExponentialMovingAverage _fast_ema;
         private ExponentialMovingAverage _slow_ema;
         private MovingAverageConvergenceDivergence _macd;
-        private AverageDirectionalIndex _adx;
+        private ParabolicStopAndReverse _psar;
 
         private Maximum _maximumPrice;
 
@@ -86,8 +88,8 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2020, 3, 1); // Set Start Date
-            SetEndDate(2021, 4, 21); // Set End Date
+            SetStartDate(2020, 3, 29); // Set Start Date
+            SetEndDate(2021, 4, 27); // Set End Date
 
             SetCash(CurrencyName, 1000, 1.21m);
 #if DEBUG
@@ -106,8 +108,9 @@ namespace QuantConnect.Algorithm.CSharp
             _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
             _fast_ema = EMA(_symbol, fastValue, resolution);
             _slow_ema = EMA(_symbol, slowValue, resolution);
-            _macd = MACD(_symbol, fastValue, slowValue, signal, MovingAverageType.Exponential, resolution);
-            _adx = ADX(_symbol, 2, resolution);
+            _macd = MACD(_symbol, 10, 60, 8, MovingAverageType.Exponential, resolution);
+            _psar = PSAR(_symbol, 0.025m, 0.025m, 0.25m, resolution);
+
             _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
             
             _min_max_macd = new MinMaxMACD(15);
@@ -125,8 +128,11 @@ namespace QuantConnect.Algorithm.CSharp
                 _bought = 1;
                 if (HasBoughtPriceFromPreviousSession)
                 {
-                    _bought_price = Convert.ToDecimal(ObjectStore.Read(LastBoughtObjectStoreKey), _culture_info);
+                    string bought_price = ObjectStore.Read(LastBoughtObjectStoreKey);
+                    Log("Previous Purchase found: " + bought_price );
+                    _bought_price = Convert.ToDecimal(bought_price, _culture_info);
                 }
+                _is_ready_to_trade = true;
             }
             else
             {
@@ -134,11 +140,14 @@ namespace QuantConnect.Algorithm.CSharp
                 _bought = -1;
                 if(HasSoldPriceFromPreviousSession)
                 {
-                    _sold_price = Convert.ToDecimal(ObjectStore.Read(LastSoldObjectStoreKey), _culture_info);
+                    string sold_price = ObjectStore.Read(LastSoldObjectStoreKey);
+                    Log("Previous Sell found: " + sold_price);
+                    _sold_price = Convert.ToDecimal(sold_price, _culture_info);
                 }
+
+                _is_ready_to_trade = false;
             }
 
-            _is_ready_to_trade = false;
 
             base.PostInitialize();
         }
@@ -205,9 +214,9 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = Securities[SymbolName].Price;
             if (_bought < 0)
             {
-                //bool is_adx_ok = _adx.NegativeDirectionalIndex > 24 && _adx.PositiveDirectionalIndex < 16;
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
                 bool is_moving_averages_ok = _fast_ema > _slow_ema;
+                bool is_psar_ok = current_price > _psar;
 
                 if (is_moving_averages_ok && is_macd_ok)
                 {
@@ -272,7 +281,7 @@ namespace QuantConnect.Algorithm.CSharp
                 //Log(body);
             }
 
-            bool is_gain_ok = is_macd_ok && is_moving_averages_ok && is_price_ok;
+            bool is_gain_ok = is_moving_averages_ok && is_macd_ok && is_price_ok;
             return is_gain_ok;
 
         }
