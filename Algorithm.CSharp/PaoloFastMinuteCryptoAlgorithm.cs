@@ -16,6 +16,7 @@
 
 //#define LIVE_NO_TRADE
 #define PLOT_CHART
+//#define LOG_INDICATORS
 
 using System;
 using System.Collections.Generic;
@@ -210,6 +211,10 @@ namespace QuantConnect.Algorithm.CSharp
         private void OnProcessData(Slice data)
         {
             _min_max_macd.OnData(_macd);
+
+#if DEBUG && LOG_INDICATORS
+            Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
+#endif
 
             decimal current_price = Securities[SymbolName].Price;
             if (_bought < 0)
