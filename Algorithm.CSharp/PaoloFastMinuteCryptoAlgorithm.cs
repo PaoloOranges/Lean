@@ -89,8 +89,8 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2020, 3, 29); // Set Start Date
-            SetEndDate(2021, 4, 27); // Set End Date
+            SetStartDate(2021, 4, 1); // Set Start Date
+            SetEndDate(2021, 5, 15); // Set End Date
 
             SetCash(CurrencyName, 1000, 1.21m);
 #if DEBUG
@@ -102,21 +102,21 @@ namespace QuantConnect.Algorithm.CSharp
             SetBenchmark(_symbol);
 
             const int veryFastValue = 5;
-            const int fastValue = 10;
-            const int slowValue = 25;
+            const int fastValue = 15;
+            const int slowValue = 30;
             const int signal = 8;
 
             _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
             _fast_ema = EMA(_symbol, fastValue, resolution);
             _slow_ema = EMA(_symbol, slowValue, resolution);
-            _macd = MACD(_symbol, 10, 60, 8, MovingAverageType.Exponential, resolution);
+            _macd = MACD(_symbol, fastValue, slowValue, signal, MovingAverageType.Exponential, resolution);
             _psar = PSAR(_symbol, 0.025m, 0.025m, 0.25m, resolution);
 
             _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
             
             _min_max_macd = new MinMaxMACD(15);
 
-            SetWarmUp(WarmUpTime);           
+            SetWarmUp(TimeSpan.FromDays(7));
 
         }
 
@@ -205,6 +205,11 @@ namespace QuantConnect.Algorithm.CSharp
 
 #if DEBUG && PLOT_CHART
             Plot(SymbolName, "Price", data[SymbolName].Value);
+
+            Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
+            Plot("Indicators", "VeryFastMA", _very_fast_ema);
+            Plot("Indicators", "FastMA", _fast_ema);
+            Plot("Indicators", "SlowMA", _slow_ema);
 #endif
         }
 
@@ -212,7 +217,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             _min_max_macd.OnData(_macd);
 
-#if DEBUG && LOG_INDICATORS
+#if LOG_INDICATORS
             Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
 
@@ -220,10 +225,10 @@ namespace QuantConnect.Algorithm.CSharp
             if (_bought < 0)
             {
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
-                bool is_moving_averages_ok = _fast_ema > _slow_ema;
+                bool is_moving_averages_ok = _fast_ema > _slow_ema && _very_fast_ema > _fast_ema;
                 bool is_psar_ok = current_price > _psar;
 
-                if (is_moving_averages_ok && is_macd_ok)
+                if (is_moving_averages_ok /*&& is_macd_ok*/)
                 {
                     const decimal round_multiplier = 1000m;
                     decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
@@ -232,6 +237,11 @@ namespace QuantConnect.Algorithm.CSharp
                     var order = Buy(_symbol, quantity);
 #else
                     _bought = 1;
+                    Log("Buy order: " + quantity + " at price " + current_price);
+#endif
+
+#if LOG_INDICATORS
+                    Log("BUY ORDER. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
                 }
             }
@@ -240,20 +250,19 @@ namespace QuantConnect.Algorithm.CSharp
                 if (IsOkToSell(data))
                 {
 #if !(LIVE_NO_TRADE)
-                    Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);                    
+                    Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
 #else
                     _bought = -1;
+                    Log("Sell order: at price " + current_price);
+#endif
+
+#if LOG_INDICATORS
+                    Log("SELL ORDER. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
                 }
             }
 
-#if DEBUG && PLOT_CHART
 
-            Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
-            Plot("Indicators", "VeryFastMA", _very_fast_ema);
-            Plot("Indicators", "FastMA", _fast_ema);
-            Plot("Indicators", "SlowMA", _slow_ema);
-#endif
 
         }
 
@@ -270,12 +279,12 @@ namespace QuantConnect.Algorithm.CSharp
         private bool IsOkToSell(Slice data)
         {
 
-            // check on gain
+            decimal current_price = data[SymbolName].Value;
+            
             //bool is_adx_ok = _adx.PositiveDirectionalIndex > 25 && _adx.NegativeDirectionalIndex < 20;
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
             bool is_moving_averages_ok = _very_fast_ema < _fast_ema; //_fast_ema < _slow_ema;
 
-            decimal current_price = data[SymbolName].Value;
 
             bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
 
@@ -286,7 +295,8 @@ namespace QuantConnect.Algorithm.CSharp
                 //Log(body);
             }
 
-            bool is_gain_ok = is_moving_averages_ok && is_macd_ok && is_price_ok;
+            bool is_gain_ok = is_moving_averages_ok /*&& is_macd_ok*/ && is_price_ok;
+            bool is_stop_loss = _fast_ema < _slow_ema && is_macd_ok;
             return is_gain_ok;
 
         }
