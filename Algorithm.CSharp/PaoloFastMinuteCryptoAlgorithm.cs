@@ -42,12 +42,14 @@ namespace QuantConnect.Algorithm.CSharp
         private ExponentialMovingAverage _very_fast_ema;
         private ExponentialMovingAverage _fast_ema;
         private ExponentialMovingAverage _slow_ema;
+        private HullMovingAverage _slow_hullma;
+        private LeastSquaresMovingAverage _fast_lsma;
+
         private MovingAverageConvergenceDivergence _macd;
         private ParabolicStopAndReverse _psar;
 
         private Maximum _maximumPrice;
 
-        private MinMaxMACD _min_max_macd;
         private int _bought = -1;
         private decimal _bought_price = 0;
 
@@ -89,8 +91,8 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 resolutionInSeconds = 3600.0;
             }
-            SetStartDate(2021, 4, 1); // Set Start Date
-            SetEndDate(2021, 5, 15); // Set End Date
+            SetStartDate(2021, 3, 1); // Set Start Date
+            SetEndDate(2021, 6, 6); // Set End Date
 
             SetCash(CurrencyName, 1000, 1.21m);
 #if DEBUG
@@ -109,13 +111,14 @@ namespace QuantConnect.Algorithm.CSharp
             _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
             _fast_ema = EMA(_symbol, fastValue, resolution);
             _slow_ema = EMA(_symbol, slowValue, resolution);
+            _slow_hullma = HMA(_symbol, slowValue, resolution);
+            _fast_lsma = LSMA(_symbol, fastValue, resolution);
+
             _macd = MACD(_symbol, fastValue, slowValue, signal, MovingAverageType.Exponential, resolution);
             _psar = PSAR(_symbol, 0.025m, 0.025m, 0.25m, resolution);
 
             _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
             
-            _min_max_macd = new MinMaxMACD(15);
-
             SetWarmUp(TimeSpan.FromDays(7));
 
         }
@@ -215,8 +218,6 @@ namespace QuantConnect.Algorithm.CSharp
 
         private void OnProcessData(Slice data)
         {
-            _min_max_macd.OnData(_macd);
-
 #if LOG_INDICATORS
             Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
@@ -224,8 +225,8 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = Securities[SymbolName].Price;
             if (_bought < 0)
             {
-                bool is_macd_ok = _macd.Histogram.Current.Value > 0;                
-                bool is_moving_averages_ok = _fast_ema > _slow_ema && _very_fast_ema > _fast_ema;
+                bool is_macd_ok = _macd.Histogram.Current.Value > 0;
+                bool is_moving_averages_ok = /*_fast_ema > _slow_ema && _very_fast_ema > _fast_ema*/ _fast_lsma > _slow_hullma ;
                 bool is_psar_ok = current_price > _psar;
 
                 if (is_moving_averages_ok /*&& is_macd_ok*/)
@@ -283,7 +284,7 @@ namespace QuantConnect.Algorithm.CSharp
             
             //bool is_adx_ok = _adx.PositiveDirectionalIndex > 25 && _adx.NegativeDirectionalIndex < 20;
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _very_fast_ema < _fast_ema; //_fast_ema < _slow_ema;
+            bool is_moving_averages_ok = _fast_lsma < _slow_hullma; //_very_fast_ema < _fast_ema;
 
 
             bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
