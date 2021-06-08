@@ -97,10 +97,6 @@ namespace QuantConnect.Algorithm.CSharp
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
 
-            //SetCash(CurrencyName, 1000, 1.21m);
-#if DEBUG
-            //SetCash("USD", 0);
-#endif
             //SetCash(CryptoName, 0.08m);
 
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
