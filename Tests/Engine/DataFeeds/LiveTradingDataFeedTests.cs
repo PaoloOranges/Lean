@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -88,7 +88,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         public void EmitsData()
         {
             var endDate = _startDate.AddDays(10);
-            var feed = RunDataFeed(forex: new List<string> { Symbols.EURUSD });
+            var feed = RunDataFeed(forex: new List<string> { Symbols.EURUSD.ToString() });
 
             var emittedData = false;
             ConsumeBridge(feed, TimeSpan.FromSeconds(5), true, ts =>
@@ -424,13 +424,14 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 }
                 else
                 {
-                    // should of remove trade and quote bar subscription and split/dividend/delisting for trade bar
-                    Assert.AreEqual(currentSubscriptionCount - 5, _dataQueueHandler.SubscriptionDataConfigs.Count);
+                    // should of remove trade and quote bar subscription and split/dividend/delisting for both (8)
+                    Assert.AreEqual(currentSubscriptionCount - 8, _dataQueueHandler.SubscriptionDataConfigs.Count);
                     // internal subscription should still be there
                     Assert.AreEqual(0, _dataQueueHandler.SubscriptionDataConfigs
                         .Where(config => !config.IsInternalFeed)
                         .Count(config => config.Symbol == Symbols.SPY));
-                    Assert.AreEqual(1, _dataQueueHandler.SubscriptionDataConfigs.Count(config => config.Symbol == Symbols.SPY));
+                    // Should be 4 left because of internal subscription + its split/dividend/delisting subscriptions
+                    Assert.AreEqual(4, _dataQueueHandler.SubscriptionDataConfigs.Count(config => config.Symbol == Symbols.SPY));
                     Assert.IsTrue(_dataQueueHandler.Subscriptions.Contains(Symbols.EURUSD));
 
                     // we got what we wanted shortcut unit test
@@ -471,13 +472,14 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 }
                 else
                 {
-                    // should of remove trade and quote bar subscription and split/dividend/delisting for trade bar
-                    Assert.AreEqual(currentSubscriptionCount - 5, _dataQueueHandler.SubscriptionDataConfigs.Count);
+                    // should of remove trade and quote bar subscription and split/dividend/delisting for both (8)
+                    Assert.AreEqual(currentSubscriptionCount - 8, _dataQueueHandler.SubscriptionDataConfigs.Count);
                     // internal subscription should still be there
                     Assert.AreEqual(0, _dataQueueHandler.SubscriptionDataConfigs
                         .Where(config => !config.IsInternalFeed)
                         .Count(config => config.Symbol == Symbols.SPY));
-                    Assert.AreEqual(1, _dataQueueHandler.SubscriptionDataConfigs.Count(config => config.Symbol == Symbols.SPY));
+                    // Should be 4 left because of internal subscription + its split/dividend/delisting subscriptions
+                    Assert.AreEqual(4, _dataQueueHandler.SubscriptionDataConfigs.Count(config => config.Symbol == Symbols.SPY));
                     Assert.IsTrue(_dataQueueHandler.Subscriptions.Contains(Symbols.EURUSD));
                     // we got what we wanted shortcut unit test
                     _manualTimeProvider.SetCurrentTimeUtc(DateTime.UtcNow);
@@ -647,10 +649,10 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         [Test]
         public void DelistedEventEmitted_Equity()
         {
-            _startDate = new DateTime(2016, 2, 18);
+            _startDate = new DateTime(2016, 2, 18, 6, 0, 0);
             CustomMockedFileBaseData.StartDate = _startDate;
             _manualTimeProvider.SetCurrentTimeUtc(_startDate);
-            var delistingDate = _startDate.AddDays(1);
+            var delistingDate = _startDate.Date.AddDays(1);
 
             var autoResetEvent = new AutoResetEvent(false);
             var feed = RunDataFeed(getNextTicksFunction: handler =>
@@ -658,11 +660,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 autoResetEvent.Set();
                 return new[] { new Delisting(Symbols.AAPL, delistingDate, 1, DelistingType.Warning) };
             });
-
             _algorithm.AddEquity(Symbols.AAPL);
             _algorithm.OnEndOfTimeStep();
             _algorithm.SetFinishedWarmingUp();
-
             Assert.IsTrue(autoResetEvent.WaitOne(TimeSpan.FromMilliseconds(200)));
 
             var receivedDelistedWarning = 0;
@@ -1116,9 +1116,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         {
             var lastTime = _manualTimeProvider.GetUtcNow();
             var feed = RunDataFeed(Resolution.Minute,
-                equities: securityType == SecurityType.Equity ? new List<string> { Symbols.SPY } : new List<string>(),
-                forex: securityType == SecurityType.Forex ? new List<string> { Symbols.EURUSD } : new List<string>(),
-                crypto: securityType == SecurityType.Crypto ? new List<string> { Symbols.BTCUSD } : new List<string>(),
+                equities: securityType == SecurityType.Equity ? new List<string> { Symbols.SPY.ToString() } : new List<string>(),
+                forex: securityType == SecurityType.Forex ? new List<string> { Symbols.EURUSD.ToString() } : new List<string>(),
+                crypto: securityType == SecurityType.Crypto ? new List<string> { Symbols.BTCUSD.ToString() } : new List<string>(),
                 getNextTicksFunction: (fdqh =>
                 {
                     var time = _manualTimeProvider.GetUtcNow();
@@ -1406,12 +1406,14 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             // Forex - FXCM
             new TestCaseData(Symbols.EURUSD, Resolution.Hour, 1, 0, 0, 24, 0, 0, false, _instances[typeof(BaseData)]),
             new TestCaseData(Symbols.EURUSD, Resolution.Minute, 1, 0, 0, 1 * 60, 0, 0, false, _instances[typeof(BaseData)]),
-            new TestCaseData(Symbols.EURUSD, Resolution.Tick, 1, 24, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
+            // emit at the start and end time
+            new TestCaseData(Symbols.EURUSD, Resolution.Tick, 1, 25, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
 
             // Forex - Oanda
             new TestCaseData(Symbol.Create("EURUSD", SecurityType.Forex, Market.Oanda), Resolution.Hour, 1, 0, 0, 24, 0, 0, false, _instances[typeof(BaseData)]),
             new TestCaseData(Symbol.Create("EURUSD", SecurityType.Forex, Market.Oanda), Resolution.Minute, 1, 0, 0, 1 * 60, 0, 0, false, _instances[typeof(BaseData)]),
-            new TestCaseData(Symbol.Create("EURUSD", SecurityType.Forex, Market.Oanda), Resolution.Tick, 1, 24, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
+            // emit at the start and end time
+            new TestCaseData(Symbol.Create("EURUSD", SecurityType.Forex, Market.Oanda), Resolution.Tick, 1, 25, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
 
             // CFD - FXCM
             new TestCaseData(Symbols.DE30EUR, Resolution.Hour, 1, 0, 0, 14, 0, 0, false, _instances[typeof(BaseData)]),
@@ -1419,22 +1421,22 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             new TestCaseData(Symbols.DE30EUR, Resolution.Tick, 1, 14, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
 
             // CFD - Oanda
-            new TestCaseData(Symbol.Create("DE30EUR", SecurityType.Cfd, Market.Oanda), Resolution.Hour, 1, 0, 0, 14, 0, 0, false, _instances[typeof(BaseData)]),
+            new TestCaseData(Symbol.Create("DE30EUR", SecurityType.Cfd, Market.Oanda), Resolution.Hour, 1, 0, 0, 21, 0, 0, false, _instances[typeof(BaseData)]),
             new TestCaseData(Symbol.Create("DE30EUR", SecurityType.Cfd, Market.Oanda), Resolution.Minute, 1, 0, 0, 1 * 60, 0, 0, false, _instances[typeof(BaseData)]),
-            new TestCaseData(Symbol.Create("DE30EUR", SecurityType.Cfd, Market.Oanda), Resolution.Tick, 1, 14, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
+            new TestCaseData(Symbol.Create("DE30EUR", SecurityType.Cfd, Market.Oanda), Resolution.Tick, 1, 21, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
 
             // Crypto
             new TestCaseData(Symbols.BTCUSD, Resolution.Hour, 1, 0, 24, 24, 0, 0, false, _instances[typeof(BaseData)]),
             new TestCaseData(Symbols.BTCUSD, Resolution.Minute, 1, 0, 1 * 60, 1 * 60, 0, 0, false, _instances[typeof(BaseData)]),
-            // x2 because counting trades and quotes
-            new TestCaseData(Symbols.BTCUSD, Resolution.Tick, 1, 24 * 2, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
+            // x2 because counting trades and quotes. Emit at the start and end time
+            new TestCaseData(Symbols.BTCUSD, Resolution.Tick, 1, 25 * 2, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
 
             // Futures
             // ES has two session breaks totalling 1h 15m, so total trading hours = 22.75
             new TestCaseData(Symbols.Future_ESZ18_Dec2018, Resolution.Hour, 1, 0, 23, 23, 0, 0, false, _instances[typeof(BaseData)]),
             new TestCaseData(Symbols.Future_ESZ18_Dec2018, Resolution.Minute, 1, 0, 1 * 60, 1 * 60, 0, 0, false, _instances[typeof(BaseData)]),
-            // x2 because counting trades and quotes
-            new TestCaseData(Symbols.Future_ESZ18_Dec2018, Resolution.Tick, 1, 23 * 2, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
+            // x2 because counting trades and quotes. Emit at the start and end time
+            new TestCaseData(Symbols.Future_ESZ18_Dec2018, Resolution.Tick, 1, 24 * 2, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
 
             // Options
             new TestCaseData(Symbols.SPY_C_192_Feb19_2016, Resolution.Hour, 1, 0, 7, 7, 0, 0, false, _instances[typeof(BaseData)]),
@@ -1501,10 +1503,13 @@ namespace QuantConnect.Tests.Engine.DataFeeds
 
                 var utcTime = timeProvider.GetUtcNow();
                 var exchangeTime = utcTime.ConvertFromUtc(exchangeTimeZone);
-                if (exchangeTime == lastTime ||
-                    exchangeTime > endDate.ConvertTo(algorithmTimeZone, exchangeTimeZone))
+                var ended = exchangeTime > endDate.ConvertTo(algorithmTimeZone, exchangeTimeZone);
+                if (exchangeTime == lastTime || ended)
                 {
-                    emittedData.Set();
+                    if (ended)
+                    {
+                        emittedData.Set();
+                    }
                     return Enumerable.Empty<BaseData>();
                 }
 
@@ -1696,12 +1701,6 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             try
             {
                 algorithm.PostInitialize();
-
-                // The custom exchange has to pick up the universe selection data point and push it into the universe subscription to
-                // trigger adding the securities. else there will be a race condition emitting the first data point and having a subscription
-                // to receive it
-                Thread.Sleep(200);
-
                 var actualTicksReceived = 0;
                 var actualTradeBarsReceived = 0;
                 var actualQuoteBarsReceived = 0;
@@ -1719,6 +1718,12 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                     exchangeTimeZone = security.Exchange.TimeZone;
 
                     sliceCount++;
+
+                    // give enough time to the producer to emit
+                    if (sliceCount == 1 && !emittedData.WaitOne(300))
+                    {
+                        Assert.Fail("Timeout waiting for data generation");
+                    }
 
                     if (resolution == Resolution.Tick)
                     {

@@ -27,8 +27,6 @@ namespace QuantConnect.Algorithm
 {
     public partial class QCAlgorithm
     {
-        private bool _isWarmUpIndicatorWarningSent = false;
-
         /// <summary>
         /// Gets whether or not WarmUpIndicator is allowed to warm up indicators/>
         /// </summary>
@@ -1282,6 +1280,30 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a new PivotPointsHighLow indicator
+        /// </summary>
+        /// <param name="symbol">The symbol whose PPHL we seek</param>
+        /// <param name="lengthHigh">The number of surrounding bars whose high values should be less than the current bar's for the bar high to be marked as high pivot point</param>
+        /// <param name="lengthLow">The number of surrounding bars whose low values should be more than the current bar's for the bar low to be marked as low pivot point</param>
+        /// <param name="lastStoredValues">The number of last stored indicator values</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The PivotPointsHighLow indicator for the requested symbol.</returns>
+        public PivotPointsHighLow PPHL(Symbol symbol, int lengthHigh, int lengthLow, int lastStoredValues = 100, Resolution? resolution = null, Func<IBaseData, IBaseDataBar> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"PPHL({lengthHigh},{lengthLow})", resolution);
+            var pivotPointsHighLow = new PivotPointsHighLow(name, lengthHigh, lengthLow, lastStoredValues);
+            RegisterIndicator(symbol, pivotPointsHighLow, resolution, selector);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, pivotPointsHighLow, resolution);
+            }
+
+            return pivotPointsHighLow;
+        }
+
+        /// <summary>
         /// Creates a new PercentagePriceOscillator indicator.
         /// </summary>
         /// <param name="symbol">The symbol whose PPO we want</param>
@@ -1883,12 +1905,69 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a Wilder Swing Index (SI) indicator for the symbol.
+        /// The indicator will be automatically updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose SI we want</param>
+        /// <param name="limitMove">The maximum daily change in price for the SI</param>
+        /// <param name="resolution">The resolution</param>
+        /// <returns>The WilderSwingIndex for the given parameters</returns>
+        /// <remarks>SI for Wilder Swing Index</remarks>
+        public WilderSwingIndex SI(Symbol symbol, decimal limitMove, Resolution? resolution = Resolution.Daily)
+        {
+            var name = CreateIndicatorName(symbol, "SI", resolution);
+            var si = new WilderSwingIndex(name, limitMove);
+            RegisterIndicator(symbol, si, resolution);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, si, resolution);
+            }
+
+            return si;
+        }
+
+        /// <summary>
+        /// Creates a Wilder Accumulative Swing Index (ASI) indicator for the symbol.
+        /// The indicator will be automatically updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose ASI we want</param>
+        /// <param name="limitMove">The maximum daily change in price for the ASI</param>
+        /// <param name="resolution">The resolution</param>
+        /// <returns>The WilderAccumulativeSwingIndex for the given parameters</returns>
+        /// <remarks>ASI for Wilder Accumulative Swing Index</remarks>
+        public WilderAccumulativeSwingIndex ASI(Symbol symbol, decimal limitMove, Resolution? resolution = Resolution.Daily)
+        {
+            var name = CreateIndicatorName(symbol, "ASI", resolution);
+            var asi = new WilderAccumulativeSwingIndex(name, limitMove);
+            RegisterIndicator(symbol, asi, resolution);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, asi, resolution);
+            }
+
+            return asi;
+        }
+
+        /// <summary>
         /// Creates a new Arms Index indicator
         /// </summary>
         /// <param name="symbols">The symbols whose Arms Index we want</param>
         /// <param name="resolution">The resolution</param>
         /// <returns>The Arms Index indicator for the requested symbol over the specified period</returns>
         public ArmsIndex TRIN(IEnumerable<Symbol> symbols, Resolution? resolution = null)
+        {
+            return TRIN(symbols.ToArray(), resolution);
+        }
+
+        /// <summary>
+        /// Creates a new Arms Index indicator
+        /// </summary>
+        /// <param name="symbols">The symbols whose Arms Index we want</param>
+        /// <param name="resolution">The resolution</param>
+        /// <returns>The Arms Index indicator for the requested symbol over the specified period</returns>
+        public ArmsIndex TRIN(Symbol[] symbols, Resolution? resolution = null)
         {
             var name = CreateIndicatorName(QuantConnect.Symbol.None, "TRIN", resolution ?? GetSubscription(symbols.First()).Resolution);
             var trin = new ArmsIndex(name);

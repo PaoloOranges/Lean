@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -108,7 +108,7 @@ namespace QuantConnect
         public Symbol Symbol = Symbol.Empty;
 
         /// Type of the security
-        public SecurityType Type;
+        public SecurityType Type => Symbol.SecurityType;
 
         /// The currency symbol of the holding, such as $
         public string CurrencySymbol;
@@ -153,7 +153,6 @@ namespace QuantConnect
             var holding = security.Holdings;
 
             Symbol = holding.Symbol;
-            Type = holding.Type;
             Quantity = holding.Quantity;
             MarketValue = holding.HoldingsValue;
             CurrencySymbol = Currencies.GetCurrencySymbol(security.QuoteCurrency.Symbol);
@@ -186,7 +185,6 @@ namespace QuantConnect
             {
                 AveragePrice = AveragePrice,
                 Symbol = Symbol,
-                Type = Type,
                 Quantity = Quantity,
                 MarketPrice = MarketPrice,
                 MarketValue = MarketValue,
@@ -767,7 +765,7 @@ namespace QuantConnect
         public static PrimaryExchange GetPrimaryExchange(this string exchange)
         {
             var primaryExchange = PrimaryExchange.UNKNOWN;
-            if (string.IsNullOrEmpty(exchange) || Enum.TryParse(exchange, true, out primaryExchange))
+            if (string.IsNullOrEmpty(exchange))
             {
                 return primaryExchange;
             }
@@ -836,10 +834,13 @@ namespace QuantConnect
                     return PrimaryExchange.ISE_GEMINI;
                 case "ISE_MERCURY":
                     return PrimaryExchange.ISE_MERCURY;
-                default:
                 case "UNKNOWN":
                     return PrimaryExchange.UNKNOWN;
+                default:
+                    break;
             }
+
+            return Enum.TryParse(exchange, true, out primaryExchange) ? primaryExchange : PrimaryExchange.UNKNOWN;
         }
     }
 

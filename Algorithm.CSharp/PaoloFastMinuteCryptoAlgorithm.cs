@@ -94,9 +94,12 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2021, 3, 1); // Set Start Date
             SetEndDate(2021, 6, 6); // Set End Date
 
-            SetCash(CurrencyName, 1000, 1.21m);
+            SetAccountCurrency(CurrencyName);
+            SetCash(1000);
+
+            //SetCash(CurrencyName, 1000, 1.21m);
 #if DEBUG
-            SetCash("USD", 0);
+            //SetCash("USD", 0);
 #endif
             //SetCash(CryptoName, 0.08m);
 

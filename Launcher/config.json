@@ -119,6 +119,11 @@
   "atreyu-sub-port": "",
   "atreyu-username": "",
   "atreyu-password": "",
+  "atreyu-client-id": "",
+  "atreyu-cash-balance": "",
+  "atreyu-holdings": "[]",
+  "atreyu-broker-mpid": "",
+  "atreyu-locate-rqd": "",
 
   // Trading Technologies configuration
   "tt-user-name": "",
@@ -180,6 +185,9 @@
     "ema-fast": 10,
     "ema-slow": 20
   },
+
+  // specify supported languages when running regression tests
+  "regression-test-languages": ["CSharp", "Python"],
 
   "environments": {
 
