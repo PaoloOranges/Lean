@@ -1,13 +1,13 @@
 ![alt tag](https://cdn.quantconnect.com/web/i/20180601-1615-lean-logo-small.png)
 =========
 
-[![Build Status](https://github.com/QuantConnect/Lean/workflows/Build%20%26%20Test%20Lean/badge.svg)](https://github.com/QuantConnect/Lean/actions?query=workflow%3A%22Build%20%26%20Test%20Lean%22) &nbsp;&nbsp;&nbsp; [![LEAN Forum](https://img.shields.io/badge/debug-LEAN%20Forum-53c82b.svg)](https://www.quantconnect.com/forum/discussions/1/lean) &nbsp;&nbsp;&nbsp; [![Slack Chat](https://img.shields.io/badge/chat-Slack-53c82b.svg)](https://www.quantconnect.com/slack)
+[![Build Status](https://github.com/QuantConnect/Lean/workflows/Build%20%26%20Test%20Lean/badge.svg)](https://github.com/QuantConnect/Lean/actions?query=workflow%3A%22Build%20%26%20Test%20Lean%22) &nbsp;&nbsp;&nbsp; [![Regression Tests](https://github.com/QuantConnect/Lean/workflows/Regression%20Tests/badge.svg)](https://github.com/QuantConnect/Lean/actions?query=workflow%3A%22Regression%20Tests%22) &nbsp;&nbsp;&nbsp; [![LEAN Forum](https://img.shields.io/badge/debug-LEAN%20Forum-53c82b.svg)](https://www.quantconnect.com/forum/discussions/1/lean) &nbsp;&nbsp;&nbsp; [![Slack Chat](https://img.shields.io/badge/chat-Slack-53c82b.svg)](https://www.quantconnect.com/slack)
 
 
-[Lean Home - https://www.quantconnect.com/lean][1] | [Documentation][2] | [Download Zip][3] | [Docker Hub][8]
-
+[Lean Home][1] | [Documentation][2] | [Download Zip][3] | [Docker Hub][8] | [Nuget][9]
+ 
 ----------
-
+ 
 ## Introduction ##
   
 Lean Engine is an open-source algorithmic trading engine built for easy strategy research, backtesting and live trading. We integrate with common data providers and brokerages so you can quickly deploy algorithmic trading strategies.
@@ -23,7 +23,9 @@ Want your company logo here? [Sponsor LEAN](https://github.com/sponsors/QuantCon
 ## QuantConnect is Hiring! ##
 Join the team and solve some of the most difficult challenges in quantitative finance. If you are passionate about algorithmic trading we'd like to hear from you. The below roles are open in our Seattle, WA office. When applying, make sure to mention you came through GitHub: 
 
-- [**Senior UX Developer**](mailto:jared@quantconnect.com): Collaborate with QuantConnect to develop a world-leading online experience for a community of developers from all over the world.  
+- [**C# Engineer**](https://www.getonbrd.com/jobs/programming/c-c-software-engineer-quantconnect-remote): Contribute remotely to the core of LEAN through the open-source project LEAN. 
+
+- [**UX Developer**](https://www.getonbrd.com/jobs/programming/full-stack-engineer-quantconnect-remote): Collaborate with QuantConnect to develop a world-leading online experience for a community of developers from all over the world.  
 
 ## System Overview ##
 
@@ -141,12 +143,12 @@ The open-sourcing of QuantConnect would not have been possible without the suppo
 Ryan H, Pravin B, Jimmie B, Nick C, Sam C, Mattias S, Michael H, Mark M, Madhan, Paul R, Nik M, Scott Y, BinaryExecutor.com, Tadas T, Matt B, Binumon P, Zyron, Mike O, TC, Luigi, Lester Z, Andreas H, Eugene K, Hugo P, Robert N, Christofer O, Ramesh L, Nicholas S, Jonathan E, Marc R, Raghav N, Marcus, Hakan D, Sergey M, Peter McE, Jim M, INTJCapital.com, Richard E, Dominik, John L, H. Orlandella, Stephen L, Risto K, E.Subasi, Peter W, Hui Z, Ross F, Archibald112, MooMooForex.com, Jae S, Eric S, Marco D, Jerome B, James B. Crocker, David Lypka, Edward T, Charlie Guse, Thomas D, Jordan I, Mark S, Bengt K, Marc D, Al C, Jan W, Ero C, Eranmn, Mitchell S, Helmuth V, Michael M, Jeremy P, PVS78, Ross D, Sergey K, John Grover, Fahiz Y, George L.Z., Craig E, Sean S, Brad G, Dennis H, Camila C, Egor U, David T, Cameron W, Napoleon Hernandez, Keeshen A, Daniel E, Daniel H, M.Patterson, Asen K, Virgil J, Balazs Trader, Stan L, Con L, Will D, Scott K, Barry K, Pawel D, S Ray, Richard C, Peter L, Thomas L., Wang H, Oliver Lee, Christian L..
 
 
-  [1]: https://www.quantconnect.com/lean "Lean Open Source Home Page"
-  [2]: https://www.quantconnect.com/lean/docs "Lean Documentation"
+  [1]: https://www.lean.io/ "Lean Open Source Home Page"
+  [2]: https://www.lean.io/docs/ "Lean Documentation"
   [3]: https://github.com/QuantConnect/Lean/archive/master.zip
   [4]: https://www.quantconnect.com "QuantConnect"
   [5]: https://github.com/QuantConnect/Lean/issues
   [6]: https://www.quantconnect.com/forum/discussions/1/lean
   [7]: https://github.com/QuantConnect/Lean/blob/master/CONTRIBUTING.md
   [8]: https://hub.docker.com/orgs/quantconnect/repositories
-
+  [9]: https://www.nuget.org/profiles/jaredbroad
