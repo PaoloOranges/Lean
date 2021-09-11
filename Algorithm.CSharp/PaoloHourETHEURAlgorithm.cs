@@ -21,12 +21,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
+
 using QuantConnect.Data;
 using QuantConnect.Brokerages;
 using QuantConnect.Indicators;
 using QuantConnect.Orders;
-using QuantConnect.Interfaces;
-using System.Globalization;
 
 
 namespace QuantConnect.Algorithm.CSharp
@@ -37,7 +37,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="using data" />
     /// <meta name="tag" content="using quantconnect" />
     /// <meta name="tag" content="trading and orders" />
-    public class PaoloFastMinuteCryptoAlgorithm : QCAlgorithm
+    public class PaoloHourETHEURAlgorithm : QCAlgorithm
     {
         private ExponentialMovingAverage _very_fast_ema;
         private ExponentialMovingAverage _fast_ema;
@@ -47,6 +47,8 @@ namespace QuantConnect.Algorithm.CSharp
         
         private MovingAverageConvergenceDivergence _macd;
         private ParabolicStopAndReverse _psar;
+        private AroonOscillator _ao;
+        private ChaikinMoneyFlow _cmf;
 
         private Maximum _maximumPrice;
 
@@ -67,11 +69,11 @@ namespace QuantConnect.Algorithm.CSharp
 
         private bool _is_ready_to_trade = false;
 
-        private const decimal _amount_to_buy = 0.75m;
-        private const decimal _percentage_price_gain = 0.05m;
+        private const decimal _amount_to_buy = 0.8m;
+        private const decimal _percentage_price_gain = 0.01m;
 
         private const int WarmUpTime = 60;
-        private double resolutionInSeconds = 60.0;
+        private const double resolutionInSeconds = 3600.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
 
         private CultureInfo _culture_info = CultureInfo.CreateSpecificCulture("en-GB");
@@ -87,12 +89,10 @@ namespace QuantConnect.Algorithm.CSharp
 
             Resolution resolution = Resolution.Hour;
 
-            if(resolution == Resolution.Hour)
-            {
-                resolutionInSeconds = 3600.0;
-            }
-            SetStartDate(2021, 5, 15); // Set Start Date
-            SetEndDate(2021, 7, 4); // Set End Date
+            SetStartDate(2021, 6, 15); // Set Start Date
+            SetEndDate(2021, 9, 10); // Set End Date
+            //SetStartDate(2021, 7, 15); // Set Start Date
+            //SetEndDate(2021, 8, 8); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -103,18 +103,21 @@ namespace QuantConnect.Algorithm.CSharp
             SetBenchmark(_symbol);
 
             const int veryFastValue = 5;
-            const int fastValue = 18;
-            const int slowValue = 30;
+            const int fastValue = 15;
+            const int slowValue = 25;
             const int signal = 8;
 
             _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
             _fast_ema = EMA(_symbol, fastValue, resolution);
             _slow_ema = EMA(_symbol, slowValue, resolution);
-            _slow_hullma = HMA(_symbol, slowValue, resolution);
-            _fast_lsma = LSMA(_symbol, fastValue, resolution);
+            _slow_hullma = HMA(_symbol, 260, resolution);
+            _fast_lsma = LSMA(_symbol, 120, resolution);
 
+            
             _macd = MACD(_symbol, fastValue, slowValue*2, signal, MovingAverageType.Exponential, resolution);
-            _psar = PSAR(_symbol, 0.025m, 0.025m, 0.5m, resolution);
+            _psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
+            _ao = AROON(_symbol, (slowValue + fastValue) / 2, resolution);
+            _cmf = CMF(_symbol, (slowValue + fastValue) / 2, resolution);
 
             _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
             
@@ -199,8 +202,7 @@ namespace QuantConnect.Algorithm.CSharp
             DateTime UtcTimeNow = UtcTime;
             
             if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > resolutionInSeconds)
-            {
-                
+            {                
                 Log("WrongTime! Last: " + UtcTimeLast.ToString(_culture_info) + " Now: " + UtcTimeNow.ToString(_culture_info));
             }
             UtcTimeLast = UtcTimeNow;
@@ -215,6 +217,8 @@ namespace QuantConnect.Algorithm.CSharp
             Plot("Indicators", "HullMA", _slow_hullma);
             Plot("Indicators", "LSMA", _fast_lsma);
             Plot("Indicators", "PSAR", _psar);
+            Plot("Indicators", "AOup", _ao.AroonUp);
+            Plot("Indicators", "AOdown", _ao.AroonDown);
 #endif
         }
 
@@ -230,8 +234,9 @@ namespace QuantConnect.Algorithm.CSharp
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;
                 bool is_moving_averages_ok = /*_fast_ema > _slow_ema && _very_fast_ema > _fast_ema*/ _fast_lsma > _slow_hullma ;
                 bool is_psar_ok = current_price > _psar;
+                bool is_ao_ok = _ao.AroonUp > _ao.AroonDown;
 
-                if (is_moving_averages_ok && is_psar_ok /*&& is_macd_ok*/)
+                if (is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok*/ /*&& is_ao_ok*/)
                 {
                     const decimal round_multiplier = 1000m;
                     decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
@@ -287,7 +292,8 @@ namespace QuantConnect.Algorithm.CSharp
             //bool is_adx_ok = _adx.PositiveDirectionalIndex > 25 && _adx.NegativeDirectionalIndex < 20;
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
             bool is_moving_averages_ok = _fast_lsma < _slow_hullma; //_very_fast_ema < _fast_ema;
-
+            bool is_psar_ok = current_price < _psar;
+            bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
 
             bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
 
@@ -298,8 +304,8 @@ namespace QuantConnect.Algorithm.CSharp
                 //Log(body);
             }
 
-            bool is_gain_ok = is_moving_averages_ok /*&& is_macd_ok*/ && is_price_ok;
-            bool is_stop_loss = _fast_ema < _slow_ema && is_macd_ok;
+            bool is_gain_ok = is_moving_averages_ok /*&& is_macd_ok*/ && is_price_ok /*&& is_psar_ok*/;
+            bool is_stop_loss = is_moving_averages_ok && is_ao_ok;
             return is_gain_ok;
 
         }

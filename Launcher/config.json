@@ -6,10 +6,10 @@
   // two predefined environments, 'backtesting' and 'live', feel free
   // to add more!
 
-  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed", "paper-gdax"
+  "environment": "backtesting", // "backtesting", "paper-gdax", "live-gdax"
 
   // algorithm class selector
-  "algorithm-type-name": "PaoloFastMinuteCryptoAlgorithm",
+  "algorithm-type-name": "PaoloHourETHEURAlgorithm",
 
   // Algorithm language selector - options CSharp, Python
   "algorithm-language": "CSharp",
@@ -23,6 +23,8 @@
 
   // engine
   "data-folder": "../../../Data/",
+  // "object-store-root": "../LeanStorage",
+  //"results-destination-folder": "../LeanStorage/Results",
 
   // debugging configuration - options for debugging-method LocalCmdLine, VisualStudio, PTVSD, PyCharm
   "debugging": false,
@@ -106,9 +108,9 @@
   "iqfeed-version": "1.0",
 
   // gdax configuration
-  "gdax-api-secret": "8VDvTMErRuVa0Qw5uaAJVeyJhf12Dbm4ZOXPhHWrr/du5n9PrR3HSRJ2WloixIDql2CZ2Ir9Kqo4/pPFtv/6QA==",
-  "gdax-api-key": "c25aeedaa11b6a3172024cb8219c16f5",
-  "gdax-passphrase": "mwqbx6woqk",
+  "gdax-api-secret": "tpVbpDrSDZlLHo7rM4tvWTiAT3utti1TBd3ZCe54aHjTS00JN3XU/uZDdh6fKy7jHEdI5OQlED+bBmEGoSFMCQ==",
+  "gdax-api-key": "4abd36b9033580f370ba75be61e40db6",
+  "gdax-passphrase": "x7twk5jqnl",
 
   // bitfinex configuration
   "bitfinex-api-secret": "",
@@ -250,7 +252,7 @@
       "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
       "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
       "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BacktestingTransactionHandler",
-      "history-provider": "BrokerageHistoryProvider"
+      "history-provider": "QuantConnect.Lean.Engine.HistoricalData.SubscriptionDataReaderHistoryProvider"
     },
 
     // defines the 'live-tradier' environment
