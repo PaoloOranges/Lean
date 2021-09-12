@@ -89,7 +89,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2021, 6, 15); // Set Start Date
+            SetStartDate(2020, 1, 1); // Set Start Date
             SetEndDate(2021, 9, 10); // Set End Date
             //SetStartDate(2021, 7, 15); // Set Start Date
             //SetEndDate(2021, 8, 8); // Set End Date
@@ -234,9 +234,9 @@ namespace QuantConnect.Algorithm.CSharp
                 bool is_macd_ok = _macd.Histogram.Current.Value > 0;
                 bool is_moving_averages_ok = /*_fast_ema > _slow_ema && _very_fast_ema > _fast_ema*/ _fast_lsma > _slow_hullma ;
                 bool is_psar_ok = current_price > _psar;
-                bool is_ao_ok = _ao.AroonUp > _ao.AroonDown;
+                bool is_ao_ok = _ao.AroonUp > 80;
 
-                if (is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok*/ /*&& is_ao_ok*/)
+                if (is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok*/ && is_ao_ok)
                 {
                     const decimal round_multiplier = 1000m;
                     decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
