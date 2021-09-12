@@ -108,9 +108,9 @@
   "iqfeed-version": "1.0",
 
   // gdax configuration
-  "gdax-api-secret": "tpVbpDrSDZlLHo7rM4tvWTiAT3utti1TBd3ZCe54aHjTS00JN3XU/uZDdh6fKy7jHEdI5OQlED+bBmEGoSFMCQ==",
-  "gdax-api-key": "4abd36b9033580f370ba75be61e40db6",
-  "gdax-passphrase": "x7twk5jqnl",
+  "gdax-api-secret": "uJBuANb4gXmxmzbWFJLdF937mwikF99J3hHoad4YUHmN/jovxswP64eazaALg54k6vC5WXoxAMVQn+53ZUjnGA==",
+  "gdax-api-key": "9f74c9958e3042941f2a90f2dfa687e6",
+  "gdax-passphrase": "kvbcqn30z6o",
 
   // bitfinex configuration
   "bitfinex-api-secret": "",
