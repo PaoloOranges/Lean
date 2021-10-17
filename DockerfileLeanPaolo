@@ -1,0 +1,19 @@
+    #
+    # Release Version
+    #
+
+    FROM mcr.microsoft.com/dotnet/sdk:latest as build
+    
+    WORKDIR /Lean
+    
+    COPY . .
+    
+    RUN dotnet publish Launcher/QuantConnect.Lean.Launcher.csproj -c Release -o /output
+
+
+    FROM mcr.microsoft.com/dotnet/runtime:latest
+    WORKDIR /Lean
+    COPY Data /Data
+    COPY --from=build /output /Lean
+
+    ENTRYPOINT [ "dotnet", "QuantConnect.Lean.Launcher.dll" ]
