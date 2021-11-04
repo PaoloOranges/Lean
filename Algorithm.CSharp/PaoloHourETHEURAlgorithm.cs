@@ -89,8 +89,8 @@ namespace QuantConnect.Algorithm.CSharp
 
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2020, 1, 1); // Set Start Date
-            SetEndDate(2021, 9, 10); // Set End Date
+            SetStartDate(2021, 8, 1); // Set Start Date
+            SetEndDate(2021, 10, 12); // Set End Date
             //SetStartDate(2021, 7, 15); // Set Start Date
             //SetEndDate(2021, 8, 8); // Set End Date
 
