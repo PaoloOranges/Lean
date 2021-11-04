@@ -13,35 +13,20 @@
  * limitations under the License.
 */
 
+using QuantConnect.Algorithm.Framework.Alphas;
 using System.Collections.Generic;
 
-namespace QuantConnect.Securities.Index
+namespace QuantConnect.Tests.Algorithm.Framework.Alphas
 {
-    /// <summary>
-    /// Helper methods for Index Symbols
-    /// </summary>
-    public static class IndexSymbol
+    class TestMacdAlphaModel: MacdAlphaModel
     {
-        private static readonly Dictionary<string, string> _indexMarket = new Dictionary<string, string>
-        {
-            { "SPX", Market.CBOE },
-            { "NDX", "NASDAQ" },
-            { "VIX", Market.CBOE },
-            { "SPXW", Market.CBOE },
-            { "NQX", "NASDAQ" },
-            { "VIXW", Market.CBOE }
-        };
-
         /// <summary>
-        /// Gets the actual exchange the index lives on
+        /// Get the _symbolData dictionary from MacdAlphaModel
         /// </summary>
-        /// <returns>The market of the index</returns>
-        public static string GetIndexExchange(Symbol symbol)
+        /// <returns>_symbolData dictionary from MacdAlphaModel</returns>
+        public Dictionary<Symbol, SymbolData> GetSymbolData()
         {
-            string market;
-            return _indexMarket.TryGetValue(symbol.Value, out market)
-                ? market
-                : symbol.ID.Market;
+            return _symbolData;
         }
     }
 }
