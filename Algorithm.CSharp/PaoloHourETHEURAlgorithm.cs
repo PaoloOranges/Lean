@@ -70,7 +70,7 @@ namespace QuantConnect.Algorithm.CSharp
         private bool _is_ready_to_trade = false;
 
         private const decimal _amount_to_buy = 0.8m;
-        private const decimal _percentage_price_gain = 0.01m;
+        private const decimal _percentage_price_gain = 0.05m;
 
         private const int WarmUpTime = 60;
         private const double resolutionInSeconds = 3600.0;
@@ -89,10 +89,8 @@ namespace QuantConnect.Algorithm.CSharp
 
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2021, 8, 1); // Set Start Date
-            SetEndDate(2021, 10, 12); // Set End Date
-            //SetStartDate(2021, 7, 15); // Set Start Date
-            //SetEndDate(2021, 8, 8); // Set End Date
+            SetStartDate(2021, 6, 1); // Set Start Date
+            SetEndDate(2021, 11, 15); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -228,15 +226,10 @@ namespace QuantConnect.Algorithm.CSharp
             Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
 
-            decimal current_price = Securities[SymbolName].Price;
             if (_bought < 0)
-            {
-                bool is_macd_ok = _macd.Histogram.Current.Value > 0;
-                bool is_moving_averages_ok = /*_fast_ema > _slow_ema && _very_fast_ema > _fast_ema*/ _fast_lsma > _slow_hullma ;
-                bool is_psar_ok = current_price > _psar;
-                bool is_ao_ok = _ao.AroonUp > 80;
-
-                if (is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok*/ && is_ao_ok)
+            {                
+                decimal current_price = Securities[SymbolName].Price;
+                if (IsOkToBuy(data))
                 {
                     const decimal round_multiplier = 1000m;
                     decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
@@ -284,6 +277,18 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
         
+        private bool IsOkToBuy(Slice data)
+        {
+            decimal current_price = data[SymbolName].Value;
+
+            bool is_macd_ok = _macd.Histogram.Current.Value > 0;
+            bool is_moving_averages_ok = /*_fast_ema > _slow_ema && _very_fast_ema > _fast_ema*/ _fast_lsma > _slow_hullma;
+            bool is_psar_ok = current_price > _psar;
+            bool is_ao_ok = _ao.AroonUp > 80;
+
+            return is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok*/ && is_ao_ok;
+        }
+
         private bool IsOkToSell(Slice data)
         {
 
