@@ -184,8 +184,12 @@ namespace QuantConnect.Algorithm.CSharp
                 if(_bought < 0 && !HasSoldPriceFromPreviousSession)
                 {
                     _sold_price = _maximumPrice;
-                }               
-                return;
+                }
+                if (!_is_ready_to_trade)
+                {
+                    OnPrepareToTrade(data);
+                }
+                 return;
             }
 
             if(_is_ready_to_trade)
