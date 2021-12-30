@@ -90,7 +90,7 @@ namespace QuantConnect.Algorithm.CSharp
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2021, 6, 1); // Set Start Date
-            SetEndDate(2021, 11, 15); // Set End Date
+            SetEndDate(2021, 12, 25); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -108,8 +108,8 @@ namespace QuantConnect.Algorithm.CSharp
             _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
             _fast_ema = EMA(_symbol, fastValue, resolution);
             _slow_ema = EMA(_symbol, slowValue, resolution);
-            _slow_hullma = HMA(_symbol, 260, resolution);
-            _fast_lsma = LSMA(_symbol, 120, resolution);
+            _slow_hullma = HMA(_symbol, 220, resolution);
+            _fast_lsma = LSMA(_symbol, 110, resolution);
 
             
             _macd = MACD(_symbol, fastValue, slowValue*2, signal, MovingAverageType.Exponential, resolution);
