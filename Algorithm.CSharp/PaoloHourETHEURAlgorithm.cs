@@ -39,16 +39,11 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="trading and orders" />
     public class PaoloHourETHEURAlgorithm : QCAlgorithm
     {
-        private ExponentialMovingAverage _very_fast_ema;
-        private ExponentialMovingAverage _fast_ema;
-        private ExponentialMovingAverage _slow_ema;
         private HullMovingAverage _slow_hullma;
         private LeastSquaresMovingAverage _fast_lsma;
         
         private MovingAverageConvergenceDivergence _macd;
         private ParabolicStopAndReverse _psar;
-        private AroonOscillator _ao;
-        private ChaikinMoneyFlow _cmf;
 
         private Maximum _maximumPrice;
 
@@ -89,7 +84,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2021, 6, 1); // Set Start Date
+            SetStartDate(2021, 1, 1); // Set Start Date
             SetEndDate(2021, 12, 25); // Set End Date
 
             SetAccountCurrency(CurrencyName);
@@ -100,22 +95,16 @@ namespace QuantConnect.Algorithm.CSharp
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
             SetBenchmark(_symbol);
 
-            const int veryFastValue = 5;
-            const int fastValue = 15;
-            const int slowValue = 25;
+            const int fastValue = 110;
+            const int slowValue = 220;
             const int signal = 8;
 
-            _very_fast_ema = EMA(_symbol, veryFastValue, resolution);
-            _fast_ema = EMA(_symbol, fastValue, resolution);
-            _slow_ema = EMA(_symbol, slowValue, resolution);
-            _slow_hullma = HMA(_symbol, 220, resolution);
-            _fast_lsma = LSMA(_symbol, 110, resolution);
+            _slow_hullma = HMA(_symbol, slowValue, resolution);
+            _fast_lsma = LSMA(_symbol, fastValue, resolution);
 
             
             _macd = MACD(_symbol, fastValue, slowValue*2, signal, MovingAverageType.Exponential, resolution);
             _psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
-            _ao = AROON(_symbol, (slowValue + fastValue) / 2, resolution);
-            _cmf = CMF(_symbol, (slowValue + fastValue) / 2, resolution);
 
             _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
             
@@ -213,14 +202,9 @@ namespace QuantConnect.Algorithm.CSharp
             Plot(SymbolName, "Price", data[SymbolName].Value);
 
             Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
-            Plot("Indicators", "VeryFastMA", _very_fast_ema);
-            Plot("Indicators", "FastMA", _fast_ema);
-            Plot("Indicators", "SlowMA", _slow_ema);
             Plot("Indicators", "HullMA", _slow_hullma);
             Plot("Indicators", "LSMA", _fast_lsma);
             Plot("Indicators", "PSAR", _psar);
-            Plot("Indicators", "AOup", _ao.AroonUp);
-            Plot("Indicators", "AOdown", _ao.AroonDown);
 #endif
         }
 
@@ -286,9 +270,9 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = data[SymbolName].Value;
 
             bool is_macd_ok = _macd.Histogram.Current.Value > 0;
-            bool is_moving_averages_ok = /*_fast_ema > _slow_ema && _very_fast_ema > _fast_ema*/ _fast_lsma > _slow_hullma;
+            bool is_moving_averages_ok = _fast_lsma > _slow_hullma;
             bool is_psar_ok = current_price > _psar;
-            bool is_ao_ok = _ao.AroonUp > 80;
+            bool is_ao_ok = true; // _ao.AroonUp > 80;
 
             return is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok*/ && is_ao_ok;
         }
@@ -298,11 +282,10 @@ namespace QuantConnect.Algorithm.CSharp
 
             decimal current_price = data[SymbolName].Value;
             
-            //bool is_adx_ok = _adx.PositiveDirectionalIndex > 25 && _adx.NegativeDirectionalIndex < 20;
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _fast_lsma < _slow_hullma; //_very_fast_ema < _fast_ema;
+            bool is_moving_averages_ok = _fast_lsma < _slow_hullma; 
             bool is_psar_ok = current_price < _psar;
-            bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
+            //bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
 
             bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
 
@@ -313,8 +296,8 @@ namespace QuantConnect.Algorithm.CSharp
                 //Log(body);
             }
 
-            bool is_gain_ok = is_moving_averages_ok /*&& is_macd_ok*/ && is_price_ok /*&& is_psar_ok*/;
-            bool is_stop_loss = is_moving_averages_ok && is_ao_ok;
+            bool is_gain_ok = is_moving_averages_ok  && is_price_ok;
+            bool is_stop_loss = is_moving_averages_ok ;
             return is_gain_ok;
 
         }
