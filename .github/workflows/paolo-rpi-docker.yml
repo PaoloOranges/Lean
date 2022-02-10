@@ -24,7 +24,10 @@ jobs:
     # https://github.com/docker/setup-buildx-action
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
-
+      
+    - name: Available platforms
+      run: echo ${{ steps.buildx.outputs.platforms }}
+      
     - name: Prepare      
       if: success()      
       id: prepare      
@@ -40,10 +43,10 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
           
-    - name: Run Buildx (push image)
-      if: success()
-      run: |
-        docker buildx build --platform ${{ steps.prepare.outputs.docker_platform }} \
-        --tag ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }} \
-        --file ./DockerfileLeanPaolo \
-        --output type=image,push=true . 
+   # - name: Run Buildx (push image)
+   #   if: success()
+   #   run: |
+  #      docker buildx build --platform ${{ steps.prepare.outputs.docker_platform }} \
+  #      --tag ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }} \
+  #      --file ./DockerfileLeanPaolo \
+  #      --output type=image,push=true . 
