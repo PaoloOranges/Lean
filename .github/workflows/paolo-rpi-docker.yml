@@ -43,8 +43,8 @@ jobs:
          context: .
          file: ./DockerfileLeanPaolo
          push: true
-         tags: ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}
-         platform: ${{ steps.prepare.outputs.docker_platform }}
+         tags: ${DOCKER_IMAGE}:${GITHUB_RUN_NUMBER}
+         platform: ${DOCKER_TARGET_PLATFORM}
          
    # - name: Run Buildx (push image)
    #   if: success()
