@@ -12,23 +12,10 @@ jobs:
       DOCKER_IMAGE: paolooranges/lean-release-etheur-raspberrypi
       DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-      DOCKER_TARGET_PLATFORM: linux/arm/v7
       
     steps:
     - name: Checkout the code       
       uses: actions/checkout@v1 
-    
-    # https://github.com/docker/setup-qemu-action
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v1
-      
-    # https://github.com/docker/setup-buildx-action
-    - name: Set up Docker Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v1
-      
-    - name: Available platforms
-      run: echo ${{ steps.buildx.outputs.platforms }}
 
     - name: Docker Login
       if: success()      
@@ -53,11 +40,3 @@ jobs:
          push: true
          tags: ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}
          platforms: ${{ steps.prepare.outputs.docker_platform }}
-         
-   # - name: Run Buildx (push image)
-   #   if: success()
-   #   run: |
-  #      docker buildx build --platform ${{ steps.prepare.outputs.docker_platform }} \
-  #      --tag ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }} \
-  #      --file ./DockerfileLeanPaolo \
-  #      --output type=image,push=true . 
