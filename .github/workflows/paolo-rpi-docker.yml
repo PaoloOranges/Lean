@@ -38,5 +38,5 @@ jobs:
          context: .
          file: ./DockerfileLeanPaolo
          push: true
-         tags: ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}
+         tags: ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}, ${{ steps.prepare.outputs.docker_image }}:latest
          platforms: ${{ steps.prepare.outputs.docker_platform }}
