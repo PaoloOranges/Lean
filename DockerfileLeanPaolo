@@ -2,7 +2,7 @@
     # Release Version
     #
 
-    FROM mcr.microsoft.com/dotnet/sdk:5.0-bullseye-slim-arm32v7 as build
+    FROM mcr.microsoft.com/dotnet/sdk:5.0 as build
     
     WORKDIR /Lean
     
