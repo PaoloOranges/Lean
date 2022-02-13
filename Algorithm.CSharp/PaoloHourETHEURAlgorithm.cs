@@ -68,7 +68,7 @@ namespace QuantConnect.Algorithm.CSharp
         private const decimal _amount_to_buy = 0.8m;
         private const decimal _percentage_price_gain = 0.05m;
 
-        private const int WarmUpTime = 60;
+        private const int WarmUpTime = 440;
         private const double resolutionInSeconds = 3600.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
 
@@ -85,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2021, 1, 1); // Set Start Date
+            SetStartDate(2021, 10, 20); // Set Start Date
             SetEndDate(2021, 12, 25); // Set End Date
 
             SetAccountCurrency(CurrencyName);
@@ -203,13 +203,25 @@ namespace QuantConnect.Algorithm.CSharp
 
 #if DEBUG && PLOT_CHART
             Plot(SymbolName, "Price", data[SymbolName].Value);
-
-            Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
-            Plot("Indicators", "HullMA", _slow_hullma);
-            Plot("Indicators", "LSMA", _fast_lsma);
-            Plot("Indicators", "PSAR", _psar);
+            if (_macd.Histogram.Current.Value > 0m)
+            {
+                Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
+            }
+            if (_slow_hullma > 0)
+            {
+                Plot("Indicators", "HullMA", _slow_hullma);
+            }
+            if (_fast_lsma > 0)
+            {
+                Plot("Indicators", "LSMA", _fast_lsma);
+            }
+            if (_psar > 0)
+            {
+                Plot("Indicators", "PSAR", _psar);
+            }
 #endif
         }
+
 
         private void OnProcessData(Slice data)
         {
