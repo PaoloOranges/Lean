@@ -23,7 +23,7 @@ class BasicTemplateFuturesHourlyAlgorithm(QCAlgorithm):
 
     def Initialize(self):
         self.SetStartDate(2013, 10, 8)
-        self.SetEndDate(2013, 10, 10)
+        self.SetEndDate(2014, 10, 10)
         self.SetCash(1000000)
 
         self.contractSymbol = None
@@ -50,6 +50,7 @@ class BasicTemplateFuturesHourlyAlgorithm(QCAlgorithm):
                 front = sorted(contracts, key = lambda x: x.Expiry, reverse=True)[0]
 
                 self.contractSymbol = front.Symbol
-                self.MarketOrder(front.Symbol , 1)
+                if self.IsMarketOpen(self.contractSymbol):
+                    self.MarketOrder(front.Symbol , 1)
         else:
             self.Liquidate()

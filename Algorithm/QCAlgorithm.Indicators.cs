@@ -177,7 +177,7 @@ namespace QuantConnect.Algorithm
 
             return awesomeOscillator;
         }
-        
+
         /// <summary>
         /// Creates a new AverageDirectionalMovementIndexRating indicator.
         /// </summary>
@@ -368,7 +368,7 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Creates a Beta indicator for the given target symbol in relation with the reference used. 
+        /// Creates a Beta indicator for the given target symbol in relation with the reference used.
         /// The indicator will be automatically updated on the given resolution.
         /// </summary>
         /// <param name="target">The target symbol whose Beta value we want</param>
@@ -466,7 +466,7 @@ namespace QuantConnect.Algorithm
 
             return commodityChannelIndex;
         }
-        
+
         /// <summary>
         /// Creates a new ChaikinMoneyFlow indicator.
         /// </summary>
@@ -487,7 +487,7 @@ namespace QuantConnect.Algorithm
             }
 
             return chaikinMoneyFlow;
-            
+
         }
 
         /// <summary>
@@ -512,10 +512,10 @@ namespace QuantConnect.Algorithm
 
             return chandeMomentumOscillator;
         }
-        
+
         ///<summary>
         /// Creates a new DeMarker Indicator (DEM), an oscillator-type indicator measuring changes in terms of an asset's
-        /// High and Low tradebar values. 
+        /// High and Low tradebar values.
         ///</summary>
         /// <param name="symbol">The symbol whose DEM we seek.</param>
         /// <param name="period">The period of the moving average implemented</param>
@@ -537,7 +537,7 @@ namespace QuantConnect.Algorithm
 
             return deMarkerIndicator;
         }
-        
+
         /// <summary>
         /// Creates a new Donchian Channel indicator which will compute the Upper Band and Lower Band.
         /// The indicator will be automatically updated on the given resolution.
@@ -1560,6 +1560,30 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a new Relative Moving Average indicator for the symbol. The indicator will be automatically updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose relative moving average we seek</param>
+        /// <param name="period">The period of the relative moving average</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>A relative moving average configured with the specified period and number of standard deviation</returns>
+        [DocumentationAttribute(Indicators)]
+        public RelativeMovingAverage RMA(Symbol symbol, int period, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"RMA({period})", resolution);
+            var relativeMovingAverage = new RelativeMovingAverage(name, period);
+            RegisterIndicator(symbol, relativeMovingAverage, resolution, selector);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, relativeMovingAverage, resolution);
+            }
+
+            return relativeMovingAverage;
+        }
+
+
+        /// <summary>
         /// Creates a new RateOfChange indicator. This will compute the n-period rate of change in the security.
         /// The indicator will be automatically updated on the given resolution.
         /// </summary>
@@ -1953,6 +1977,34 @@ namespace QuantConnect.Algorithm
             }
 
             return tripleExponentialMovingAverage;
+        }
+
+        /// <summary>
+        /// Creates a TrueStrengthIndex indicator for the symbol. The indicator will be automatically
+        /// updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose TSI we want</param>
+        /// <param name="shortTermPeriod">Period used for the first price change smoothing</param>
+        /// <param name="longTermPeriod">Period used for the second (double) price change smoothing</param>
+        /// <param name="signalPeriod">The signal period</param>
+        /// <param name="signalType">The type of moving average to use for the signal</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The TrueStrengthIndex indicator for the given parameters</returns>
+        [DocumentationAttribute(Indicators)]
+        public TrueStrengthIndex TSI(Symbol symbol, int longTermPeriod = 25, int shortTermPeriod = 13, int signalPeriod = 7,
+            MovingAverageType signalType = MovingAverageType.Exponential, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"TSI({longTermPeriod},{shortTermPeriod},{signalPeriod})", resolution);
+            var trueStrengthIndex = new TrueStrengthIndex(name, longTermPeriod, shortTermPeriod, signalPeriod, signalType);
+            RegisterIndicator(symbol, trueStrengthIndex, resolution, selector);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, trueStrengthIndex, resolution);
+            }
+
+            return trueStrengthIndex;
         }
 
         /// <summary>
@@ -2360,7 +2412,7 @@ namespace QuantConnect.Algorithm
                 parts.Add(symbol.ToString());
             }
             parts.Add(res);
-            
+
             return Invariant($"{type}({string.Join("_", parts)})").Replace(")(", ",");
         }
 
@@ -2553,14 +2605,13 @@ namespace QuantConnect.Algorithm
         /// <param name="indicator">The indicator we want to warm up</param>
         /// <param name="resolution">The resolution</param>
         /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
-        /// <returns>The given indicator</returns>
         [DocumentationAttribute(HistoricalData)]
         [DocumentationAttribute(Indicators)]
-        public IndicatorBase<IndicatorDataPoint> WarmUpIndicator(Symbol symbol, IndicatorBase<IndicatorDataPoint> indicator, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
+        public void WarmUpIndicator(Symbol symbol, IndicatorBase<IndicatorDataPoint> indicator, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
         {
             resolution = GetResolution(symbol, resolution);
             var period = resolution.Value.ToTimeSpan();
-            return WarmUpIndicator(symbol, indicator, period, selector);
+            WarmUpIndicator(symbol, indicator, period, selector);
         }
 
         /// <summary>
@@ -2570,16 +2621,15 @@ namespace QuantConnect.Algorithm
         /// <param name="indicator">The indicator we want to warm up</param>
         /// <param name="period">The necessary period to warm up the indicator</param>
         /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
-        /// <returns>The given indicator</returns>
         [DocumentationAttribute(HistoricalData)]
         [DocumentationAttribute(Indicators)]
-        public IndicatorBase<IndicatorDataPoint> WarmUpIndicator(Symbol symbol, IndicatorBase<IndicatorDataPoint> indicator, TimeSpan period, Func<IBaseData, decimal> selector = null)
+        public void WarmUpIndicator(Symbol symbol, IndicatorBase<IndicatorDataPoint> indicator, TimeSpan period, Func<IBaseData, decimal> selector = null)
         {
-            var history = GetIndicatorWarmUpHistory(symbol, indicator, period);
-            if (history == Enumerable.Empty<Slice>()) return indicator;
+            var history = GetIndicatorWarmUpHistory(symbol, indicator, period, out var identityConsolidator);
+            if (history == Enumerable.Empty<Slice>()) return;
 
             // assign default using cast
-            selector = selector ?? (x => x.Value);
+            selector ??= (x => x.Value);
 
             Action<IBaseData> onDataConsolidated = bar =>
             {
@@ -2587,8 +2637,7 @@ namespace QuantConnect.Algorithm
                 indicator.Update(input);
             };
 
-            WarmUpIndicatorImpl(symbol, period, onDataConsolidated, history);
-            return indicator;
+            WarmUpIndicatorImpl(symbol, period, onDataConsolidated, history, identityConsolidator);
         }
 
         /// <summary>
@@ -2598,15 +2647,14 @@ namespace QuantConnect.Algorithm
         /// <param name="indicator">The indicator we want to warm up</param>
         /// <param name="resolution">The resolution</param>
         /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
-        /// <returns>The given indicator</returns>
         [DocumentationAttribute(HistoricalData)]
         [DocumentationAttribute(Indicators)]
-        public IndicatorBase<T> WarmUpIndicator<T>(Symbol symbol, IndicatorBase<T> indicator, Resolution? resolution = null, Func<IBaseData, T> selector = null)
+        public void WarmUpIndicator<T>(Symbol symbol, IndicatorBase<T> indicator, Resolution? resolution = null, Func<IBaseData, T> selector = null)
             where T : class, IBaseData
         {
             resolution = GetResolution(symbol, resolution);
             var period = resolution.Value.ToTimeSpan();
-            return WarmUpIndicator(symbol, indicator, period, selector);
+            WarmUpIndicator(symbol, indicator, period, selector);
         }
 
         /// <summary>
@@ -2616,17 +2664,16 @@ namespace QuantConnect.Algorithm
         /// <param name="indicator">The indicator we want to warm up</param>
         /// <param name="period">The necessary period to warm up the indicator</param>
         /// <param name="selector">Selects a value from the BaseData send into the indicator, if null defaults to a cast (x => (T)x)</param>
-        /// <returns>The given indicator</returns>
         [DocumentationAttribute(HistoricalData)]
         [DocumentationAttribute(Indicators)]
-        public IndicatorBase<T> WarmUpIndicator<T>(Symbol symbol, IndicatorBase<T> indicator, TimeSpan period, Func<IBaseData, T> selector = null)
+        public void WarmUpIndicator<T>(Symbol symbol, IndicatorBase<T> indicator, TimeSpan period, Func<IBaseData, T> selector = null)
             where T : class, IBaseData
         {
-            var history = GetIndicatorWarmUpHistory(symbol, indicator, period);
-            if (history == Enumerable.Empty<Slice>()) return indicator;
+            var history = GetIndicatorWarmUpHistory(symbol, indicator, period, out var identityConsolidator);
+            if (history == Enumerable.Empty<Slice>()) return;
 
             // assign default using cast
-            selector = selector ?? (x => (T)x);
+            selector ??= (x => (T)x);
 
             // we expect T type as input
             Action<T> onDataConsolidated = bar =>
@@ -2634,17 +2681,19 @@ namespace QuantConnect.Algorithm
                 indicator.Update(selector(bar));
             };
 
-            WarmUpIndicatorImpl(symbol, period, onDataConsolidated, history);
-            return indicator;
+            WarmUpIndicatorImpl(symbol, period, onDataConsolidated, history, identityConsolidator);
         }
 
-        private IEnumerable<Slice> GetIndicatorWarmUpHistory(Symbol symbol, IIndicator indicator, TimeSpan timeSpan)
+        private IEnumerable<Slice> GetIndicatorWarmUpHistory(Symbol symbol, IIndicator indicator, TimeSpan timeSpan, out bool identityConsolidator)
         {
+            identityConsolidator = false;
             var periods = (indicator as IIndicatorWarmUpPeriodProvider)?.WarmUpPeriod;
 
             if (periods.HasValue && periods != 0)
             {
                 var resolution = timeSpan.ToHigherResolutionEquivalent(false);
+                // if they are the same, means we can use an identity consolidator
+                identityConsolidator = resolution.ToTimeSpan() == timeSpan;
                 var resolutionTicks = resolution.ToTimeSpan().Ticks;
                 if (resolutionTicks != 0)
                 {
@@ -2671,10 +2720,14 @@ namespace QuantConnect.Algorithm
             return Enumerable.Empty<Slice>();
         }
 
-        private void WarmUpIndicatorImpl<T>(Symbol symbol, TimeSpan period, Action<T> handler, IEnumerable<Slice> history)
+        private void WarmUpIndicatorImpl<T>(Symbol symbol, TimeSpan period, Action<T> handler, IEnumerable<Slice> history, bool identityConsolidator)
             where T : class, IBaseData
         {
             IDataConsolidator consolidator;
+            if (identityConsolidator)
+            {
+                period = TimeSpan.Zero;
+            }
             if (SubscriptionManager.SubscriptionDataConfigService.GetSubscriptionDataConfigs(symbol).Count > 0)
             {
                 consolidator = Consolidate(symbol, period, handler);
@@ -2754,20 +2807,26 @@ namespace QuantConnect.Algorithm
         {
             var tickType = dataType != null ? LeanData.GetCommonTickTypeForCommonDataTypes(dataType, symbol.SecurityType) : (TickType?)null;
             var subscription = GetSubscription(symbol, tickType);
+            var subscriptionTimeSpan = subscription.Resolution.ToTimeSpan();
 
             // if not specified, default to the subscription resolution
             if (!timeSpan.HasValue)
             {
-                timeSpan = subscription.Resolution.ToTimeSpan();
+                timeSpan = subscriptionTimeSpan;
             }
 
             // verify this consolidator will give reasonable results, if someone asks for second consolidation but we have minute
             // data we won't be able to do anything good, we'll call it second, but it would really just be minute!
-            if (timeSpan.Value < subscription.Resolution.ToTimeSpan())
+            if (timeSpan.Value < subscriptionTimeSpan)
             {
                 throw new ArgumentException($"Unable to create {symbol} consolidator because {symbol} is registered for " +
                     Invariant($"{subscription.Resolution.ToStringInvariant()} data. Consolidators require higher resolution data to produce lower resolution data.")
                 );
+            }
+            else if (timeSpan.Value == subscriptionTimeSpan)
+            {
+                // input and expected output share the same time span, means we just want an identity consolidator
+                timeSpan = TimeSpan.Zero;
             }
 
             return CreateConsolidator(timeSpan.Value, subscription.Type, subscription.TickType);
@@ -2787,6 +2846,11 @@ namespace QuantConnect.Algorithm
             // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to TradeBar
             if (typeof(TradeBar).IsAssignableFrom(consolidatorInputType))
             {
+                // Use IdentityDataConsolidator when data are not meant to consolidated into bars
+                if (period.Ticks == 0)
+                {
+                    return new IdentityDataConsolidator<TradeBar>();
+                }
                 return new TradeBarConsolidator(period);
             }
 
@@ -2794,6 +2858,11 @@ namespace QuantConnect.Algorithm
             // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to QuoteBar
             if (typeof(QuoteBar).IsAssignableFrom(consolidatorInputType))
             {
+                // Use IdentityDataConsolidator when data are not meant to consolidated into bars
+                if (period.Ticks == 0)
+                {
+                    return new IdentityDataConsolidator<QuoteBar>();
+                }
                 return new QuoteBarConsolidator(period);
             }
 
@@ -2823,9 +2892,19 @@ namespace QuantConnect.Algorithm
             // if our type can be used as a DynamicData then we'll use the DynamicDataConsolidator
             if (typeof(DynamicData).IsAssignableFrom(consolidatorInputType))
             {
+                // Use IdentityDataConsolidator when data are not meant to consolidated into bars
+                if (period.Ticks == 0)
+                {
+                    return new DynamicDataConsolidator(1);
+                }
                 return new DynamicDataConsolidator(period);
             }
 
+            // Use IdentityDataConsolidator when data are not meant to consolidated into bars
+            if (period.Ticks == 0)
+            {
+                return new IdentityDataConsolidator<BaseData>();
+            }
             // no matter what we can always consolidate based on the time-value pair of BaseData
             return new BaseDataConsolidator(period);
         }

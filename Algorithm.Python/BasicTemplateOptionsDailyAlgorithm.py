@@ -35,7 +35,7 @@ class BasicTemplateOptionsDailyAlgorithm(QCAlgorithm):
         self.option_symbol = option.Symbol
 
         # set our strike/expiry filter for this option chain
-        option.SetFilter(lambda u: (u.Strikes(0, 1).Expiration(0, 30)))
+        option.SetFilter(lambda u: (u.CallsOnly().Strikes(0, 1).Expiration(0, 30)))
 
         # use the underlying equity as the benchmark
         self.SetBenchmark(equity.Symbol)
@@ -51,7 +51,7 @@ class BasicTemplateOptionsDailyAlgorithm(QCAlgorithm):
         contracts = sorted(chain, key = lambda x: x.Expiry)
 
         # if found, trade it
-        if len(contracts) == 0: return
+        if len(contracts) == 0 or not self.IsMarketOpen(contracts[0].Symbol): return
         symbol = contracts[0].Symbol
         self.MarketOrder(symbol, 1)
 

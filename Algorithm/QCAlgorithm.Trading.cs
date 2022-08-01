@@ -29,6 +29,7 @@ namespace QuantConnect.Algorithm
     {
         private int _maxOrders = 10000;
         private bool _isMarketOnOpenOrderWarningSent;
+        private bool _isMarketOnOpenOrderRestrictedForFuturesWarningSent;
 
         /// <summary>
         /// Transaction Manager - Process transaction fills and order management.
@@ -250,7 +251,7 @@ namespace QuantConnect.Algorithm
         public OrderTicket MarketOrder(Security security, decimal quantity, bool asynchronous = false, string tag = "", IOrderProperties orderProperties = null)
         {
             // check the exchange is open before sending a market order, if it's not open
-            // then convert it into a market on open order
+            // then convert it into a market on open order (not supported for futures)
             if (!security.Exchange.ExchangeOpen)
             {
                 var mooTicket = MarketOnOpenOrder(security.Symbol, quantity, tag);
@@ -854,6 +855,20 @@ namespace QuantConnect.Algorithm
                 );
             }
 
+            //Check the exchange is open before sending a market on open order for futures
+            if ((security.Type == SecurityType.Future || security.Type == SecurityType.FutureOption) && request.OrderType == OrderType.MarketOnOpen)
+            {
+                if (!_isMarketOnOpenOrderRestrictedForFuturesWarningSent)
+                {
+                    Debug("Warning: Market-On-Open orders are not allowed for futures and future options. Consider using limit orders during extended market hours.");
+                    _isMarketOnOpenOrderRestrictedForFuturesWarningSent = true;
+                }
+
+                return OrderResponse.Error(request, OrderResponseErrorCode.ExchangeNotOpen,
+                    $"{request.OrderType} orders not supported for {security.Type}."
+                );
+            }
+
             if (price == 0)
             {
                 return OrderResponse.Error(request, OrderResponseErrorCode.SecurityPriceZero, request.Symbol.GetZeroPriceMessage());
@@ -935,8 +950,20 @@ namespace QuantConnect.Algorithm
                 }
             }
 
-            if (request.OrderType == OrderType.MarketOnClose)
+            if (request.OrderType == OrderType.MarketOnOpen)
             {
+                if (security.Exchange.Hours.IsMarketAlwaysOpen)
+                {
+                    throw new InvalidOperationException($"Market never closes for this symbol {security.Symbol}, can no submit a {nameof(OrderType.MarketOnOpen)} order.");
+                }
+            }
+            else if (request.OrderType == OrderType.MarketOnClose)
+            {
+                if (security.Exchange.Hours.IsMarketAlwaysOpen)
+                {
+                    throw new InvalidOperationException($"Market never closes for this symbol {security.Symbol}, can no submit a {nameof(OrderType.MarketOnClose)} order.");
+                }
+
                 var nextMarketClose = security.Exchange.Hours.GetNextMarketClose(security.LocalTime, false);
 
                 // Enforce MarketOnClose submission buffer
@@ -1269,13 +1296,11 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(SecuritiesAndPortfolio)]
         public bool IsMarketOpen(Symbol symbol)
         {
-            var exchangeHours = MarketHoursDatabase
-                .FromDataFolder()
-                .GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType);
-
-            var time = UtcTime.ConvertFromUtc(exchangeHours.TimeZone);
-
-            return exchangeHours.IsOpen(time, false);
+            if (Securities.TryGetValue(symbol, out var security))
+            {
+                return security.IsMarketOpen(false);
+            }
+            return symbol.IsMarketOpen(UtcTime, false);
         }
 
         private SubmitOrderRequest CreateSubmitOrderRequest(OrderType orderType, Security security, decimal quantity, string tag, IOrderProperties properties, decimal stopPrice = 0m, decimal limitPrice = 0m,  decimal triggerPrice = 0m)

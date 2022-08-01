@@ -67,7 +67,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             // Test case: custom IndicatorBase<QuoteBar> indicator using Future subscribed symbol
             var indicator = new CustomIndicator();
-            var consolidator = CreateConsolidator(TimeSpan.FromMinutes(1), typeof(QuoteBar));
+            var consolidator = CreateConsolidator(TimeSpan.FromMinutes(2), typeof(QuoteBar));
             RegisterIndicator(_symbol, indicator, consolidator);
 
             AssertIndicatorState(indicator, isReady: false);
@@ -142,6 +142,16 @@ namespace QuantConnect.Algorithm.CSharp
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp };
+
+        /// <summary>
+        /// Data Points count of all timeslices of algorithm
+        /// </summary>
+        public long DataPoints => 14531;
+
+        /// <summary>
+        /// Data Points count of the algorithm history
+        /// </summary>
+        public int AlgorithmHistoryDataPoints => 84;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm

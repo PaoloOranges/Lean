@@ -38,6 +38,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
     {
         private IAlgorithm _algorithm;
         private IBrokerage _brokerage;
+        private bool _loggedFeeAdjustmentWarning;
 
         // Counter to keep track of total amount of processed orders
         private int _totalOrderCount;
@@ -604,7 +605,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             }
 
             // check if the brokerage should perform cash sync now
-            if (_brokerage.ShouldPerformCashSync(CurrentTimeUtc))
+            if (!_algorithm.IsWarmingUp && _brokerage.ShouldPerformCashSync(CurrentTimeUtc))
             {
                 // only perform cash syncs if we haven't had a fill for at least 10 seconds
                 if (TimeSinceLastFill > TimeSpan.FromSeconds(10))
@@ -1055,15 +1056,25 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
                     // check if the fill currency and the order currency match the symbol currency
                     var security = _algorithm.Securities[orderEvent.Symbol];
-                    // Bug in FXCM API flipping the currencies -- disabling for now. 5/17/16 RFB
-                    //if (fill.FillPriceCurrency != security.SymbolProperties.QuoteCurrency)
-                    //{
-                    //    Log.Error(string.Format("Currency mismatch: Fill currency: {0}, Symbol currency: {1}", fill.FillPriceCurrency, security.SymbolProperties.QuoteCurrency));
-                    //}
-                    //if (order.PriceCurrency != security.SymbolProperties.QuoteCurrency)
-                    //{
-                    //    Log.Error(string.Format("Currency mismatch: Order currency: {0}, Symbol currency: {1}", order.PriceCurrency, security.SymbolProperties.QuoteCurrency));
-                    //}
+
+                    if (order.Direction == OrderDirection.Buy
+                        && CurrencyPairUtil.TryDecomposeCurrencyPair(orderEvent.Symbol, out var baseCurrency, out var quoteCurrency)
+                        && orderEvent.OrderFee.Value.Currency == baseCurrency)
+                    {
+                        // fees are in the base currency, so we have to subtract them from the filled quantity
+                        // else the virtual position will bigger than the real size and we might no be able to liquidate
+                        orderEvent.FillQuantity -= orderEvent.OrderFee.Value.Amount;
+                        orderEvent.OrderFee = new ModifiedFillQuantityOrderFee(orderEvent.OrderFee.Value, quoteCurrency, security.SymbolProperties.ContractMultiplier);
+
+                        if (!_loggedFeeAdjustmentWarning)
+                        {
+                            _loggedFeeAdjustmentWarning = true;
+                            const string message = "When buying currency pairs, using Cash account types, fees in base currency" +
+                                " will be deducted from the filled quantity so virtual positions reflect actual holdings.";
+                            Log.Trace($"BrokerageTransactionHandler.HandleOrderEvent(): {message}");
+                            _algorithm.Debug(message);
+                        }
+                    }
 
                     var multiplier = security.SymbolProperties.ContractMultiplier;
                     var securityConversionRate = security.QuoteCurrency.ConversionRate;
@@ -1162,10 +1173,14 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         {
             if (_algorithm.Securities.TryGetValue(e.Symbol, out var security))
             {
-                Log.Trace(
-                    "BrokerageTransactionHandler.HandleDelistingNotification(): clearing position for delisted holding: " +
-                    $"Symbol: {e.Symbol.Value}, " +
-                    $"Quantity: {security.Holdings.Quantity}");
+                // only log always in live trading, in backtesting log if not 0 holdings
+                if (_algorithm.LiveMode || security.Holdings.Quantity != 0)
+                {
+                    Log.Trace(
+                        $"BrokerageTransactionHandler.HandleDelistingNotification(): UtcTime: {CurrentTimeUtc} clearing position for delisted holding: " +
+                        $"Symbol: {e.Symbol.Value}, " +
+                        $"Quantity: {security.Holdings.Quantity}");
+                }
 
                 // Only submit an order if we have holdings
                 var quantity = -security.Holdings.Quantity;
@@ -1207,10 +1222,14 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                     {
                         if (e.Position == 0)
                         {
-                            Log.Trace(
-                                "BrokerageTransactionHandler.HandleOptionNotification(): clearing position for expired option holding: " +
-                                $"Symbol: {e.Symbol.Value}, " +
-                                $"Quantity: {security.Holdings.Quantity}");
+                            // only log always in live trading, in backtesting log if not 0 holdings
+                            if (_algorithm.LiveMode || security.Holdings.Quantity != 0)
+                            {
+                                Log.Trace(
+                                    $"BrokerageTransactionHandler.HandleOptionNotification(): UtcTime: {CurrentTimeUtc} clearing position for expired option holding: " +
+                                    $"Symbol: {e.Symbol.Value}, " +
+                                    $"Holdings: {security.Holdings.Quantity}");
+                            }
 
                             var quantity = -security.Holdings.Quantity;
 

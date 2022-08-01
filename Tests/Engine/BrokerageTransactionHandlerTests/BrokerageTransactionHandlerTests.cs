@@ -1108,6 +1108,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
             var securityService = new SecurityService(algorithm.Portfolio.CashBook, marketHoursDatabase, symbolPropertiesDataBase, algorithm, RegisteredSecurityDataTypesProvider.Null, new SecurityCacheProvider(algorithm.Portfolio));
             algorithm.Securities.SetSecurityService(securityService);
             algorithm.SetLiveMode(true);
+            algorithm.SetFinishedWarmingUp();
 
             var transactionHandler = new TestBrokerageTransactionHandler();
             var resultHandler = new TestResultHandler();
@@ -1741,7 +1742,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
             }
         }
 
-        internal class TestBrokerageTransactionHandler : BrokerageTransactionHandler
+        public class TestBrokerageTransactionHandler : BrokerageTransactionHandler
         {
             private IBrokerageCashSynchronizer _brokerage;
 

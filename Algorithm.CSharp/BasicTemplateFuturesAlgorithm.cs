@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
+using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Future;
@@ -64,6 +65,9 @@ namespace QuantConnect.Algorithm.CSharp
 
             var benchmark = AddEquity("SPY");
             SetBenchmark(benchmark.Symbol);
+
+            var seeder = new FuncSecuritySeeder(GetLastKnownPrices);
+            SetSecurityInitializer(security => seeder.SeedSecurity(security));
         }
 
         /// <summary>
@@ -72,6 +76,15 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="slice">The current slice of data keyed by symbol string</param>
         public override void OnData(Slice slice)
         {
+            foreach (var changedEvent in slice.SymbolChangedEvents.Values)
+            {
+                Debug($"{Time} - SymbolChanged event: {changedEvent}");
+                if (Time.TimeOfDay != TimeSpan.Zero)
+                {
+                    throw new Exception($"{Time} unexpected symbol changed event {changedEvent}!");
+                }
+            }
+
             if (!Portfolio.Invested)
             {
                 foreach(var chain in slice.FutureChains)
@@ -112,6 +125,19 @@ namespace QuantConnect.Algorithm.CSharp
             var maintenanceIntraday = futureMarginModel.MaintenanceIntradayMarginRequirement;
         }
 
+        public override void OnSecuritiesChanged(SecurityChanges changes)
+        {
+            foreach (var addedSecurity in changes.AddedSecurities)
+            {
+                if (addedSecurity.Symbol.SecurityType == SecurityType.Future
+                    && !addedSecurity.Symbol.IsCanonical()
+                    && !addedSecurity.HasData)
+                {
+                    throw new Exception($"Future contracts did not work up as expected: {addedSecurity.Symbol}");
+                }
+            }
+        }
+
         /// <summary>
         /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
         /// </summary>
@@ -123,38 +149,48 @@ namespace QuantConnect.Algorithm.CSharp
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
 
         /// <summary>
+        /// Data Points count of all timeslices of algorithm
+        /// </summary>
+        public long DataPoints => 203367;
+
+        /// <summary>
+        /// Data Points count of the algorithm history
+        /// </summary>
+        public int AlgorithmHistoryDataPoints => 518;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "8220"},
+            {"Total Trades", "8186"},
             {"Average Win", "0.00%"},
             {"Average Loss", "0.00%"},
             {"Compounding Annual Return", "-100.000%"},
-            {"Drawdown", "13.500%"},
-            {"Expectancy", "-0.818"},
-            {"Net Profit", "-13.517%"},
-            {"Sharpe Ratio", "-98.781"},
+            {"Drawdown", "13.100%"},
+            {"Expectancy", "-0.817"},
+            {"Net Profit", "-13.059%"},
+            {"Sharpe Ratio", "-22.436"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "89%"},
             {"Win Rate", "11%"},
             {"Profit-Loss Ratio", "0.69"},
-            {"Alpha", "-1.676"},
-            {"Beta", "0.042"},
-            {"Annual Standard Deviation", "0.01"},
-            {"Annual Variance", "0"},
-            {"Information Ratio", "-73.981"},
-            {"Tracking Error", "0.233"},
-            {"Treynor Ratio", "-23.975"},
-            {"Total Fees", "$15207.00"},
-            {"Estimated Strategy Capacity", "$8000.00"},
+            {"Alpha", "1.976"},
+            {"Beta", "-0.184"},
+            {"Annual Standard Deviation", "0.045"},
+            {"Annual Variance", "0.002"},
+            {"Information Ratio", "-59.896"},
+            {"Tracking Error", "0.287"},
+            {"Treynor Ratio", "5.445"},
+            {"Total Fees", "$15144.10"},
+            {"Estimated Strategy Capacity", "$130000.00"},
             {"Lowest Capacity Asset", "GC VOFJUCDY9XNH"},
-            {"Fitness Score", "0.033"},
+            {"Fitness Score", "0.028"},
             {"Kelly Criterion Estimate", "0"},
             {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "-8.62"},
-            {"Return Over Maximum Drawdown", "-7.81"},
-            {"Portfolio Turnover", "302.321"},
+            {"Sortino Ratio", "-10.138"},
+            {"Return Over Maximum Drawdown", "-8.192"},
+            {"Portfolio Turnover", "299.379"},
             {"Total Insights Generated", "0"},
             {"Total Insights Closed", "0"},
             {"Total Insights Analysis Completed", "0"},
@@ -168,7 +204,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
             {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "35b3f4b7a225468d42ca085386a2383e"}
+            {"OrderListHash", "fbf8650f2a4f433563f37f44c59cfa0d"}
         };
     }
 }

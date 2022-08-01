@@ -74,14 +74,7 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(HistoricalData)]
         public void SetWarmup(TimeSpan timeSpan, Resolution? resolution)
         {
-            if (_locked)
-            {
-                throw new InvalidOperationException("QCAlgorithm.SetWarmup(): This method cannot be used after algorithm initialized");
-            }
-
-            _warmupBarCount = null;
-            _warmupTimeSpan = timeSpan;
-            _warmupResolution = resolution;
+            SetWarmup(null, timeSpan, resolution);
         }
 
         /// <summary>
@@ -130,14 +123,7 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(HistoricalData)]
         public void SetWarmup(int barCount, Resolution? resolution)
         {
-            if (_locked)
-            {
-                throw new InvalidOperationException("QCAlgorithm.SetWarmup(): This method cannot be used after algorithm initialized");
-            }
-
-            _warmupTimeSpan = null;
-            _warmupBarCount = barCount;
-            _warmupResolution = resolution;
+            SetWarmup(barCount, null, resolution);
         }
 
         /// <summary>
@@ -159,9 +145,6 @@ namespace QuantConnect.Algorithm
         public void SetFinishedWarmingUp()
         {
             IsWarmingUp = false;
-
-            // notify the algorithm
-            OnWarmupFinished();
         }
 
         /// <summary>
@@ -176,20 +159,57 @@ namespace QuantConnect.Algorithm
         /// </summary>
         /// <returns></returns>
         [DocumentationAttribute(HistoricalData)]
-        public IEnumerable<HistoryRequest> GetWarmupHistoryRequests()
+        private bool TryGetWarmupHistoryStartTime(out DateTime result)
         {
+            result = Time;
+
             if (_warmupBarCount.HasValue)
             {
-                return CreateBarCountHistoryRequests(Securities.Keys, _warmupBarCount.Value, _warmupResolution);
+                var symbols = Securities.Keys;
+                if (symbols.Count != 0)
+                {
+                    var startTimeUtc = CreateBarCountHistoryRequests(symbols, _warmupBarCount.Value, Settings.WarmupResolution)
+                        .DefaultIfEmpty()
+                        .Min(request => request == null ? default : request.StartTimeUtc);
+                    if(startTimeUtc != default)
+                    {
+                        result = startTimeUtc.ConvertFromUtc(TimeZone);
+                        return true;
+                    }
+                }
+
+                var defaultResolutionToUse = UniverseSettings.Resolution;
+                if (Settings.WarmupResolution.HasValue)
+                {
+                    defaultResolutionToUse = Settings.WarmupResolution.Value;
+                }
+
+                // if the algorithm has no added security, let's take a look at the universes to determine
+                // what the start date should be used. Defaulting to always open
+                result = Time - _warmupBarCount.Value * defaultResolutionToUse.ToTimeSpan();
+
+                foreach (var universe in _pendingUniverseAdditions.Concat(UniverseManager.Values))
+                {
+                    var config = universe.Configuration;
+                    var resolution = universe.Configuration.Resolution;
+                    if (Settings.WarmupResolution.HasValue)
+                    {
+                        resolution = Settings.WarmupResolution.Value;
+                    }
+                    var exchange = MarketHoursDatabase.GetExchangeHours(config);
+                    var start = _historyRequestFactory.GetStartTimeAlgoTz(config.Symbol, _warmupBarCount.Value, resolution, exchange, config.DataTimeZone);
+                    // we choose the min start
+                    result = result < start ? result : start;
+                }
+                return true;
             }
             if (_warmupTimeSpan.HasValue)
             {
-                var end = UtcTime.ConvertFromUtc(TimeZone);
-                return CreateDateRangeHistoryRequests(Securities.Keys, end - _warmupTimeSpan.Value, end, _warmupResolution);
+                result = Time - _warmupTimeSpan.Value;
+                return true;
             }
 
-            // if not warmup requested return nothing
-            return Enumerable.Empty<HistoryRequest>();
+            return false;
         }
 
         /// <summary>
@@ -457,11 +477,18 @@ namespace QuantConnect.Algorithm
         /// <param name="resolution">The resolution to request</param>
         /// <param name="fillForward">True to fill forward missing data, false otherwise</param>
         /// <param name="extendedMarket">True to include extended market hours data, false otherwise</param>
+        /// <param name="dataMappingMode">The contract mapping mode to use for the security history request</param>
+        /// <param name="dataNormalizationMode">The price scaling mode to use for the securities history</param>
+        /// <param name="contractDepthOffset">The continuous contract desired offset from the current front month.
+        /// For example, 0 (default) will use the front month, 1 will use the back month contract</param>
         /// <returns>An enumerable of slice containing the requested historical data</returns>
         [DocumentationAttribute(HistoricalData)]
-        public IEnumerable<Slice> History(IEnumerable<Symbol> symbols, DateTime start, DateTime end, Resolution? resolution = null, bool? fillForward = null, bool? extendedMarket = null)
+        public IEnumerable<Slice> History(IEnumerable<Symbol> symbols, DateTime start, DateTime end, Resolution? resolution = null,
+            bool? fillForward = null, bool? extendedMarket = null, DataMappingMode? dataMappingMode = null,
+            DataNormalizationMode? dataNormalizationMode = null, int? contractDepthOffset = null)
         {
-            return History(CreateDateRangeHistoryRequests(symbols, start, end, resolution, fillForward, extendedMarket)).Memoize();
+            return History(CreateDateRangeHistoryRequests(symbols, start, end, resolution, fillForward, extendedMarket, dataMappingMode,
+                dataNormalizationMode, contractDepthOffset)).Memoize();
         }
 
         /// <summary>
@@ -513,16 +540,18 @@ namespace QuantConnect.Algorithm
             }
 
             var result = new Dictionary<TickType, BaseData>();
-            // For speed and memory usage, use Resolution.Minute as the minimum resolution
-            var resolution = (Resolution)Math.Max((int)Resolution.Minute,
-                (int)SubscriptionManager.SubscriptionDataConfigService.GetSubscriptionDataConfigs(symbol).GetHighestResolution());
+            Resolution? resolution = null;
             Func<int, bool> requestData = period =>
             {
-                var historyRequests = CreateBarCountHistoryRequests(new[] { symbol }, period, resolution)
+                var historyRequests = CreateBarCountHistoryRequests(new[] { symbol }, period)
                     .Select(request =>
                     {
+                        // For speed and memory usage, use Resolution.Minute as the minimum resolution
+                        request.Resolution = (Resolution)Math.Max((int)Resolution.Minute, (int)request.Resolution);
                         // force no fill forward behavior
                         request.FillForwardResolution = null;
+
+                        resolution = request.Resolution;
                         return request;
                     })
                     // request only those tick types we didn't get the data we wanted
@@ -547,12 +576,21 @@ namespace QuantConnect.Algorithm
 
             if (!requestData(5))
             {
-                // If the first attempt to get the last know price returns null, it maybe the case of an illiquid security.
-                // We increase the look-back period for this case accordingly to the resolution to cover 3 trading days
-                var periods =
-                    resolution == Resolution.Daily ? 3 :
-                    resolution == Resolution.Hour ? 24 : 1440;
-                requestData(periods);
+                if (resolution.HasValue)
+                {
+                    // If the first attempt to get the last know price returns null, it maybe the case of an illiquid security.
+                    // We increase the look-back period for this case accordingly to the resolution to cover 3 trading days
+                    var periods =
+                        resolution.Value == Resolution.Daily ? 3 :
+                        resolution.Value == Resolution.Hour ? 24 : 1440;
+                    requestData(periods);
+                }
+                else
+                {
+                    // this shouldn't happen but just in case
+                    QuantConnect.Logging.Log.Error(
+                        $"QCAlgorithm.GetLastKnownPrices(): no history request was created for symbol {symbol} at {Time}");
+                }
             }
             // return the data ordered by time ascending
             return result.Values.OrderBy(data => data.Time);
@@ -597,7 +635,7 @@ namespace QuantConnect.Algorithm
             }
             return config;
         }
-        
+
         [DocumentationAttribute(HistoricalData)]
         private IEnumerable<Slice> History(IEnumerable<HistoryRequest> requests, DateTimeZone timeZone)
         {
@@ -620,7 +658,8 @@ namespace QuantConnect.Algorithm
                     filteredRequests[i] = new HistoryRequest(startTimeUtc, endTimeUtc,
                         request.DataType, request.Symbol, request.Resolution, request.ExchangeHours,
                         request.DataTimeZone, request.FillForwardResolution, request.IncludeExtendedMarketHours,
-                        request.IsCustomData, request.DataNormalizationMode, request.TickType);
+                        request.IsCustomData, request.DataNormalizationMode, request.TickType, request.DataMappingMode,
+                        request.ContractDepthOffset);
 
                     if (!sentMessage)
                     {
@@ -637,19 +676,32 @@ namespace QuantConnect.Algorithm
         /// <summary>
         /// Helper method to create history requests from a date range
         /// </summary>
-        private IEnumerable<HistoryRequest> CreateDateRangeHistoryRequests(IEnumerable<Symbol> symbols, DateTime startAlgoTz, DateTime endAlgoTz, Resolution? resolution = null, bool? fillForward = null, bool? extendedMarket = null)
+        private IEnumerable<HistoryRequest> CreateDateRangeHistoryRequests(IEnumerable<Symbol> symbols, DateTime startAlgoTz, DateTime endAlgoTz,
+            Resolution? resolution = null, bool? fillForward = null, bool? extendedMarket = null, DataMappingMode? dataMappingMode = null,
+            DataNormalizationMode? dataNormalizationMode = null, int? contractDepthOffset = null)
+        {
+            return CreateDateRangeHistoryRequests(symbols, typeof(BaseData), startAlgoTz, endAlgoTz, resolution, fillForward, extendedMarket,
+                dataMappingMode, dataNormalizationMode, contractDepthOffset);
+        }
+
+        /// <summary>
+        /// Helper method to create history requests from a date range with custom data type
+        /// </summary>
+        private IEnumerable<HistoryRequest> CreateDateRangeHistoryRequests(IEnumerable<Symbol> symbols, Type requestedType, DateTime startAlgoTz, DateTime endAlgoTz,
+            Resolution? resolution = null, bool? fillForward = null, bool? extendedMarket = null, DataMappingMode? dataMappingMode = null,
+            DataNormalizationMode? dataNormalizationMode = null, int? contractDepthOffset = null)
         {
             return symbols.Where(HistoryRequestValid).SelectMany(x =>
             {
                 var requests = new List<HistoryRequest>();
 
-                foreach (var config in GetMatchingSubscriptions(x, typeof(BaseData), resolution))
+                foreach (var config in GetMatchingSubscriptions(x, requestedType, resolution))
                 {
-                    var request = _historyRequestFactory.CreateHistoryRequest(config, startAlgoTz, endAlgoTz, GetExchangeHours(x), resolution);
+                    var request = _historyRequestFactory.CreateHistoryRequest(config, startAlgoTz, endAlgoTz, GetExchangeHours(x), resolution,
+                        dataMappingMode, dataNormalizationMode, contractDepthOffset);
 
                     // apply overrides
-                    var res = GetResolution(x, resolution);
-                    if (fillForward.HasValue) request.FillForwardResolution = fillForward.Value ? res : (Resolution?)null;
+                    if (fillForward.HasValue) request.FillForwardResolution = fillForward.Value ? GetResolution(x, resolution) : (Resolution?)null;
                     if (extendedMarket.HasValue) request.IncludeExtendedMarketHours = extendedMarket.Value;
 
                     requests.Add(request);
@@ -662,13 +714,25 @@ namespace QuantConnect.Algorithm
         /// <summary>
         /// Helper methods to create a history request for the specified symbols and bar count
         /// </summary>
-        private IEnumerable<HistoryRequest> CreateBarCountHistoryRequests(IEnumerable<Symbol> symbols, int periods, Resolution? resolution = null)
+        private IEnumerable<HistoryRequest> CreateBarCountHistoryRequests(IEnumerable<Symbol> symbols, int periods, Resolution? resolution = null,
+            DataMappingMode? dataMappingMode = null, DataNormalizationMode? dataNormalizationMode = null, int? contractDepthOffset = null)
+        {
+            return CreateBarCountHistoryRequests(symbols, typeof(BaseData), periods, resolution, dataMappingMode, dataNormalizationMode,
+                contractDepthOffset);
+        }
+
+        /// <summary>
+        /// Helper methods to create a history request for the specified symbols and bar count with custom data type
+        /// </summary>
+        private IEnumerable<HistoryRequest> CreateBarCountHistoryRequests(IEnumerable<Symbol> symbols, Type requestedType, int periods,
+            Resolution? resolution = null, DataMappingMode? dataMappingMode = null, DataNormalizationMode? dataNormalizationMode = null,
+            int? contractDepthOffset = null)
         {
             return symbols.Where(HistoryRequestValid).SelectMany(x =>
             {
                 var res = GetResolution(x, resolution);
                 var exchange = GetExchangeHours(x);
-                var configs = GetMatchingSubscriptions(x, typeof(BaseData), resolution).ToList();
+                var configs = GetMatchingSubscriptions(x, requestedType, resolution).ToList();
                 if (!configs.Any())
                 {
                     return Enumerable.Empty<HistoryRequest>();
@@ -677,7 +741,8 @@ namespace QuantConnect.Algorithm
                 var start = _historyRequestFactory.GetStartTimeAlgoTz(x, periods, res, exchange, configs.First().DataTimeZone);
                 var end = Time;
 
-                return configs.Select(config => _historyRequestFactory.CreateHistoryRequest(config, start, end, exchange, res));
+                return configs.Select(config => _historyRequestFactory.CreateHistoryRequest(config, start, end, exchange, res, dataMappingMode,
+                    dataNormalizationMode, contractDepthOffset));
             });
         }
 
@@ -804,9 +869,30 @@ namespace QuantConnect.Algorithm
             Security security;
             if (Securities.TryGetValue(symbol, out security))
             {
-                return resolution ?? SubscriptionManager.SubscriptionDataConfigService
-                    .GetSubscriptionDataConfigs(symbol)
-                    .GetHighestResolution();
+                if (resolution != null)
+                {
+                    return resolution.Value;
+                }
+
+                Resolution? result = null;
+                var hasNonInternal = false;
+                foreach (var config in SubscriptionManager.SubscriptionDataConfigService
+                    .GetSubscriptionDataConfigs(symbol, includeInternalConfigs: true)
+                    // we process non internal configs first
+                    .OrderBy(config => config.IsInternalFeed ? 1 : 0))
+                {
+                    if (!config.IsInternalFeed || !hasNonInternal)
+                    {
+                        // once we find a non internal config we ignore internals
+                        hasNonInternal |= !config.IsInternalFeed;
+                        if (!result.HasValue || config.Resolution < result)
+                        {
+                            result = config.Resolution;
+                        }
+                    }
+                }
+
+                return result ?? UniverseSettings.Resolution;
             }
             else
             {
@@ -821,6 +907,21 @@ namespace QuantConnect.Algorithm
         private bool HistoryRequestValid(Symbol symbol)
         {
             return symbol.SecurityType == SecurityType.Future || !UniverseManager.ContainsKey(symbol) && !symbol.IsCanonical();
+        }
+
+        /// <summary>
+        /// Will set warmup settings validating the algorithm has not finished initialization yet
+        /// </summary>
+        private void SetWarmup(int? barCount, TimeSpan? timeSpan, Resolution? resolution)
+        {
+            if (_locked)
+            {
+                throw new InvalidOperationException("QCAlgorithm.SetWarmup(): This method cannot be used after algorithm initialized");
+            }
+
+            _warmupTimeSpan = timeSpan;
+            _warmupBarCount = barCount;
+            Settings.WarmupResolution = resolution;
         }
     }
 }

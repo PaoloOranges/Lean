@@ -18,18 +18,21 @@ using NUnit.Framework;
 using Python.Runtime;
 using QuantConnect.Data;
 using QuantConnect.Data.Custom;
+using QuantConnect.Data.Custom.IconicTypes;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Python;
 using QuantConnect.Securities;
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Tests.Common.Data.UniverseSelection;
 using QuantConnect.Tests.ToolBox;
 using QuantConnect.ToolBox;
 using QuantConnect.Util;
+using QuantConnect.Indicators;
 
 namespace QuantConnect.Tests.Python
 {
@@ -39,13 +42,15 @@ namespace QuantConnect.Tests.Python
         private PandasConverter _converter = new PandasConverter();
         private bool _newerPandas;
 
-        private static bool IsNewerPandas(){
+        private static bool IsNewerPandas()
+        {
             bool newPandas;
-            using(Py.GIL()){
+            using (Py.GIL())
+            {
                 var pandas = Py.Import("pandas");
-                var local = new PyDict();
+                using var local = new PyDict();
                 local["pd"] = pandas;
-                newPandas = PythonEngine.Eval("int(pd.__version__.split('.')[0]) >= 1", locals:local.Handle).As<bool>();
+                newPandas = PythonEngine.Eval("int(pd.__version__.split('.')[0]) >= 1", locals: local).As<bool>();
             }
             return newPandas;
         }
@@ -67,7 +72,7 @@ namespace QuantConnect.Tests.Python
         public void HandlesEnumerableDataType()
         {
             var converter = new PandasConverter();
-            var data = new []
+            var data = new[]
             {
                 new EnumerableData
                 {
@@ -238,7 +243,8 @@ namespace QuantConnect.Tests.Python
             var converter = new PandasConverter();
             var rawBars = Enumerable
                 .Range(0, 10)
-                .Select(i => new NullableValueData {
+                .Select(i => new NullableValueData
+                {
                     Symbol = Symbols.AAPL,
                     EndTime = new DateTime(2020, 1, 1),
                     NullableInt = null,
@@ -296,7 +302,7 @@ namespace QuantConnect.Tests.Python
             using (Py.GIL())
             {
 
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
     $@"
 def Test(dataFrame):
     data = dataFrame.loc['LOW']
@@ -334,7 +340,7 @@ def Test(dataFrame):
             using (Py.GIL())
             {
 
-                var Test = PythonEngine.ModuleFromString("testModule",
+                var Test = PyModule.FromString("testModule",
     $@"
 def Test1(dataFrame):
     # Should not throw, access all LOW ticker data
@@ -371,7 +377,7 @@ def Test4(dataFrame):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.droplevel('symbol')
@@ -390,7 +396,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.add_prefix('price_')['price_lastprice'].unstack(level=0)
@@ -411,7 +417,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.add_suffix('_tick')['lastprice_tick'].unstack(level=0)
@@ -432,7 +438,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, other, symbol):
     data = dataFrame.lastprice.unstack(level=0)
@@ -455,7 +461,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, symbol):
@@ -477,7 +483,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0).applymap(lambda x: x*2)
@@ -498,7 +504,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0).asfreq(freq='30S')
@@ -519,7 +525,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, symbol):
@@ -542,7 +548,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.assign(tmp=lambda x: x.lastprice * 1.1)['tmp'].unstack(level=0)
@@ -563,7 +569,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0).astype('float16')
@@ -591,7 +597,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.at[({index},), 'lastprice']").GetAttr("Test");
@@ -609,7 +615,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0).at_time('04:00')
@@ -630,7 +636,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     axes = dataFrame.axes[0]
@@ -650,7 +656,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0).between_time('02:00', '06:00')
@@ -671,7 +677,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     columns = dataFrame.lastprice.unstack(level=0).columns
@@ -691,7 +697,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, other, symbol):
@@ -715,7 +721,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, dataFrame2, symbol):
@@ -737,7 +743,7 @@ def Test(dataFrame, dataFrame2, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, other, symbol):
@@ -760,7 +766,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.drop(columns=['exchange']).lastprice.unstack(level=0)
@@ -781,7 +787,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.droplevel('time').lastprice
@@ -802,7 +808,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, symbol):
@@ -824,7 +830,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.eval('tmp=lastprice * 1.1')['tmp'].unstack(level=0)
@@ -845,7 +851,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, other, symbol):
     if not dataFrame.equals(other):
@@ -864,7 +870,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0)
@@ -886,7 +892,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0)
@@ -908,7 +914,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.explode('lastprice').lastprice.unstack(level=0)
@@ -929,7 +935,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.filter(items=['lastprice']).lastprice.unstack(level=0)
@@ -947,7 +953,8 @@ def Test(dataFrame, symbol):
         public void BackwardsCompatibilityDataFrame_ftypes(string index, bool cache = false)
         {
             // ftypes deprecated in newer pandas; use dtypes instead
-            if(_newerPandas){
+            if (_newerPandas)
+            {
                 return;
             }
 
@@ -955,7 +962,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0).ftypes
@@ -976,7 +983,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.get({index})
@@ -996,7 +1003,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame['lastprice'][{index}]").GetAttr("Test");
@@ -1011,7 +1018,8 @@ def Test(dataFrame, symbol):
         public void BackwardsCompatibilityDataFrame_get_value_index(string index, bool cache = false)
         {
             // get_value deprecated in new Pandas; Syntax also deprecated; Use .at[] or .iat[] instead
-            if(_newerPandas){
+            if (_newerPandas)
+            {
                 return;
             }
 
@@ -1019,7 +1027,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.get_value(({index},), 'lastprice')
@@ -1036,15 +1044,16 @@ def Test(dataFrame, symbol):
         public void BackwardsCompatibilityDataFrame_get_value_column(string index, bool cache = false)
         {
             // get_value deprecated in new Pandas; use at[] or iat[] instead
-            if(_newerPandas){
+            if (_newerPandas)
+            {
                 return;
             }
-            
+
             if (cache) SymbolCache.Set("SPY", Symbols.SPY);
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0)
@@ -1066,7 +1075,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(df, other, symbol):
@@ -1089,7 +1098,7 @@ def Test(df, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame['lastprice'].unstack(level=0).iloc[-1][{index}]
@@ -1109,7 +1118,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(level=0)
@@ -1130,7 +1139,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     if {index} not in dataFrame.index.levels[0]:
@@ -1152,7 +1161,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     for index, data in dataFrame.{method}():
@@ -1174,7 +1183,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     for index, data in dataFrame.lastprice.unstack(level=0).iterrows():
@@ -1193,7 +1202,8 @@ def Test(dataFrame, symbol):
         public void BackwardsCompatibilityDataFrame_ix(string index, bool cache = false)
         {
             // ix deprecated in newer pandas; use loc and iloc instead
-            if(_newerPandas){
+            if (_newerPandas)
+            {
                 return;
             }
 
@@ -1201,7 +1211,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame['lastprice'].unstack(level=0).ix[-1][{index}]
@@ -1221,7 +1231,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, dataFrame2, symbol):
     newDataFrame = dataFrame.join(dataFrame2, lsuffix='_')
@@ -1242,7 +1252,7 @@ def Test(dataFrame, dataFrame2, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.loc[{index}]").GetAttr("Test");
@@ -1264,13 +1274,13 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbols):
     data = dataFrame.lastprice.unstack(0)
     data = data.loc[:, {index}]").GetAttr("Test");
 
-                var symbols = new List<Symbol> {Symbols.SPY, Symbols.AAPL};
+                var symbols = new List<Symbol> { Symbols.SPY, Symbols.AAPL };
                 Assert.DoesNotThrow(() => test(GetTestDataFrame(symbols), symbols));
             }
         }
@@ -1284,7 +1294,7 @@ def Test(dataFrame, symbols):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     time = dataFrame.index.get_level_values('time')[0]
@@ -1304,7 +1314,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.loc[{index}]").GetAttr("Test");
@@ -1322,7 +1332,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.loc[{index}].loc['2013-10-07 04:00:00']").GetAttr("Test");
@@ -1340,7 +1350,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(0)
@@ -1362,7 +1372,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, symbol):
@@ -1386,7 +1396,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, dataFrame2, symbol):
     newDataFrame = dataFrame.merge(dataFrame2, on='symbol', how='outer')
@@ -1410,7 +1420,7 @@ def Test(dataFrame, dataFrame2, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.{method}(3, 'lastprice')
@@ -1431,7 +1441,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, other, symbol):
@@ -1457,7 +1467,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.pop('lastprice')
@@ -1478,7 +1488,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.query('lastprice > 100').lastprice.unstack(0)
@@ -1499,7 +1509,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     time = '2011-02-01'
@@ -1521,7 +1531,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, other, symbol):
     data = other.reindex_like(dataFrame)
@@ -1545,7 +1555,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.rename({rename})['price'].unstack(0)
@@ -1566,7 +1576,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.reorder_levels(['time', 'symbol']).lastprice.unstack(1)
@@ -1587,10 +1597,10 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
-    data = dataFrame.lastprice.unstack(0) 
+    data = dataFrame.lastprice.unstack(0)
     data = data.resample('2S').sum()
     data = data[{index}]
     if data is 0:
@@ -1609,7 +1619,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(0).reset_index('time')
@@ -1630,7 +1640,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.rolling(2).sum()
@@ -1652,7 +1662,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.select_dtypes(exclude=['int']).lastprice.unstack(0)
@@ -1672,13 +1682,14 @@ def Test(dataFrame, symbol):
             if (cache) SymbolCache.Set("SPY", Symbols.SPY);
 
             // set_value deprecated in newer pandas; use .at[] or .iat instead
-            if(_newerPandas) {
+            if (_newerPandas)
+            {
                 return;
             }
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     idx = dataFrame.first_valid_index()
@@ -1700,7 +1711,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.slice_shift().lastprice.unstack(0)
@@ -1721,7 +1732,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.sort_values(by=['lastprice']).lastprice.unstack(0)
@@ -1742,7 +1753,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.unstack(0).swapaxes('index', 'columns')
@@ -1763,7 +1774,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.swaplevel().lastprice.unstack(1)
@@ -1784,7 +1795,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.take([0, 3]).lastprice.unstack(0)
@@ -1805,7 +1816,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, symbol):
@@ -1827,7 +1838,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.T.iloc[0]
@@ -1848,7 +1859,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.transpose().iloc[0]
@@ -1869,7 +1880,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 from datetime import timedelta as d
 def Test(dataFrame, symbol):
@@ -1889,7 +1900,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.tz_localize('UTC', level=1)
@@ -1911,7 +1922,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.unstack(level=0).lastprice[{index}]").GetAttr("Test");
@@ -1929,7 +1940,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     df2 = dataFrame.unstack(level=0)
@@ -1949,7 +1960,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     df2 = dataFrame.lastprice.unstack(level=0)
@@ -1972,7 +1983,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, symbol):
@@ -1995,7 +2006,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     dataFrame = dataFrame.lastprice.unstack(0)
@@ -2017,7 +2028,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.xs({index})").GetAttr("Test");
@@ -2034,7 +2045,7 @@ def Test(dataFrame, symbol):
             if (cache) SymbolCache.Set("SPY", Symbols.SPY);
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 from datetime import datetime as dt
@@ -2059,7 +2070,7 @@ def Test(dataFrame, symbol):
             if (cache) SymbolCache.Set("SPY", Symbols.SPY);
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 from datetime import datetime as dt
@@ -2085,7 +2096,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, other, symbol):
     data = dataFrame.lastprice
@@ -2108,7 +2119,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, symbol):
@@ -2130,10 +2141,10 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
-    series = dataFrame.lastprice.droplevel(0) 
+    series = dataFrame.lastprice.droplevel(0)
     data = series.asfreq(freq='30S')").GetAttr("Test");
 
                 Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
@@ -2149,7 +2160,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, symbol):
@@ -2170,7 +2181,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.astype('float16')
@@ -2191,10 +2202,10 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
-    series = dataFrame.lastprice.droplevel(0) 
+    series = dataFrame.lastprice.droplevel(0)
     data = series.at_time('04:00')").GetAttr("Test");
 
                 Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
@@ -2210,7 +2221,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2229,10 +2240,10 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
-    series = dataFrame.lastprice.droplevel(0) 
+    series = dataFrame.lastprice.droplevel(0)
     data = series.between_time('02:00', '06:00')").GetAttr("Test");
 
                 Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
@@ -2248,7 +2259,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, other, symbol):
@@ -2272,7 +2283,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2295,7 +2306,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2317,7 +2328,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, other, symbol):
     series = dataFrame.lastprice
@@ -2338,7 +2349,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2360,7 +2371,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2382,7 +2393,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2404,10 +2415,10 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
-    series = dataFrame.lastprice.droplevel(0) 
+    series = dataFrame.lastprice.droplevel(0)
     data = series.first('2S')").GetAttr("Test");
 
                 Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY, 10), Symbols.SPY));
@@ -2423,7 +2434,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2441,7 +2452,8 @@ def Test(dataFrame, symbol):
         public void BackwardsCompatibilitySeries_get_value(string index, bool cache = false)
         {
             // get_value deprecated in new Pandas; Use .at[] or .iat[] instead
-            if (_newerPandas){
+            if (_newerPandas)
+            {
                 return;
             }
 
@@ -2449,7 +2461,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2471,7 +2483,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(df, other, symbol):
@@ -2494,10 +2506,10 @@ def Test(df, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
-    series = dataFrame.lastprice.droplevel(0) 
+    series = dataFrame.lastprice.droplevel(0)
     data = series.last('2S')").GetAttr("Test");
 
                 Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY, 10), Symbols.SPY));
@@ -2515,7 +2527,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2537,7 +2549,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2559,7 +2571,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, other, symbol):
@@ -2585,7 +2597,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     data = dataFrame.lastprice.pop({index})
@@ -2605,7 +2617,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, other, symbol):
     series = dataFrame.lastprice
@@ -2628,7 +2640,7 @@ def Test(dataFrame, other, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2650,7 +2662,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2672,7 +2684,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2694,7 +2706,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2713,7 +2725,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2735,7 +2747,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2764,7 +2776,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2787,7 +2799,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2809,7 +2821,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2831,7 +2843,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2853,7 +2865,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2875,7 +2887,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import numpy as np
 def Test(dataFrame, symbol):
@@ -2899,7 +2911,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2921,7 +2933,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2943,7 +2955,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 from datetime import timedelta as d
 def Test(dataFrame, symbol):
@@ -2963,7 +2975,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -2986,7 +2998,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 import pandas as pd
 def Test(dataFrame, symbol):
@@ -3010,7 +3022,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -3032,7 +3044,7 @@ def Test(dataFrame, symbol):
 
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     $@"
 def Test(dataFrame, symbol):
     series = dataFrame.lastprice
@@ -3048,7 +3060,7 @@ def Test(dataFrame, symbol):
         {
             using (Py.GIL())
             {
-                dynamic test = PythonEngine.ModuleFromString("testModule",
+                dynamic test = PyModule.FromString("testModule",
                     @"
 def Test(dataFrame, symbol):
     if 'SPY' not in dataFrame.index.levels[0]:
@@ -3181,10 +3193,10 @@ def Test(dataFrame, symbol):
 
 
         private static Resolution[] ResolutionCases = { Resolution.Tick, Resolution.Minute, Resolution.Second };
-        private static Symbol[] SymbolCases = {Symbols.Fut_SPY_Feb19_2016, Symbols.Fut_SPY_Mar19_2016, Symbols.SPY_C_192_Feb19_2016, Symbols.SPY_P_192_Feb19_2016};
+        private static Symbol[] SymbolCases = { Symbols.Fut_SPY_Feb19_2016, Symbols.Fut_SPY_Mar19_2016, Symbols.SPY_C_192_Feb19_2016, Symbols.SPY_P_192_Feb19_2016 };
 
         [Test]
-        public void HandlesOpenInterestTicks([ValueSource(nameof(ResolutionCases))]Resolution resolution, [ValueSource(nameof(SymbolCases))] Symbol symbol)
+        public void HandlesOpenInterestTicks([ValueSource(nameof(ResolutionCases))] Resolution resolution, [ValueSource(nameof(SymbolCases))] Symbol symbol)
         {
             // Arrange
             var converter = new PandasConverter();
@@ -3229,16 +3241,16 @@ def Test(dataFrame, symbol):
         }
 
         [Test]
-        [TestCase(typeof(Quandl), "yyyy-MM-dd")]
+        [TestCase(typeof(CustomData), "yyyy-MM-dd")]
         [TestCase(typeof(FxcmVolume), "yyyyMMdd HH:mm")]
         public void HandlesCustomDataBars(Type type, string format)
         {
             var converter = new PandasConverter();
             var symbol = Symbols.LTCUSD;
 
-            var config = GetSubscriptionDataConfig<Quandl>(symbol, Resolution.Daily);
+            var config = GetSubscriptionDataConfig<BaseData>(symbol, Resolution.Daily);
             var custom = Activator.CreateInstance(type) as BaseData;
-            if (type == typeof(Quandl)) custom.Reader(config, "date,open,high,low,close,transactions", DateTime.UtcNow, false);
+            if (type == typeof(CustomData)) custom.Reader(config, "date,open,high,low,close,transactions", DateTime.UtcNow, false);
 
             var rawBars = Enumerable
                 .Range(0, 10)
@@ -3311,8 +3323,8 @@ def Test(dataFrame, symbol):
             var converter = new PandasConverter();
             var symbol = Symbols.LTCUSD;
 
-            var config = GetSubscriptionDataConfig<Quandl>(symbol, Resolution.Daily);
-            var custom = Activator.CreateInstance(typeof(CustomQuandl)) as BaseData;
+            var config = GetSubscriptionDataConfig<BaseData>(symbol, Resolution.Daily);
+            var custom = Activator.CreateInstance(typeof(CustomData)) as BaseData;
             custom.Reader(config, "Date,Value", DateTime.UtcNow, false);
 
             var rawBars = Enumerable
@@ -3376,7 +3388,7 @@ def Test(dataFrame, symbol):
             var converter = new PandasConverter();
             var symbol = Symbols.LTCUSD;
 
-            var config = GetSubscriptionDataConfig<Quandl>(symbol, Resolution.Daily);
+            var config = GetSubscriptionDataConfig<UnlinkedDataTradeBar>(symbol, Resolution.Daily);
             dynamic custom = Activator.CreateInstance(type);
 
             var rawBars = Enumerable
@@ -3498,6 +3510,129 @@ def Test(dataFrame, symbol):
             }
         }
 
+        [Test]
+        public void AcceptsPythonDictAsIndicatorData()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PyModule.FromString("testModule",
+                    $@"
+from QuantConnect.Python import PandasConverter
+from QuantConnect.Indicators import IndicatorDataPoint;
+def Test():
+    pdConverter = PandasConverter()
+    return pdConverter.GetIndicatorDataFrame({{'ind': [IndicatorDataPoint()]}})").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test());
+            }
+        }
+
+        [Test]
+        public void DoesntAcceptOtherPythonObjectRatherThanDict()
+        {
+            using (Py.GIL())
+            {
+                dynamic tests = PyModule.FromString("testModule",
+                    $@"
+from QuantConnect.Python import PandasConverter
+from QuantConnect.Indicators import IndicatorDataPoint;
+pdConverter = PandasConverter()
+def Test1():
+    pdConverter.GetIndicatorDataFrame([""ind"", IndicatorDataPoint()])
+def Test2():
+    pdConverter.GetIndicatorDataFrame(IndicatorDataPoint())
+def Test3():
+    pdConverter.GetIndicatorDataFrame({{'ind': IndicatorDataPoint()}})");
+
+                dynamic test1 = tests.GetAttr("Test1");
+                dynamic test2 = tests.GetAttr("Test2");
+                dynamic test3 = tests.GetAttr("Test3");
+
+                Assert.Throws<ArgumentException>(() => test1());
+                Assert.Throws<ArgumentException>(() => test2());
+                Assert.Throws<ArgumentException>(() => test3());
+            }
+        }
+
+        [Test]
+        public void ReturnsTheCorrectDataInTheDataFrameFromPyDict()
+        {
+            using (Py.GIL())
+            {
+                dynamic tests = PyModule.FromString("testModule",
+                    $@"
+from datetime import datetime, timedelta
+from QuantConnect.Python import PandasConverter
+from QuantConnect.Indicators import IndicatorDataPoint;
+
+def DataFrameContainsCorrectData():
+    dateTime = datetime(2018, 1, 1)
+    makePoint = lambda i: IndicatorDataPoint(dateTime + timedelta(minutes=i), i)
+    indicator1DataPoints = [makePoint(i) for i in range(10)]
+    indicator2DataPoints = [makePoint(i) for i in range(5)]
+    indicator3DataPoints = []
+    pdConverter = PandasConverter()
+    dataFrame = pdConverter.GetIndicatorDataFrame({{
+        'ind1': indicator1DataPoints,
+        'ind2': indicator2DataPoints,
+        'ind3': indicator3DataPoints
+    }})
+
+    hasData = lambda key, data: dataFrame[key].tolist()[:len(data)] == [point.Value for point in data]
+
+    return (
+        dataFrame.shape == (10, 3) and
+        dataFrame.columns.tolist() == ['ind1', 'ind2', 'ind3'] and
+        dataFrame.index.tolist() == [point.EndTime for point in indicator1DataPoints] and
+        hasData('ind1', indicator1DataPoints) and
+        hasData('ind2', indicator2DataPoints) and
+        hasData('ind3', indicator3DataPoints)
+    )
+
+def DataFrameIsEmpty():
+    indicatorDataPoints = []
+    pdConverter = PandasConverter()
+    dataFrame = pdConverter.GetIndicatorDataFrame({{'ind1': indicatorDataPoints}})
+
+    return dataFrame.empty");
+
+                dynamic dataFrameContainsCorrectData = tests.GetAttr("DataFrameContainsCorrectData");
+                dynamic dataFrameIsEmpty = tests.GetAttr("DataFrameIsEmpty");
+
+                Assert.IsTrue(dataFrameContainsCorrectData().As<bool>());
+                Assert.IsTrue(dataFrameIsEmpty().As<bool>());
+            }
+        }
+
+        [Test]
+        public void ReturnsTheCorrectDataInTheDataFrameFromDictionary()
+        {
+            using (Py.GIL())
+            {
+                var dateTime = new DateTime(2018, 1, 1);
+                Func<int, IndicatorDataPoint> makePoint = i => new IndicatorDataPoint(dateTime.AddMinutes(i), i);
+                var indicator1DataPoints = Enumerable.Range(0, 10).Select(i => makePoint(i)).ToList();
+                var indicator2DataPoints = Enumerable.Range(0, 5).Select(i => makePoint(i)).ToList();
+                var indicator3DataPoints = new List<IndicatorDataPoint>();
+
+                var pdConverter = new PandasConverter();
+                var dataFrame = pdConverter.GetIndicatorDataFrame(new Dictionary<string, List<IndicatorDataPoint>>
+                {
+                    {"ind1", indicator1DataPoints},
+                    {"ind2", indicator2DataPoints},
+                    {"ind3", indicator3DataPoints}
+                });
+
+                Func<string, List<double>> getIndicatorData = key => dataFrame.GetItem(key).GetAttr("tolist").Invoke().As<List<double>>();
+                CollectionAssert.AreEqual(new int[] {10, 3}, dataFrame.GetAttr("shape").As<int[]>());
+                CollectionAssert.AreEqual(new string[] { "ind1", "ind2", "ind3" }, dataFrame.GetAttr("columns").As<string[]>());
+                CollectionAssert.AreEqual(indicator1DataPoints.Select(point => point.EndTime).ToList(), dataFrame.GetAttr("index").GetAttr("tolist").Invoke().As<List<DateTime>>());
+                CollectionAssert.AreEqual(indicator1DataPoints.Select(point => point.Value), getIndicatorData("ind1").GetRange(0, indicator1DataPoints.Count));
+                CollectionAssert.AreEqual(indicator2DataPoints.Select(point => point.Value), getIndicatorData("ind2").GetRange(0, indicator2DataPoints.Count));
+                CollectionAssert.AreEqual(indicator3DataPoints.Select(point => point.Value), getIndicatorData("ind3").GetRange(0, indicator3DataPoints.Count));
+            }
+        }
+
         public IEnumerable<Slice> GetHistory<T>(Symbol symbol, Resolution resolution, IEnumerable<T> data)
             where T : IBaseData
         {
@@ -3539,7 +3674,7 @@ def Test(dataFrame, symbol):
 
         private dynamic GetTestDataFrame(Symbol symbol, int count = 1)
         {
-            return GetTestDataFrame(new[] {symbol}, count);
+            return GetTestDataFrame(new[] { symbol }, count);
         }
 
         private dynamic GetTestDataFrame(IEnumerable<Symbol> symbols, int count = 1)
@@ -3561,7 +3696,7 @@ def Test(dataFrame, symbol):
                                     Quantity = 1 + i * 10,
                                     Exchange = "T"
                                 }
-                            )
+                            ), time
                         );
                     }
                 );
@@ -3577,7 +3712,7 @@ def Test(dataFrame, symbol):
             public SubTradeBar(TradeBar tradeBar) : base(tradeBar) { }
 
             public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode) =>
-                new SubTradeBar((TradeBar) base.Reader(config, line, date, isLiveMode));
+                new SubTradeBar((TradeBar)base.Reader(config, line, date, isLiveMode));
         }
 
         internal class SubSubTradeBar : SubTradeBar
@@ -3589,7 +3724,7 @@ def Test(dataFrame, symbol):
             public SubSubTradeBar(TradeBar tradeBar) : base(tradeBar) { }
 
             public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode) =>
-                new SubSubTradeBar((TradeBar) base.Reader(config, line, date, isLiveMode));
+                new SubSubTradeBar((TradeBar)base.Reader(config, line, date, isLiveMode));
         }
 
         internal class NullableValueData : BaseData
@@ -3601,11 +3736,47 @@ def Test(dataFrame, symbol):
             public double? NullableColumn { get; set; }
         }
 
-        internal class CustomQuandl : Quandl
+        internal class CustomData : DynamicData
         {
-            // For CustomDataWithValueColumn test
-            public CustomQuandl() : base("Value")
+            private bool _isInitialized;
+            private readonly List<string> _propertyNames = new List<string>();
+
+            public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode)
             {
+                // be sure to instantiate the correct type
+                var data = (CustomData)Activator.CreateInstance(GetType());
+                data.Symbol = config.Symbol;
+                var csv = line.Split(',');
+
+                if (!_isInitialized)
+                {
+                    _isInitialized = true;
+                    foreach (var propertyName in csv)
+                    {
+                        var property = propertyName.Trim();
+                        // should we remove property names like Time?
+                        // do we need to alias the Time??
+                        data.SetProperty(property, 0m);
+                        _propertyNames.Add(property);
+                    }
+                    // Returns null at this point where we are only reading the properties names
+                    return null;
+                }
+
+                data.Time = DateTime.ParseExact(csv[0], "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+                for (var i = 1; i < csv.Length; i++)
+                {
+                    var value = csv[i].ToDecimal();
+                    data.SetProperty(_propertyNames[i], value);
+                }
+
+                if (!_propertyNames.Contains("Value"))
+                {
+                    data.Value = 1;
+                }
+
+                return data;
             }
         }
 

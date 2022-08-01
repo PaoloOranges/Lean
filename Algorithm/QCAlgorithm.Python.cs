@@ -661,21 +661,18 @@ namespace QuantConnect.Algorithm
         public void WarmUpIndicator(Symbol symbol, PyObject indicator, Resolution? resolution = null, PyObject selector = null)
         {
             // TODO: to be removed when https://github.com/QuantConnect/pythonnet/issues/62 is solved
-            IndicatorBase<IndicatorDataPoint> indicatorDataPoint;
-            IndicatorBase<IBaseDataBar> indicatorDataBar;
-            IndicatorBase<TradeBar> indicatorTradeBar;
 
-            if (indicator.TryConvert(out indicatorDataPoint))
+            if (indicator.TryConvert(out IndicatorBase<IndicatorDataPoint> indicatorDataPoint))
             {
                 WarmUpIndicator(symbol, indicatorDataPoint, resolution, selector?.ConvertToDelegate<Func<IBaseData, decimal>>());
                 return;
             }
-            else if (indicator.TryConvert(out indicatorDataBar))
+            if (indicator.TryConvert(out IndicatorBase<IBaseDataBar> indicatorDataBar))
             {
                 WarmUpIndicator(symbol, indicatorDataBar, resolution, selector?.ConvertToDelegate<Func<IBaseData, IBaseDataBar>>());
                 return;
             }
-            else if (indicator.TryConvert(out indicatorTradeBar))
+            if (indicator.TryConvert(out IndicatorBase<TradeBar> indicatorTradeBar))
             {
                 WarmUpIndicator(symbol, indicatorTradeBar, resolution, selector?.ConvertToDelegate<Func<IBaseData, TradeBar>>());
                 return;
@@ -695,15 +692,22 @@ namespace QuantConnect.Algorithm
         {
             using (Py.GIL())
             {
-                try
+                if (pyObject.TryConvert(out IndicatorBase indicator, true))
                 {
-                    var value = (((dynamic)pyObject).Current.Value as PyObject).GetAndDispose<decimal>();
-                    Plot(series, value);
+                    Plot(series, indicator);
                 }
-                catch
+                else
                 {
-                    var pythonType = pyObject.GetPythonType().Repr();
-                    throw new ArgumentException($"QCAlgorithm.Plot(): The last argument should be a QuantConnect Indicator object, {pythonType} was provided.");
+                    try
+                    {
+                        var value = (((dynamic)pyObject).Value as PyObject).GetAndDispose<decimal>();
+                        Plot(series, value);
+                    }
+                    catch
+                    {
+                        var pythonType = pyObject.GetPythonType().Repr();
+                        throw new ArgumentException($"QCAlgorithm.Plot(): The last argument should be a QuantConnect Indicator object, {pythonType} was provided.");
+                    }
                 }
             }
         }
@@ -864,6 +868,30 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Gets the historical data for the specified symbols between the specified dates. The symbols must exist in the Securities collection.
+        /// </summary>
+        /// <param name="tickers">The symbols to retrieve historical data for</param>
+        /// <param name="start">The start time in the algorithm's time zone</param>
+        /// <param name="end">The end time in the algorithm's time zone</param>
+        /// <param name="resolution">The resolution to request</param>
+        /// <param name="fillForward">True to fill forward missing data, false otherwise</param>
+        /// <param name="extendedMarket">True to include extended market hours data, false otherwise</param>
+        /// <param name="dataMappingMode">The contract mapping mode to use for the security history request</param>
+        /// <param name="dataNormalizationMode">The price scaling mode to use for the securities history</param>
+        /// <param name="contractDepthOffset">The continuous contract desired offset from the current front month.
+        /// For example, 0 (default) will use the front month, 1 will use the back month contract</param>
+        /// <returns>A python dictionary with a pandas DataFrame containing the requested historical data</returns>
+        [DocumentationAttribute(HistoricalData)]
+        public PyObject History(PyObject tickers, DateTime start, DateTime end, Resolution? resolution = null, bool? fillForward = null,
+            bool? extendedMarket = null, DataMappingMode? dataMappingMode = null, DataNormalizationMode? dataNormalizationMode = null,
+            int? contractDepthOffset = null)
+        {
+            var symbols = tickers.ConvertToSymbolEnumerable();
+            return PandasConverter.GetDataFrame(History(symbols, start, end, resolution, fillForward, extendedMarket, dataMappingMode,
+                dataNormalizationMode, contractDepthOffset));
+        }
+
+        /// <summary>
         /// Gets the historical data for the specified symbol between the specified dates. The symbol must exist in the Securities collection.
         /// </summary>
         /// <param name="tickers">The symbols to retrieve historical data for</param>
@@ -886,24 +914,23 @@ namespace QuantConnect.Algorithm
         /// <param name="start">The start time in the algorithm's time zone</param>
         /// <param name="end">The end time in the algorithm's time zone</param>
         /// <param name="resolution">The resolution to request</param>
+        /// <param name="fillForward">True to fill forward missing data, false otherwise</param>
+        /// <param name="extendedMarket">True to include extended market hours data, false otherwise</param>
+        /// <param name="dataMappingMode">The contract mapping mode to use for the security history request</param>
+        /// <param name="dataNormalizationMode">The price scaling mode to use for the securities history</param>
+        /// <param name="contractDepthOffset">The continuous contract desired offset from the current front month.
+        /// For example, 0 (default) will use the front month, 1 will use the back month contract</param>
         /// <returns>pandas.DataFrame containing the requested historical data</returns>
         [DocumentationAttribute(HistoricalData)]
-        public PyObject History(PyObject type, PyObject tickers, DateTime start, DateTime end, Resolution? resolution = null)
+        public PyObject History(PyObject type, PyObject tickers, DateTime start, DateTime end, Resolution? resolution = null,
+            bool? fillForward = null, bool? extendedMarket = null, DataMappingMode? dataMappingMode = null,
+            DataNormalizationMode? dataNormalizationMode = null, int? contractDepthOffset = null)
         {
             var symbols = tickers.ConvertToSymbolEnumerable();
             var requestedType = type.CreateType();
-
-            var requests = symbols.Select(x =>
-            {
-                var security = Securities[x];
-                var config = security.Subscriptions.OrderByDescending(s => s.Resolution)
-                        .FirstOrDefault(s => s.Type.BaseType == requestedType.BaseType);
-                if (config == null) return null;
-
-                return _historyRequestFactory.CreateHistoryRequest(config, start, end, GetExchangeHours(x), resolution);
-            });
-
-            return PandasConverter.GetDataFrame(History(requests.Where(x => x != null)).Memoize());
+            var requests = CreateDateRangeHistoryRequests(symbols, requestedType, start, end, resolution, fillForward, extendedMarket,
+                dataMappingMode, dataNormalizationMode, contractDepthOffset);
+            return PandasConverter.GetDataFrame(History(requests.Where(x => x != null)));
         }
 
         /// <summary>
@@ -921,19 +948,7 @@ namespace QuantConnect.Algorithm
         {
             var symbols = tickers.ConvertToSymbolEnumerable();
             var requestedType = type.CreateType();
-
-            var requests = symbols.Select(x =>
-            {
-                var security = Securities[x];
-                var config = security.Subscriptions.OrderByDescending(s => s.Resolution)
-                        .FirstOrDefault(s => s.Type.BaseType == requestedType.BaseType);
-                if (config == null) return null;
-
-                var res = GetResolution(x, resolution);
-                var exchange = GetExchangeHours(x);
-                var start = _historyRequestFactory.GetStartTimeAlgoTz(x, periods, res, exchange, config.DataTimeZone);
-                return _historyRequestFactory.CreateHistoryRequest(config, start, Time, exchange, res);
-            });
+            var requests = CreateBarCountHistoryRequests(symbols, requestedType, periods, resolution);
 
             return PandasConverter.GetDataFrame(History(requests.Where(x => x != null)).Memoize());
         }
@@ -965,18 +980,14 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(HistoricalData)]
         public PyObject History(PyObject type, Symbol symbol, DateTime start, DateTime end, Resolution? resolution = null)
         {
-            var security = Securities[symbol];
-            // verify the types match
             var requestedType = type.CreateType();
-            var config = security.Subscriptions.OrderByDescending(s => s.Resolution)
-                .FirstOrDefault(s => s.Type.BaseType == requestedType.BaseType);
-            if (config == null)
+            var request = CreateDateRangeHistoryRequests(new [] {  symbol }, requestedType, start, end, resolution).FirstOrDefault();
+            if (request == null)
             {
-                var actualType = security.Subscriptions.Select(x => x.Type.Name).DefaultIfEmpty("[None]").FirstOrDefault();
+                var actualType = GetMatchingSubscription(symbol, typeof(BaseData)).Type;
                 throw new ArgumentException("The specified security is not of the requested type. Symbol: " + symbol.ToString() + " Requested Type: " + requestedType.Name + " Actual Type: " + actualType);
             }
 
-            var request = _historyRequestFactory.CreateHistoryRequest(config, start, end, GetExchangeHours(symbol), resolution);
             return PandasConverter.GetDataFrame(History(request).Memoize());
         }
 
@@ -1107,7 +1118,8 @@ namespace QuantConnect.Algorithm
                     // In order to convert it into a C# Dictionary
                     if (PyDict.IsDictType(headers))
                     {
-                        foreach (PyObject pyKey in headers)
+                        using var iterator = headers.GetIterator();
+                        foreach (PyObject pyKey in iterator)
                         {
                             var key = (string)pyKey.AsManagedObject(typeof(string));
                             var value = (string)headers.GetItem(pyKey).AsManagedObject(typeof(string));

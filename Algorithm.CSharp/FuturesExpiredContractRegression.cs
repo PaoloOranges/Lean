@@ -46,6 +46,14 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void OnData(Slice data)
         {
+            foreach (var point in data)
+            {
+                if (point.Value.IsFillForward)
+                {
+                    throw new Exception("We requested no fill forwarding!");
+                }
+            }
+
             foreach (var chain in data.FutureChains)
             {
                 _receivedData = true;
@@ -77,6 +85,16 @@ namespace QuantConnect.Algorithm.CSharp
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp };
+
+        /// <summary>
+        /// Data Points count of all timeslices of algorithm
+        /// </summary>
+        public long DataPoints => 420232;
+
+        /// <summary>
+        /// Data Points count of the algorithm history
+        /// </summary>
+        public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm

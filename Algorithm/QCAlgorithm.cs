@@ -79,6 +79,7 @@ namespace QuantConnect.Algorithm
         private readonly TimeKeeper _timeKeeper;
         private LocalTimeKeeper _localTimeKeeper;
 
+        private DateTime _start;
         private DateTime _startDate;   //Default start and end dates.
         private DateTime _endDate;     //Default end to yesterday
         private bool _locked;
@@ -112,7 +113,6 @@ namespace QuantConnect.Algorithm
         // warmup resolution variables
         private TimeSpan? _warmupTimeSpan;
         private int? _warmupBarCount;
-        private Resolution? _warmupResolution;
         private Dictionary<string, string> _parameters = new Dictionary<string, string>();
         private SecurityDefinitionSymbolResolver _securityDefinitionSymbolResolver;
 
@@ -439,13 +439,7 @@ namespace QuantConnect.Algorithm
         /// <remarks>This property is set with SetStartDate() and defaults to the earliest QuantConnect data available - Jan 1st 1998. It is ignored during live trading </remarks>
         /// <seealso cref="SetStartDate(DateTime)"/>
         [DocumentationAttribute(HandlingData)]
-        public DateTime StartDate
-        {
-            get
-            {
-                return _startDate;
-            }
-        }
+        public DateTime StartDate => _startDate;
 
         /// <summary>
         /// Value of the user set start-date from the backtest. Controls the period of the backtest.
@@ -632,6 +626,15 @@ namespace QuantConnect.Algorithm
                 }
             }
 
+            if(TryGetWarmupHistoryStartTime(out var result))
+            {
+                SetDateTime(result.ConvertToUtc(TimeZone));
+            }
+            else
+            {
+                SetFinishedWarmingUp();
+            }
+
             // perform end of time step checks, such as enforcing underlying securities are in raw data mode
             OnEndOfTimeStep();
         }
@@ -645,16 +648,16 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Gets the parameter with the specified name. If a parameter
-        /// with the specified name does not exist, null is returned
+        /// Gets the parameter with the specified name. If a parameter with the specified name does not exist,
+        /// the given default value is returned if any, else null
         /// </summary>
         /// <param name="name">The name of the parameter to get</param>
-        /// <returns>The value of the specified parameter, or null if not found</returns>
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
         [DocumentationAttribute(ParameterAndOptimization)]
-        public string GetParameter(string name)
+        public string GetParameter(string name, string defaultValue = null)
         {
-            string value;
-            return _parameters.TryGetValue(name, out value) ? value : null;
+            return _parameters.TryGetValue(name, out var value) ? value : defaultValue;
         }
 
         /// <summary>
@@ -1019,6 +1022,10 @@ namespace QuantConnect.Algorithm
         public void SetDateTime(DateTime frontier)
         {
             _timeKeeper.SetUtcDateTime(frontier);
+            if (_locked && IsWarmingUp && Time >= _start)
+            {
+                SetFinishedWarmingUp();
+            }
         }
 
         /// <summary>
@@ -1066,6 +1073,7 @@ namespace QuantConnect.Algorithm
             // so there is no need to update it.
             if (!LiveMode)
             {
+                _start = _startDate;
                 SetDateTime(_startDate.ConvertToUtc(TimeZone));
             }
             // In live mode we need to adjust startDate to reflect the new timezone
@@ -1424,7 +1432,7 @@ namespace QuantConnect.Algorithm
             //3. Check not locked already:
             if (!_locked)
             {
-                _startDate = start;
+                _start = _startDate = start;
                 SetDateTime(_startDate.ConvertToUtc(TimeZone));
             }
             else
@@ -1499,8 +1507,9 @@ namespace QuantConnect.Algorithm
                 Securities.SetLiveMode(live);
                 if (live)
                 {
+                    _start = DateTime.UtcNow.ConvertFromUtc(TimeZone);
                     // startDate is set relative to the algorithm's timezone.
-                    _startDate = DateTime.UtcNow.ConvertFromUtc(TimeZone).Date;
+                    _startDate = _start.Date;
                     _endDate = QuantConnect.Time.EndOfTime;
                 }
             }
@@ -1657,37 +1666,33 @@ namespace QuantConnect.Algorithm
                 if (!UniverseManager.TryGetValue(symbol, out universe) && _pendingUniverseAdditions.All(u => u.Configuration.Symbol != symbol))
                 {
                     var canonicalConfig = configs.First();
-                    var settings = new UniverseSettings(canonicalConfig.Resolution, leverage, true, false, TimeSpan.Zero);
+                    var settings = new UniverseSettings(canonicalConfig.Resolution, leverage, fillDataForward, false, TimeSpan.Zero);
                     if (symbol.SecurityType.IsOption())
                     {
                         universe = new OptionChainUniverse((Option)security, settings, LiveMode);
                     }
                     else
                     {
-                        security.IsTradable = true;
-
-                        // add the expected configurations of the canonical symbol, will allow it to warmup and indicators register to them
+                        // add the expected configurations of the canonical symbol right away, will allow it to warmup and indicators register to them
                         var dataTypes = SubscriptionManager.LookupSubscriptionConfigDataTypes(SecurityType.Future,
                             GetResolution(symbol, resolution), isCanonical: false);
-                        var continuousConfigs = SubscriptionManager.SubscriptionDataConfigService.Add(symbol,
-                            resolution,
-                            fillDataForward,
-                            extendedMarketHours,
-                            isFilteredSubscription: true,
-                            subscriptionDataTypes: dataTypes,
-                            dataNormalizationMode: dataNormalizationMode ?? UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType),
-                            dataMappingMode: dataMappingMode ?? UniverseSettings.DataMappingMode,
-                            contractDepthOffset: contractOffset
-                        );
+                        var continuousUniverseSettings = new UniverseSettings(settings)
+                        {
+                            ExtendedMarketHours = extendedMarketHours,
+                            DataMappingMode = dataMappingMode ?? UniverseSettings.DataMappingMode,
+                            DataNormalizationMode = dataNormalizationMode ?? UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType),
+                            ContractDepthOffset = (int)contractOffset,
+                            SubscriptionDataTypes = dataTypes,
+                        };
+                        ContinuousContractUniverse.AddConfigurations(SubscriptionManager.SubscriptionDataConfigService, continuousUniverseSettings, security.Symbol);
 
-                        AddUniverse(new ContinuousContractUniverse(security, new UniverseSettings(settings)
-                            {
-                                DataMappingMode = continuousConfigs.First().DataMappingMode,
-                                DataNormalizationMode = continuousConfigs.DataNormalizationMode(),
-                                ContractDepthOffset = (int)continuousConfigs.First().ContractDepthOffset,
-                                SubscriptionDataTypes = dataTypes
-                            }, LiveMode,
-                            new SubscriptionDataConfig(canonicalConfig, symbol: ContinuousContractUniverse.CreateSymbol(security.Symbol))));
+                        // let's add a MHDB entry for the continuous symbol using the associated security
+                        var continuousContractSymbol = ContinuousContractUniverse.CreateSymbol(security.Symbol);
+                        MarketHoursDatabase.SetEntry(continuousContractSymbol.ID.Market,
+                            continuousContractSymbol.ID.Symbol,
+                            continuousContractSymbol.ID.SecurityType,
+                            security.Exchange.Hours);
+                        AddUniverse(new ContinuousContractUniverse(security, continuousUniverseSettings, LiveMode, new SubscriptionDataConfig(canonicalConfig, symbol: continuousContractSymbol)));
 
                         universe = new FuturesChainUniverse((Future)security, settings);
                     }
@@ -1709,11 +1714,13 @@ namespace QuantConnect.Algorithm
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice. Default is <value>true</value></param>
         /// <param name="leverage">The requested leverage for this equity. Default is set by <see cref="SecurityInitializer"/></param>
         /// <param name="extendedMarketHours">True to send data during pre and post market sessions. Default is <value>false</value></param>
+        /// <param name="dataNormalizationMode">The price scaling mode to use for the equity</param>
         /// <returns>The new <see cref="Equity"/> security</returns>
         [DocumentationAttribute(AddingData)]
-        public Equity AddEquity(string ticker, Resolution? resolution = null, string market = null, bool fillDataForward = true, decimal leverage = Security.NullLeverage, bool extendedMarketHours = false)
+        public Equity AddEquity(string ticker, Resolution? resolution = null, string market = null, bool fillDataForward = true,
+            decimal leverage = Security.NullLeverage, bool extendedMarketHours = false, DataNormalizationMode? dataNormalizationMode = null)
         {
-            return AddSecurity<Equity>(SecurityType.Equity, ticker, resolution, market, fillDataForward, leverage, extendedMarketHours);
+            return AddSecurity<Equity>(SecurityType.Equity, ticker, resolution, market, fillDataForward, leverage, extendedMarketHours, normalizationMode: dataNormalizationMode);
         }
 
         /// <summary>
@@ -1934,6 +1941,12 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(AddingData)]
         public Option AddOptionContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = Security.NullLeverage)
         {
+            if(symbol == null || !symbol.SecurityType.IsOption() || symbol.Underlying == null)
+            {
+                throw new ArgumentException($"Unexpected option symbol {symbol}. " +
+                    $"Please provide a valid option contract with it's underlying symbol set.");
+            }
+
             // add underlying if not present
             var underlying = symbol.Underlying;
             Security underlyingSecurity;
@@ -1954,7 +1967,7 @@ namespace QuantConnect.Algorithm
                 {
                     // We check the "locked" flag here because during initialization we need to load existing open orders and holdings from brokerages.
                     // There is no data streaming yet, so it is safe to change the data normalization mode to Raw.
-                    throw new ArgumentException($"The underlying equity asset ({underlying.Value}) is set to " +
+                    throw new ArgumentException($"The underlying {underlying.SecurityType} asset ({underlying.Value}) is set to " +
                         $"{dataNormalizationMode}, please change this to DataNormalizationMode.Raw with the " +
                         "SetDataNormalization() method"
                     );
@@ -1975,8 +1988,9 @@ namespace QuantConnect.Algorithm
             Universe universe;
             if (!UniverseManager.TryGetValue(universeSymbol, out universe))
             {
+                var settings = new UniverseSettings(UniverseSettings) { DataNormalizationMode = DataNormalizationMode.Raw, Resolution = underlyingConfigs.GetHighestResolution() };
                 universe = _pendingUniverseAdditions.FirstOrDefault(u => u.Configuration.Symbol == universeSymbol)
-                           ?? AddUniverse(new OptionContractUniverse(new SubscriptionDataConfig(configs.First(), symbol: universeSymbol), UniverseSettings));
+                           ?? AddUniverse(new OptionContractUniverse(new SubscriptionDataConfig(configs.First(), symbol: universeSymbol), settings));
             }
 
             // update the universe
@@ -2079,8 +2093,11 @@ namespace QuantConnect.Algorithm
                 return false;
             }
 
-            // cancel open orders
-            Transactions.CancelOpenOrders(security.Symbol);
+            if (!IsWarmingUp)
+            {
+                // cancel open orders
+                Transactions.CancelOpenOrders(security.Symbol);
+            }
 
             // liquidate if invested
             if (security.Invested)

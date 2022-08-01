@@ -32,14 +32,16 @@ RUN mkdir -p /root/ibgateway && \
     bbe -e 's|# INSTALL4J_JAVA_HOME_OVERRIDE=|INSTALL4J_JAVA_HOME_OVERRIDE="/usr/lib/jvm/java-1.8.0-openjdk-arm64"|' -e "s|-lt \"152\"|-lt \"$java_patch_version\"|" -e "s|-gt \"152\"|-gt \"$java_patch_version\"|" ibgateway-latest-standalone-linux-x64.v10.12.2d.sh > ibgateway-stable-standalone-linux-custom-jvm.sh && \
     chmod 777 ibgateway-stable-standalone-linux-custom-jvm.sh && \
     ./ibgateway-stable-standalone-linux-custom-jvm.sh -q -dir /root/ibgateway && \
-    rm ibgateway-latest-standalone-linux-x64.v10.12.2d.sh ibgateway-stable-standalone-linux-custom-jvm.sh
+    rm ibgateway-latest-standalone-linux-x64.v10.12.2d.sh ibgateway-stable-standalone-linux-custom-jvm.sh && \
+    sed -i "s/-lt \"152\"/-lt \"$java_patch_version\"/" /root/ibgateway/ibgateway && \
+    sed -i "s/-gt \"152\"/-gt \"$java_patch_version\"/" /root/ibgateway/ibgateway
 
 # Install dotnet 5 sdk & runtime
 # The .deb packages don't support ARM, the install script does
 ENV PATH="/root/.dotnet:${PATH}"
 RUN wget https://dot.net/v1/dotnet-install.sh && \
     chmod 777 dotnet-install.sh && \
-    ./dotnet-install.sh -c 5.0 && \
+    ./dotnet-install.sh -c 6.0 && \
     rm dotnet-install.sh
 ENV DOTNET_ROOT="/root/.dotnet"
 
@@ -64,12 +66,14 @@ ENV PIP_DEFAULT_TIMEOUT=120
 # Conda install required so that the packages are not
 # overwritten and have their version invalidated by
 # subsequent calls to conda install
+# Note: we pin the jupyter_server version since newer versions no long support python 3.6
 RUN conda install -y                \
     cython=0.29.17                  \
     pandas=0.25.3                   \
     numpy=1.18.1                    \
     wrapt=1.12.1                    \
-    jupyterlab=2.1.2                \
+    jupyter_server=1.13.1           \
+    jupyterlab=3.2.6                \
     matplotlib=3.2.1                \
     scipy=1.4.1                     \
     && conda clean -y --all

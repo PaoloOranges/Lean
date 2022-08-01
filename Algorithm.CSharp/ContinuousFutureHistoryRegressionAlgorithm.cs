@@ -45,7 +45,7 @@ namespace QuantConnect.Algorithm.CSharp
                 dataMappingMode: DataMappingMode.OpenInterest,
                 contractDepthOffset: 1
             );
-            SetWarmup(10);
+            SetWarmup(1, Resolution.Daily);
         }
 
         /// <summary>
@@ -77,9 +77,9 @@ namespace QuantConnect.Algorithm.CSharp
                 throw new Exception($"We are getting data for more than one symbols! {string.Join(",", data.Keys.Select(symbol => symbol))}");
             }
 
-            if (!Portfolio.Invested)
+            if (!Portfolio.Invested && !IsWarmingUp)
             {
-                Buy(_continuousContract.Symbol, 1);
+                Buy(_continuousContract.Mapped, 1);
             }
         }
 
@@ -112,9 +112,19 @@ namespace QuantConnect.Algorithm.CSharp
         public Language[] Languages { get; } = { Language.CSharp };
 
         /// <summary>
+        /// Data Points count of all timeslices of algorithm
+        /// </summary>
+        public virtual long DataPoints => 26112;
+
+        /// <summary>
+        /// Data Points count of the algorithm history
+        /// </summary>
+        public int AlgorithmHistoryDataPoints => 0;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
-        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Trades", "1"},
             {"Average Win", "0%"},
@@ -136,14 +146,14 @@ namespace QuantConnect.Algorithm.CSharp
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
             {"Total Fees", "$1.85"},
-            {"Estimated Strategy Capacity", "$42000000.00"},
-            {"Lowest Capacity Asset", "ES 1S1"},
-            {"Fitness Score", "0.76"},
+            {"Estimated Strategy Capacity", "$290000000.00"},
+            {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
+            {"Fitness Score", "0.408"},
             {"Kelly Criterion Estimate", "0"},
             {"Kelly Criterion Probability Value", "0"},
             {"Sortino Ratio", "79228162514264337593543950335"},
             {"Return Over Maximum Drawdown", "79228162514264337593543950335"},
-            {"Portfolio Turnover", "0.76"},
+            {"Portfolio Turnover", "0.408"},
             {"Total Insights Generated", "0"},
             {"Total Insights Closed", "0"},
             {"Total Insights Analysis Completed", "0"},
@@ -157,7 +167,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
             {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "4de9344671d542e30066338e2bf9d400"}
+            {"OrderListHash", "10cf3584cd0131898df3f19d26df0649"}
         };
     }
 }

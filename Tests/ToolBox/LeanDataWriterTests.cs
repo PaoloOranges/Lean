@@ -119,10 +119,13 @@ namespace QuantConnect.Tests.ToolBox
             Assert.AreEqual(data.First().Value.Count(), 3);
         }
 
-        [TestCase(SecurityType.FutureOption)]
-        [TestCase(SecurityType.Future)]
-        [TestCase(SecurityType.Option)]
-        public void LeanDataWriter_CanWriteZipWithMultipleContracts(SecurityType securityType)
+        [TestCase(SecurityType.FutureOption, Resolution.Second)]
+        [TestCase(SecurityType.Future, Resolution.Second)]
+        [TestCase(SecurityType.Option, Resolution.Second)]
+        [TestCase(SecurityType.Option, Resolution.Daily)]
+        [TestCase(SecurityType.Future, Resolution.Daily)]
+        [TestCase(SecurityType.FutureOption, Resolution.Daily)]
+        public void LeanDataWriter_CanWriteZipWithMultipleContracts(SecurityType securityType, Resolution resolution)
         {
             Symbol contract1;
             Symbol contract2;
@@ -146,12 +149,12 @@ namespace QuantConnect.Tests.ToolBox
                 throw new NotImplementedException($"{securityType} not implemented!");
             }
 
-            var filePath1 = LeanData.GenerateZipFilePath(_dataDirectory, contract1, _date, Resolution.Second, TickType.Quote);
-            var leanDataWriter1 = new LeanDataWriter(Resolution.Second, contract1, _dataDirectory, TickType.Quote);
+            var filePath1 = LeanData.GenerateZipFilePath(_dataDirectory, contract1, _date, resolution, TickType.Quote);
+            var leanDataWriter1 = new LeanDataWriter(resolution, contract1, _dataDirectory, TickType.Quote);
             leanDataWriter1.Write(GetQuoteBars(contract1));
 
-            var filePath2 = LeanData.GenerateZipFilePath(_dataDirectory, contract2, _date, Resolution.Second, TickType.Quote);
-            var leanDataWriter2 = new LeanDataWriter(Resolution.Second, contract2, _dataDirectory, TickType.Quote);
+            var filePath2 = LeanData.GenerateZipFilePath(_dataDirectory, contract2, _date, resolution, TickType.Quote);
+            var leanDataWriter2 = new LeanDataWriter(resolution, contract2, _dataDirectory, TickType.Quote);
             leanDataWriter2.Write(GetQuoteBars(contract2));
 
             Assert.AreEqual(filePath1, filePath2);
@@ -193,6 +196,66 @@ namespace QuantConnect.Tests.ToolBox
             var data = QuantConnect.Compression.Unzip(filePath);
 
             Assert.AreEqual(data.First().Value.Count(), 3);
+        }
+
+        [TestCase(null, Resolution.Daily)]
+        [TestCase(null, Resolution.Second)]
+        [TestCase(WritePolicy.Merge, Resolution.Second)]
+        [TestCase(WritePolicy.Merge, Resolution.Daily)]
+        [TestCase(WritePolicy.Append, Resolution.Second)]
+        [TestCase(WritePolicy.Overwrite, Resolution.Second)]
+        public void RespectsWritePolicy(WritePolicy? writePolicy, Resolution resolution)
+        {
+            var filePath = LeanData.GenerateZipFilePath(_dataDirectory, _crypto, _date, resolution, TickType.Quote);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            var loopCount = 3;
+            var dataPointsPerLoop = 2;
+            for (var i = 0; i < loopCount; i++)
+            {
+                var leanDataWriter = new LeanDataWriter(resolution, _crypto, _dataDirectory, TickType.Quote, writePolicy: writePolicy);
+                var quoteBar = new QuoteBar(Parse.DateTime("3/16/2017 12:00:00 PM").AddHours(i), _crypto, new Bar(1m, 2m, 3m, 4m), 1,
+                    new Bar(5m, 6m, 7m, 8m), 2);
+
+                // same quote twice! it has the same time, so it will be dropped when merging
+                leanDataWriter.Write(Enumerable.Repeat(quoteBar, dataPointsPerLoop));
+
+                Assert.IsTrue(File.Exists(filePath));
+                Assert.IsFalse(File.Exists(filePath + ".tmp"));
+            }
+
+            var data = QuantConnect.Compression.Unzip(filePath).First().Value;
+
+
+            switch (writePolicy)
+            {
+                case WritePolicy.Overwrite:
+                    Assert.AreEqual(dataPointsPerLoop, data.Count);
+                    break;
+                case WritePolicy.Merge:
+                    Assert.AreEqual(loopCount, data.Count);
+                    break;
+                case WritePolicy.Append:
+                    Assert.AreEqual(dataPointsPerLoop * loopCount, data.Count);
+                    break;
+                case null:
+                    if (resolution >= Resolution.Hour)
+                    {
+                        // will merge by default
+                        Assert.AreEqual(loopCount, data.Count);
+                    }
+                    else
+                    {
+                        // overwrite
+                        Assert.AreEqual(dataPointsPerLoop, data.Count);
+                    }
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(writePolicy), writePolicy, null);
+            }
         }
 
         [Test]

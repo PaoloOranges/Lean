@@ -116,7 +116,7 @@ namespace QuantConnect.Orders.Fees
                     if (market == Market.Globex || market == Market.NYMEX
                         || market == Market.CBOT || market == Market.ICE
                         || market == Market.CFE || market == Market.COMEX
-                        || market == Market.CME)
+                        || market == Market.CME || market == Market.NYSELIFFE)
                     {
                         // just in case...
                         market = Market.USA;
@@ -138,6 +138,9 @@ namespace QuantConnect.Orders.Fees
                     {
                         case Market.USA:
                             equityFee = new EquityFee(Currencies.USD, feePerShare: 0.005m, minimumFee: 1, maximumFeeRate: 0.005m);
+                            break;
+                        case Market.India:
+                            equityFee = new EquityFee(Currencies.INR, feePerShare: 0.01m, minimumFee: 6, maximumFeeRate: 20);
                             break;
                         default:
                             throw new KeyNotFoundException($"InteractiveBrokersFeeModel(): unexpected equity Market {market}");

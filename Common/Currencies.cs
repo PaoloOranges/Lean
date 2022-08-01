@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -43,9 +43,19 @@ namespace QuantConnect
         public const string INR = "INR";
 
         /// <summary>
+        /// IDR (Indonesian rupiah) currency string
+        /// </summary>
+        public const string IDR = "IDR";
+
+        /// <summary>
         /// CNH (Chinese Yuan Renminbi) currency string
         /// </summary>
         public const string CNH = "CNH";
+
+        /// <summary>
+        /// CHF (Swiss Franc) currency string
+        /// </summary>
+        public const string CHF = "CHF";
 
         /// <summary>
         /// HKD (Hong Kong dollar) currency string
@@ -72,7 +82,7 @@ namespace QuantConnect
             {"NZD", "$"},
             {"AUD", "$"},
             {"CAD", "$"},
-            {"CHF", "Fr"},
+            {CHF, "Fr"},
             {HKD, "$"},
             {"SGD", "$"},
             {"XAG", "Ag"},
@@ -92,39 +102,137 @@ namespace QuantConnect
             {"TRY", "₺"},
             {"TWD", "NT$"},
             {"ZAR", "R"},
+            {"RUB", "₽"},
+            {"BRL", "R$"},
+            {"GNF", "Fr"},
+            {IDR, "Rp"},
 
-            {"BTC", "฿"},
-            {"BCH", "฿"},
+            {"BTC", "₿"},
+            {"BCH", "Ƀ"},
+            {"BSV", "Ɓ"},
             {"LTC", "Ł"},
             {"ETH", "Ξ"},
-
-            {"EOS", "EOS"},
-            {"XRP", "XRP"},
-            {"XLM", "XLM"},
-            {"ETC", "ETC"},
+            {"EOS", "ε"},
+            {"XRP", "✕"},
+            {"XLM", "*"},
+            {"ETC", "ξ"},
             {"ZRX", "ZRX"},
-            {"USDT", "USDT"}
+            {"USDT", "₮"},
+            {"ADA", "₳"},
+            {"SOL", "◎"},
+            {"DOT", "●"},
+            {"DOGE", "Ð"},
+            {"DAI", "◈"},
+            {"ALGO", "Ⱥ"},
+            {"ICP", "∞"},
+            {"XMR", "ɱ"},
+            {"XTZ", "ꜩ"},
+            {"IOTA", "ɨ"},
+            {"MIOTA", "ɨ"},
+            {"MKR", "Μ"},
+            {"ZEC", "ⓩ"},
+            {"DASH", "Đ"},
+            {"XNO", "Ӿ"},
+            {"REP", "Ɍ"},
+            {"STEEM", "ȿ"},
+            {"THETA", "ϑ"},
+            {"FIL", "⨎"},
+            {"BAT", "⟁"},
+            {"LSK", "Ⱡ"},
+            {"NAV", "Ꞥ"}
         };
 
         /// <summary>
-        /// Define some StableCoins that don't have direct pairs for base currencies in our SPDB
+        /// Stable pairs in GDAX. We defined them because they have different fees in GDAX market
+        /// </summary>
+        public static HashSet<string> StablePairsGDAX = new HashSet<string>
+        {
+            "DAIUSDC",
+            "DAIUSD",
+            "GYENUSD",
+            "PAXUSD",
+            "PAXUSDT",
+            "MUSDUSD",
+            "USDCEUR",
+            "USDCGBP",
+            "USDTEUR",
+            "USDTGBP",
+            "USDTUSD",
+            "USDTUSDC",
+            "USTEUR",
+            "USTUSD",
+            "USTUSDT",
+            "WBTCBTC"
+        };
+
+        /// <summary>
+        /// Define some StableCoins that don't have direct pairs for base currencies in our SPDB in GDAX market
+        /// This is because some CryptoExchanges do not define direct pairs with the stablecoins they offer.
+        ///
+        /// We use this to allow setting cash amounts for these stablecoins without needing a conversion
+        /// security.
+        private static readonly HashSet<string> _stableCoinsWithoutPairsGDAX = new HashSet<string>
+        {
+            "USDCUSD"
+        };
+
+        /// <summary>
+        /// Define some StableCoins that don't have direct pairs for base currencies in our SPDB in Binance market
         /// This is because some CryptoExchanges do not define direct pairs with the stablecoins they offer.
         ///
         /// We use this to allow setting cash amounts for these stablecoins without needing a conversion
         /// security.
         /// </summary>
-        public static HashSet<Symbol> StableCoinsWithoutPairs = new HashSet<Symbol>
+        private static readonly HashSet<string> _stableCoinsWithoutPairsBinance = new HashSet<string>
         {
-            // Binance StableCoins Missing 1-1 Pairs
-            Symbol.Create("USDCUSD", SecurityType.Crypto, Market.Binance), // USD -> USDC
-            Symbol.Create("BGBPGBP", SecurityType.Crypto, Market.Binance), // GBP -> BGBP
-
-            // Coinbase StableCoins Missing 1-1 Pairs
-            Symbol.Create("USDCUSD", SecurityType.Crypto, Market.GDAX), // USD -> USDC
-
-            // Bitfinex StableCoins Missing 1-1 Pairs
-            Symbol.Create("EURSEUR", SecurityType.Crypto, Market.Bitfinex), // EUR -> EURS
+            "USDCUSD",
+            "USDTUSD",
+            "USDPUSD",
+            "SUSDUSD",
+            "BUSDUSD",
+            "USTUSD",
+            "TUSDUSD",
+            "DAIUSD",
+            "IDRTIDR"
         };
+
+        /// <summary>
+        /// Define some StableCoins that don't have direct pairs for base currencies in our SPDB in Bitfinex market
+        /// This is because some CryptoExchanges do not define direct pairs with the stablecoins they offer.
+        ///
+        /// We use this to allow setting cash amounts for these stablecoins without needing a conversion
+        /// security.
+        /// </summary>
+        private static readonly HashSet<string> _stableCoinsWithoutPairsBitfinex = new HashSet<string>
+        {
+            "EURSEUR",
+            "XCHFCHF"
+        };
+
+        /// <summary>
+        /// Dictionary to save StableCoins in different Markets
+        /// </summary>
+        private static readonly Dictionary<string, HashSet<string>> _stableCoinsWithoutPairsMarkets = new Dictionary<string, HashSet<string>>
+        {
+            { Market.Binance , _stableCoinsWithoutPairsBinance},
+            { Market.Bitfinex , _stableCoinsWithoutPairsBitfinex},
+            { Market.GDAX , _stableCoinsWithoutPairsGDAX},
+        };
+
+        /// <summary>
+        /// Checks whether or not certain symbol is a StableCoin without pair in a given market
+        /// </summary>
+        /// <param name="symbol">The Symbol from wich we want to know if it's a StableCoin without pair</param>
+        /// <param name="market">The market in which we want to search for that StableCoin</param>
+        /// <returns>True if the given symbol is a StableCoin without pair in the given market</returns>
+        public static bool IsStableCoinWithoutPair(string symbol, string market)
+        {
+            if (_stableCoinsWithoutPairsMarkets.TryGetValue(market, out var stableCoins) && stableCoins.Contains(symbol))
+            {
+                return true;
+            }
+            return false;
+        }
 
         /// <summary>
         /// Gets the currency symbol for the specified currency code
@@ -134,7 +242,7 @@ namespace QuantConnect
         public static string GetCurrencySymbol(string currency)
         {
             string currencySymbol;
-            return CurrencySymbols.TryGetValue(currency, out currencySymbol) ? currencySymbol : "$";
+            return CurrencySymbols.TryGetValue(currency, out currencySymbol) ? currencySymbol : currency;
         }
     }
 }

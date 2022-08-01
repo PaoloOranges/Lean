@@ -25,6 +25,7 @@ namespace QuantConnect.Algorithm
 {
     public partial class QCAlgorithm
     {
+        private bool _isEmitWarmupPlotWarningSet;
         private readonly ConcurrentDictionary<string, Chart> _charts = new ConcurrentDictionary<string, Chart>();
 
         private static readonly Dictionary<string, List<string>> ReservedChartSeriesNames = new Dictionary<string, List<string>>
@@ -210,6 +211,15 @@ namespace QuantConnect.Algorithm
                 thisChart.AddSeries(new Series(series, SeriesType.Line, 0, "$"));
             }
 
+            if (LiveMode && IsWarmingUp)
+            {
+                if (!_isEmitWarmupPlotWarningSet)
+                {
+                    _isEmitWarmupPlotWarningSet = true;
+                    Debug("Plotting is disabled during algorithm warmup in live trading.");
+                }
+                return;
+            }
             thisChart.Series[series].AddPoint(UtcTime, value);
         }
 
@@ -238,11 +248,10 @@ namespace QuantConnect.Algorithm
         /// Plots the value of each indicator on the chart
         /// </summary>
         /// <param name="chart">The chart's name</param>
-        /// <param name="indicators">The indicatorsto plot</param>
+        /// <param name="indicators">The indicators to plot</param>
         /// <seealso cref="Plot(string,string,decimal)"/>
         [DocumentationAttribute(Charting)]
-        public void Plot<T>(string chart, params IndicatorBase<T>[] indicators)
-            where T : IBaseData
+        public void Plot(string chart, params IndicatorBase[] indicators)
         {
             foreach (var indicator in indicators)
             {

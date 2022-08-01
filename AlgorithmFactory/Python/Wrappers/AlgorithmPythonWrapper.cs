@@ -83,7 +83,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
                         var repr = attr.Repr().GetStringBetweenChars('\'', '\'');
 
                         if (repr.StartsWith(moduleName) &&                // Must be defined in the module
-                            attr.TryConvert(out type) &&                  // Must be a Type
+                            attr.TryConvert(out type, true) &&                  // Must be a Type
                             typeof(QCAlgorithm).IsAssignableFrom(type))   // Must inherit from QCAlgorithm
                         {
                             Logging.Log.Trace("AlgorithmPythonWrapper(): Creating IAlgorithm instance.");
@@ -508,18 +508,13 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         public bool GetLocked() => _baseAlgorithm.GetLocked();
 
         /// <summary>
-        /// Gets the parameter with the specified name. If a parameter
-        /// with the specified name does not exist, null is returned
+        /// Gets the parameter with the specified name. If a parameter with the specified name does not exist,
+        /// the given default value is returned if any, else null
         /// </summary>
         /// <param name="name">The name of the parameter to get</param>
-        /// <returns>The value of the specified parameter, or null if not found</returns>
-        public string GetParameter(string name) => _baseAlgorithm.GetParameter(name);
-
-        /// <summary>
-        /// Gets the history requests required for provide warm up data for the algorithm
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerable<HistoryRequest> GetWarmupHistoryRequests() => _baseAlgorithm.GetWarmupHistoryRequests();
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
+        public string GetParameter(string name, string defaultValue = null) => _baseAlgorithm.GetParameter(name, defaultValue);
 
         /// <summary>
         /// Initialise the Algorithm and Prepare Required Data:
@@ -634,7 +629,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
             // Only throws if there is an error in its implementation body
             catch (PythonException exception)
             {
-                if (!exception.Message.StartsWith("TypeError : OnEndOfDay()"))
+                if (!exception.Message.StartsWith("OnEndOfDay()"))
                 {
                     _baseAlgorithm.SetRunTimeError(exception);
                 }
@@ -662,7 +657,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
             // Only throws if there is an error in its implementation body
             catch (PythonException exception)
             {
-                if (!exception.Message.StartsWith("TypeError : OnEndOfDay()"))
+                if (!exception.Message.StartsWith("OnEndOfDay()"))
                 {
                     _baseAlgorithm.SetRunTimeError(exception);
                 }
@@ -690,7 +685,8 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
 
                     requests.Clear();
 
-                    foreach (PyObject pyRequest in pyRequests)
+                    using var iterator = pyRequests.GetIterator();
+                    foreach (PyObject pyRequest in iterator)
                     {
                         SubmitOrderRequest request;
                         if (TryConvert(pyRequest, out request))

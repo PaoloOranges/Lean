@@ -38,8 +38,8 @@ namespace QuantConnect.Util
         /// The different <see cref="SecurityType"/> used for data paths
         /// </summary>
         /// <remarks>This includes 'alternative'</remarks>
-        public static IReadOnlyList<string> SecurityTypeAsDataPath => Enum.GetNames(typeof(SecurityType))
-            .Select(x => x.ToLowerInvariant()).Union(new[] { "alternative" }).ToList();
+        public static HashSet<string> SecurityTypeAsDataPath => Enum.GetNames(typeof(SecurityType))
+            .Select(x => x.ToLowerInvariant()).Union(new[] { "alternative" }).ToHashSet();
 
         /// <summary>
         /// Converts the specified base data instance into a lean data file csv line.
@@ -52,6 +52,26 @@ namespace QuantConnect.Util
             var clone = data.Clone();
             clone.Time = data.Time.ConvertTo(exchangeTimeZone, dataTimeZone);
             return GenerateLine(clone, clone.Symbol.ID.SecurityType, resolution);
+        }
+
+        /// <summary>
+        /// Helper method that will parse a given data line in search of an associated date time
+        /// </summary>
+        public static DateTime ParseTime(string line, DateTime date, Resolution resolution)
+        {
+            switch (resolution)
+            {
+                case Resolution.Tick:
+                case Resolution.Second:
+                case Resolution.Minute:
+                    var index = line.IndexOf(',', StringComparison.InvariantCulture);
+                    return date.AddTicks(Convert.ToInt64(10000 * decimal.Parse(line.AsSpan(0, index))));
+                case Resolution.Hour:
+                case Resolution.Daily:
+                    return DateTime.ParseExact(line.AsSpan(0, DateFormat.TwelveCharacter.Length), DateFormat.TwelveCharacter, CultureInfo.InvariantCulture);
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(resolution), resolution, null);
+            }
         }
 
         /// <summary>
@@ -472,7 +492,8 @@ namespace QuantConnect.Util
         ///  <see cref="QuoteBar"/> or <see cref="OpenInterest"/></returns>
         public static bool IsCommonLeanDataType(Type baseDataType)
         {
-            if (baseDataType == typeof(TradeBar) ||
+            if (baseDataType == typeof(Tick) ||
+                baseDataType == typeof(TradeBar) ||
                 baseDataType == typeof(QuoteBar) ||
                 baseDataType == typeof(OpenInterest))
             {
@@ -482,6 +503,17 @@ namespace QuantConnect.Util
             return false;
         }
 
+        /// <summary>
+        /// Helper method to determine if a configuration set is valid
+        /// </summary>
+        public static bool IsValidConfiguration(SecurityType securityType, Resolution resolution, TickType tickType)
+        {
+            if (securityType == SecurityType.Equity && (resolution == Resolution.Daily || resolution == Resolution.Hour))
+            {
+                return tickType != TickType.Quote;
+            }
+            return true;
+        }
 
         /// <summary>
         /// Generates the full zip file path rooted in the <paramref name="dataDirectory"/>
@@ -965,9 +997,11 @@ namespace QuantConnect.Util
         /// </summary>
         /// <param name="fileName">File name to be parsed</param>
         /// <param name="securityType">The securityType as parsed from the fileName</param>
-        public static bool TryParseSecurityType(string fileName, out SecurityType securityType)
+        /// <param name="market">The market as parsed from the fileName</param>
+        public static bool TryParseSecurityType(string fileName, out SecurityType securityType, out string market)
         {
             securityType = SecurityType.Base;
+            market = string.Empty;
 
             try
             {
@@ -976,6 +1010,13 @@ namespace QuantConnect.Util
                 // find the securityType and parse it
                 var typeString = info.Find(x => SecurityTypeAsDataPath.Contains(x.ToLowerInvariant()));
                 securityType = ParseDataSecurityType(typeString);
+
+                var existingMarkets = Market.SupportedMarkets();
+                var foundMarket = info.Find(x => existingMarkets.Contains(x.ToLowerInvariant()));
+                if (foundMarket != null)
+                {
+                    market = foundMarket;
+                }
             }
             catch (Exception e)
             {

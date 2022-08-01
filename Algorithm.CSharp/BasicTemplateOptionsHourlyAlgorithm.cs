@@ -76,7 +76,7 @@ namespace QuantConnect.Algorithm.CSharp
                         .ThenByDescending(x => x.Right)
                         .FirstOrDefault();
 
-                    if (atmContract != null)
+                    if (atmContract != null && IsMarketOpen(atmContract.Symbol))
                     {
                         // if found, trade it
                         MarketOrder(atmContract.Symbol, 1);
@@ -105,6 +105,16 @@ namespace QuantConnect.Algorithm.CSharp
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+
+        /// <summary>
+        /// Data Points count of all timeslices of algorithm
+        /// </summary>
+        public long DataPoints => 32492;
+
+        /// <summary>
+        /// Data Points count of the algorithm history
+        /// </summary>
+        public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm

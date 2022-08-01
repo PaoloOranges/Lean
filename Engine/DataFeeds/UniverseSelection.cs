@@ -385,6 +385,21 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                     // Check that the tradebar subscription we are using can support this resolution GH #5893
                     var subscriptionType = _algorithm.SubscriptionManager.SubscriptionDataConfigService.LookupSubscriptionConfigDataTypes(securityBenchmark.Security.Type, resolution, securityBenchmark.Security.Symbol.IsCanonical()).First();
+                    var symbol = securityBenchmark.Security.Symbol;
+                    var isCustomData = false;
+
+                    // Check if the benchmark security is a custom data in order to make sure we get the correct
+                    // type
+                    if (symbol.SecurityType == SecurityType.Base)
+                    {
+                        var symbolDataConfigs = _algorithm.SubscriptionManager.SubscriptionDataConfigService.GetSubscriptionDataConfigs(symbol);
+                        if (symbolDataConfigs.Any())
+                        {
+                            subscriptionType = new Tuple<Type, TickType>(symbolDataConfigs.First().Type, TickType.Trade);
+                            isCustomData = true;
+                        }
+                    }
+
                     var baseInstance = subscriptionType.Item1.GetBaseDataInstance();
                     baseInstance.Symbol = securityBenchmark.Security.Symbol;
                     var supportedResolutions = baseInstance.SupportedResolutions();
@@ -399,6 +414,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         resolution,
                         isInternalFeed: true,
                         fillForward: false,
+                        isCustomData: isCustomData,
                         subscriptionDataTypes: subscriptionList
                         ).First();
 
@@ -470,10 +486,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 // safe to remove the member from the universe
                 universe.RemoveMember(dateTimeUtc, member);
 
-                // we need to mark this security as untradeable while it has no data subscription
-                // it is expected that this function is called while in sync with the algo thread,
-                // so we can make direct edits to the security here
-                member.Cache.Reset();
                 foreach (var subscription in universe.GetSubscriptionRequests(member, dateTimeUtc, algorithmEndDateUtc,
                                                                               _algorithm.SubscriptionManager.SubscriptionDataConfigService))
                 {
@@ -481,6 +493,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     {
                         _internalSubscriptionManager.RemovedSubscriptionRequest(subscription);
                         member.IsTradable = false;
+
+                        // We need to mark this security as untradeable while it has no data subscription
+                        // it is expected that this function is called while in sync with the algo thread,
+                        // so we can make direct edits to the security here.
+                        // We only clear the cache once the subscription is removed from the data stack
+                        member.Cache.Reset();
                     }
                 }
             }
