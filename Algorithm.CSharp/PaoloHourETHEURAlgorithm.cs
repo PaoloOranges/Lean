@@ -47,7 +47,6 @@ namespace QuantConnect.Algorithm.CSharp
         private ParabolicStopAndReverse _psar;
 
         private Maximum _maximumPrice;
-        private decimal _maxFastLSMA = 0m;
 
         private int _bought = -1;
         private decimal _bought_price = 0;
@@ -171,8 +170,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            _maxFastLSMA = Math.Max(_maxFastLSMA, _fast_lsma);
-
             if (IsWarmingUp)
             {
                 if(_bought < 0 && !HasSoldPriceFromPreviousSession)
@@ -344,8 +341,6 @@ namespace QuantConnect.Algorithm.CSharp
                 _bought = -1;
                 _sold_price = orderEvent.FillPrice;
                 ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_culture_info));
-
-                _maxFastLSMA = 0m;
             }
 
             if (orderEvent.Status == OrderStatus.Invalid)
