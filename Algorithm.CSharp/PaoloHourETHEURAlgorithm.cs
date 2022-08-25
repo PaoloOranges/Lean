@@ -41,6 +41,7 @@ namespace QuantConnect.Algorithm.CSharp
     {
         private HullMovingAverage _slow_hullma;
         private LeastSquaresMovingAverage _fast_lsma;
+        private LinearWeightedMovingAverage _very_fast_wma;
         
         private MovingAverageConvergenceDivergence _macd;
         private ParabolicStopAndReverse _psar;
@@ -66,7 +67,7 @@ namespace QuantConnect.Algorithm.CSharp
         private bool _is_ready_to_trade = false;
 
         private const decimal _amount_to_buy = 0.8m;
-        private const decimal _percentage_price_gain = 0.05m;
+        private const decimal _percentage_price_gain = 0.04m;
 
         private const int WarmUpTime = 440;
         private const double resolutionInSeconds = 3600.0;
@@ -86,7 +87,7 @@ namespace QuantConnect.Algorithm.CSharp
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2021, 10, 20); // Set Start Date
-            SetEndDate(2021, 12, 25); // Set End Date
+            SetEndDate(2022, 08, 01); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -96,14 +97,15 @@ namespace QuantConnect.Algorithm.CSharp
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
             SetBenchmark(_symbol);
 
-            const int fastValue = 110;
-            const int slowValue = 220;
+            const int fastValue = 55;
+            const int slowValue = 110;
+            const int veryFastValue = 15;
             const int signal = 8;
 
             _slow_hullma = HMA(_symbol, slowValue, resolution);
             _fast_lsma = LSMA(_symbol, fastValue, resolution);
+            _very_fast_wma = LWMA(_symbol, veryFastValue, resolution);
 
-            
             _macd = MACD(_symbol, fastValue, slowValue*2, signal, MovingAverageType.Exponential, resolution);
             _psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
 
@@ -215,6 +217,10 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 Plot("Indicators", "LSMA", _fast_lsma);
             }
+            if(_very_fast_wma > 0)
+            {
+                Plot("Indicators", "WMA", _very_fast_wma);
+            }
             if (_psar > 0)
             {
                 Plot("Indicators", "PSAR", _psar);
@@ -285,11 +291,11 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = data[SymbolName].Value;
 
             bool is_macd_ok = _macd.Histogram.Current.Value > 0;
-            bool is_moving_averages_ok = _fast_lsma > _slow_hullma;
+            bool is_moving_averages_ok = _very_fast_wma > _fast_lsma;
             bool is_psar_ok = current_price > _psar;
             bool is_ao_ok = true; // _ao.AroonUp > 80;
 
-            return is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok*/ && is_ao_ok;
+            return is_moving_averages_ok /*&& is_psar_ok /*&& is_macd_ok && is_ao_ok*/;
         }
 
         private bool IsOkToSell(Slice data)
@@ -298,7 +304,7 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = data[SymbolName].Value;
             
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _fast_lsma < _slow_hullma; 
+            bool is_moving_averages_ok = _very_fast_wma < _fast_lsma && _very_fast_wma < _slow_hullma; 
             bool is_psar_ok = current_price < _psar;
             //bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
 
@@ -311,7 +317,7 @@ namespace QuantConnect.Algorithm.CSharp
                 //Log(body);
             }
 
-            bool is_gain_ok = /*is_moving_averages_ok*/  _fast_lsma <  0.95m *_maxFastLSMA  && is_price_ok;
+            bool is_gain_ok = is_moving_averages_ok && is_price_ok;
             bool is_stop_loss = is_moving_averages_ok ;
             return is_gain_ok;
 
