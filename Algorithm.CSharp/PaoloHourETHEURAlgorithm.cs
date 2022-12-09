@@ -39,6 +39,15 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="trading and orders" />
     public class PaoloHourETHEURAlgorithm : QCAlgorithm
     {
+        enum PurchaseStatus
+        {
+            Init,
+            Bought,
+            Sold,
+            ReadyToBuy,
+            ReadyToSell
+        };
+
         private HullMovingAverage _slow_hullma;
         private LeastSquaresMovingAverage _fast_lsma;
         private LinearWeightedMovingAverage _very_fast_wma;
@@ -46,9 +55,11 @@ namespace QuantConnect.Algorithm.CSharp
         private MovingAverageConvergenceDivergence _macd;
         private ParabolicStopAndReverse _psar;
 
-        private Maximum _maximumPrice;
+        private Maximum _maximum_price;
+        private decimal _maximum_price_after_buy = 0.0m;
+        private const decimal _stop_loss_percentage = 0.015m;
 
-        private int _bought = -1;
+        private PurchaseStatus _purchase_status = PurchaseStatus.Init;
         private decimal _bought_price = 0;
 
         private const string CryptoName = "ETH";
@@ -108,8 +119,9 @@ namespace QuantConnect.Algorithm.CSharp
             _macd = MACD(_symbol, fastValue, slowValue*2, signal, MovingAverageType.Exponential, resolution);
             _psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
 
-            _maximumPrice = MAX(_symbol, WarmUpTime, resolution);
-            
+            _maximum_price = MAX(_symbol, WarmUpTime, resolution);
+            _maximum_price_after_buy = _maximum_price;
+
             SetWarmUp(TimeSpan.FromDays(7));
 
         }
@@ -120,7 +132,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (Portfolio.CashBook[CryptoName].Amount > 0)
             {
                 Log(CryptoName + " amount in Portfolio: " + Portfolio.CashBook[CryptoName].Amount + " - Initialized to Bought");
-                _bought = 1;
+                _purchase_status = PurchaseStatus.Bought;
                 if (HasBoughtPriceFromPreviousSession)
                 {
                     string bought_price = ObjectStore.Read(LastBoughtObjectStoreKey);
@@ -132,7 +144,7 @@ namespace QuantConnect.Algorithm.CSharp
             else
             {
                 Log(CurrencyName + " amount in Portfolio: " + Portfolio.CashBook[CurrencyName].Amount + " - Initialized to Sold");
-                _bought = -1;
+                _purchase_status = PurchaseStatus.Sold;
                 if(HasSoldPriceFromPreviousSession)
                 {
                     string sold_price = ObjectStore.Read(LastSoldObjectStoreKey);
@@ -172,9 +184,9 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (IsWarmingUp)
             {
-                if(_bought < 0 && !HasSoldPriceFromPreviousSession)
+                if(_purchase_status < 0 && !HasSoldPriceFromPreviousSession)
                 {
-                    _sold_price = _maximumPrice;
+                    _sold_price = _maximum_price;
                 }
                 if (!_is_ready_to_trade)
                 {
@@ -231,10 +243,10 @@ namespace QuantConnect.Algorithm.CSharp
 #if LOG_INDICATORS
             Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
+            decimal current_price = Securities[SymbolName].Price;
 
-            if (_bought < 0)
+            if (_purchase_status < 0)
             {                
-                decimal current_price = Securities[SymbolName].Price;
                 if (IsOkToBuy(data))
                 {
                     const decimal round_multiplier = 1000m;
@@ -252,8 +264,9 @@ namespace QuantConnect.Algorithm.CSharp
 #endif
                 }
             }
-            else if (_bought > 0)
+            else if (_purchase_status > 0)
             {
+                _maximum_price_after_buy = Math.Max(current_price, _maximum_price_after_buy);
                 if (IsOkToSell(data))
                 {
 #if !(LIVE_NO_TRADE)
@@ -315,9 +328,16 @@ namespace QuantConnect.Algorithm.CSharp
             }
 
             bool is_gain_ok = is_moving_averages_ok && is_price_ok;
-            bool is_stop_loss = is_moving_averages_ok ;
-            return is_gain_ok;
 
+            return is_gain_ok || IsStopLoss(data);
+
+        }
+
+        private bool IsStopLoss(Slice data)
+        {
+            decimal current_price = data[SymbolName].Value;
+
+            return current_price < (1.0m - _stop_loss_percentage) * _maximum_price_after_buy;
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
@@ -331,26 +351,28 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (orderEvent.Direction == OrderDirection.Buy && orderEvent.Status == OrderStatus.Filled)
             {
-                _bought = 1;
+                _purchase_status = PurchaseStatus.Bought;
                 _bought_price = orderEvent.FillPrice;
                 ObjectStore.Save(LastBoughtObjectStoreKey, _bought_price.ToString(_culture_info));
+
+                _maximum_price_after_buy = _bought_price;
             }
 
             if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
             {
-                _bought = -1;
+                _purchase_status = PurchaseStatus.Sold;
                 _sold_price = orderEvent.FillPrice;
                 ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_culture_info));
             }
 
             if (orderEvent.Status == OrderStatus.Invalid)
             {
-                _bought = orderEvent.Direction == OrderDirection.Buy ? -1 : 1;
+                _purchase_status = orderEvent.Direction == OrderDirection.Buy ? PurchaseStatus.Sold : PurchaseStatus.Bought;
             }
 
             if (orderEvent.Status == OrderStatus.Submitted)
             {
-                _bought = 0;
+                //_purchase_status = 0;
             }
         }
 
