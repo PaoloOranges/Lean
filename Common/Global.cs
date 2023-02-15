@@ -151,16 +151,7 @@ namespace QuantConnect
         /// </summary>
         public override string ToString()
         {
-            var value = Invariant($"{Symbol.Value}: {Quantity} @ ") +
-                Invariant($"{CurrencySymbol}{AveragePrice} - ") +
-                Invariant($"Market: {CurrencySymbol}{MarketPrice}");
-
-            if (ConversionRate != 1m)
-            {
-                value += Invariant($" - Conversion: {ConversionRate}");
-            }
-
-            return value;
+            return Messages.Holding.ToString(this);
         }
     }
 
@@ -310,6 +301,11 @@ namespace QuantConnect
         /// For index options traded on American markets, they tend to be European-style options and are Cash-settled.
         /// </remarks>
         IndexOption,
+
+        /// <summary>
+        /// Crypto futures
+        /// </summary>
+        CryptoFuture,
     }
 
     /// <summary>
@@ -523,7 +519,7 @@ namespace QuantConnect
             Initialized = false;
             HasSubscribers = true;
             Status = AlgorithmStatus.Running;
-            ChartSubscription = "Strategy Equity";
+            ChartSubscription = Messages.AlgorithmControl.ChartSubscription;
         }
 
         /// <summary>
@@ -725,6 +721,25 @@ namespace QuantConnect
     }
 
     /// <summary>
+    /// The different types of <see cref="CashBook.Updated"/> events
+    /// </summary>
+    public enum CashBookUpdateType
+    {
+        /// <summary>
+        /// A new <see cref="Cash.Symbol"/> was added (0)
+        /// </summary>
+        Added,
+        /// <summary>
+        /// One or more <see cref="Cash"/> instances were removed (1)
+        /// </summary>
+        Removed,
+        /// <summary>
+        /// An existing <see cref="Cash.Symbol"/> was updated (2)
+        /// </summary>
+        Updated
+    }
+
+    /// <summary>
     /// Defines Lean exchanges codes and names
     /// </summary>
     public static class Exchanges
@@ -826,6 +841,12 @@ namespace QuantConnect
                         return Exchange.BOSTON;
                     case "BSE":
                         return Exchange.BSE;
+                    case "IEX":
+                        return Exchange.IEX;
+                    case "SMART":
+                        return Exchange.SMART;
+                    case "OTCX":
+                        return Exchange.OTCX;
                 }
             }
             else if (securityType == SecurityType.Option)

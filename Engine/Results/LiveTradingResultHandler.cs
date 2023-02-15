@@ -57,7 +57,7 @@ namespace QuantConnect.Lean.Engine.Results
         private DateTime _currentUtcDate;
 
         /// <summary>
-        /// The earliest time of next dump to the status file 
+        /// The earliest time of next dump to the status file
         /// </summary>
         protected DateTime NextStatusUpdate;
 
@@ -117,7 +117,7 @@ namespace QuantConnect.Lean.Engine.Results
             ExitEvent.WaitOne(3000);
 
             // -> 1. Run Primary Sender Loop: Continually process messages from queue as soon as they arrive.
-            while (!(ExitTriggered && Messages.Count == 0))
+            while (!(ExitTriggered && Messages.IsEmpty))
             {
                 try
                 {
@@ -131,7 +131,7 @@ namespace QuantConnect.Lean.Engine.Results
                     //2. Update the packet scanner:
                     Update();
 
-                    if (Messages.Count == 0)
+                    if (Messages.IsEmpty)
                     {
                         // prevent thread lock/tight loop when there's no work to be done
                         ExitEvent.WaitOne(Time.GetSecondUnevenWait(1000));
@@ -244,7 +244,7 @@ namespace QuantConnect.Lean.Engine.Results
                         var orderEvents = GetOrderEventsToStore();
 
                         var orders = new Dictionary<int, Order>(TransactionHandler.Orders);
-                        var complete = new LiveResultPacket(_job, new LiveResult(new LiveResultParameters(chartComplete, orders, Algorithm.Transactions.TransactionRecord, holdings, Algorithm.Portfolio.CashBook, deltaStatistics, runtimeStatistics, orderEvents, serverStatistics)));
+                        var complete = new LiveResultPacket(_job, new LiveResult(new LiveResultParameters(chartComplete, orders, Algorithm.Transactions.TransactionRecord, holdings, Algorithm.Portfolio.CashBook, deltaStatistics, runtimeStatistics, orderEvents, serverStatistics, state: GetAlgorithmState())));
                         StoreResult(complete);
                         _nextChartsUpdate = DateTime.UtcNow.Add(ChartUpdateInterval);
                         Log.Debug("LiveTradingResultHandler.Update(): End-store result");
@@ -276,7 +276,7 @@ namespace QuantConnect.Lean.Engine.Results
                                 _job.AlgorithmId,
                                 Algorithm.Portfolio.TotalUnrealizedProfit,
                                 Algorithm.Portfolio.TotalFees,
-                                Algorithm.Portfolio.TotalProfit,
+                                Algorithm.Portfolio.TotalNetProfit,
                                 Algorithm.Portfolio.TotalHoldingsValue,
                                 Algorithm.Portfolio.TotalPortfolioValue,
                                 GetNetReturn(),
@@ -587,6 +587,7 @@ namespace QuantConnect.Lean.Engine.Results
         {
             Messages.Enqueue(new RuntimeErrorPacket(_job.UserId, AlgorithmId, message, stacktrace));
             AddToLogStore(message + (!string.IsNullOrEmpty(stacktrace) ? ": StackTrace: " + stacktrace : string.Empty));
+            SetAlgorithmState(message, stacktrace);
         }
 
         /// <summary>
@@ -801,11 +802,14 @@ namespace QuantConnect.Lean.Engine.Results
 
                     //Create a packet:
                     result = new LiveResultPacket(_job,
-                        new LiveResult(new LiveResultParameters(charts, orders, profitLoss, new Dictionary<string, Holding>(), Algorithm.Portfolio.CashBook, statisticsResults.Summary, runtime, GetOrderEventsToStore())));
+                        new LiveResult(new LiveResultParameters(charts, orders, profitLoss, new Dictionary<string, Holding>(),
+                            Algorithm.Portfolio.CashBook, statisticsResults.Summary, runtime, GetOrderEventsToStore(),
+                            algorithmConfiguration: AlgorithmConfiguration.Create(Algorithm), state: GetAlgorithmState(DateTime.UtcNow.ToStringInvariant()))));
                 }
                 else
                 {
                     result = LiveResultPacket.CreateEmpty(_job);
+                    result.Results.State = GetAlgorithmState(DateTime.UtcNow.ToStringInvariant());
                 }
                 result.ProcessingTime = (DateTime.UtcNow - StartTime).TotalSeconds;
 
@@ -980,6 +984,8 @@ namespace QuantConnect.Lean.Engine.Results
                 SendFinalResult();
 
                 base.Exit();
+
+                _cancellationTokenSource.DisposeSafely();
             }
         }
 
@@ -1068,8 +1074,8 @@ namespace QuantConnect.Lean.Engine.Results
             }
 
             //Send all the notification messages but timeout within a second, or if this is a force process, wait till its done.
-            var start = DateTime.UtcNow;
-            while (Algorithm.Notify.Messages.Count > 0 && (DateTime.UtcNow < start.AddSeconds(1) || forceProcess))
+            var timeout = DateTime.UtcNow.AddSeconds(1);
+            while (!Algorithm.Notify.Messages.IsEmpty && (DateTime.UtcNow < timeout || forceProcess))
             {
                 Notification message;
                 if (Algorithm.Notify.Messages.TryDequeue(out message))

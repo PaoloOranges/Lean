@@ -148,6 +148,7 @@ namespace QuantConnect.Tests.Common.Securities.Futures
         [TestCase(QuantConnect.Securities.Futures.Currencies.AUDJPY, NineSixteenCentralTime)]
         [TestCase(QuantConnect.Securities.Futures.Currencies.AUDNZD, NineSixteenCentralTime)]
         [TestCase(QuantConnect.Securities.Futures.Currencies.BTC, FourPMLondonTime)]
+        [TestCase(QuantConnect.Securities.Futures.Currencies.ETH, FourPMLondonTime)]
         [TestCase(QuantConnect.Securities.Futures.Currencies.CADJPY, NineSixteenCentralTime)]
         [TestCase(QuantConnect.Securities.Futures.Currencies.StandardSizeUSDOffshoreRMBCNH, ElevenAmHongKongTime)]
         [TestCase(QuantConnect.Securities.Futures.Currencies.EuroFXEmini, NineSixteenCentralTime)]
@@ -157,6 +158,7 @@ namespace QuantConnect.Tests.Common.Securities.Futures
         [TestCase(QuantConnect.Securities.Futures.Currencies.JapaneseYenEmini, NineSixteenCentralTime)]
         [TestCase(QuantConnect.Securities.Futures.Currencies.MicroEUR, NineSixteenCentralTime)]
         [TestCase(QuantConnect.Securities.Futures.Currencies.MicroBTC, FourPMLondonTime)]
+        [TestCase(QuantConnect.Securities.Futures.Currencies.MicroEther, FourPMLondonTime)]
         public void CurrenciesExpiryDateFunction_WithDifferentDates_ShouldFollowContract(string symbol, string dayTime)
         {
             Assert.IsTrue(_data.ContainsKey(symbol), "Symbol " + symbol + " not present in Test Data");
@@ -263,6 +265,28 @@ namespace QuantConnect.Tests.Common.Securities.Futures
                 //Assert
                 Assert.AreEqual(expected, actual, "Failed for symbol: " + symbol);
             }
+        }
+
+        // 25th is a sunday
+        [TestCase(QuantConnect.Securities.Futures.Energies.MicroCrudeOilWTI, "20221001", "20220919")]
+        [TestCase(QuantConnect.Securities.Futures.Energies.CrudeOilWTI, "20221001", "20220920")]
+        // 25th is a tuesday
+        [TestCase(QuantConnect.Securities.Futures.Energies.MicroCrudeOilWTI, "20221101", "20221019")]
+        [TestCase(QuantConnect.Securities.Futures.Energies.CrudeOilWTI, "20221101", "20221020")]
+        // 25th is a friday but includes thanks giving
+        [TestCase(QuantConnect.Securities.Futures.Energies.MicroCrudeOilWTI, "20221201", "20221118")]
+        [TestCase(QuantConnect.Securities.Futures.Energies.CrudeOilWTI, "20221201", "20221121")]
+        public void MicroCrudeOilExpiration(string symbol, string dateStr, string expectedDate)
+        {
+            var date = Time.ParseDate(dateStr);
+            var expected = Time.ParseDate(expectedDate);
+
+            var futureSymbol = GetFutureSymbol(symbol, date);
+            var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
+
+            var actual = func(futureSymbol.ID.Date);
+
+            Assert.AreEqual(expected, actual, $"Failed for symbol: {symbol}. Date {dateStr}");
         }
 
         [TestCase(QuantConnect.Securities.Futures.Financials.EuroDollar, ElevenOclock)]

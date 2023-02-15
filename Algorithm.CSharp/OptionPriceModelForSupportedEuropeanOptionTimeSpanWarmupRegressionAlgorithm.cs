@@ -18,7 +18,7 @@ using System;
 namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
-    /// Regression algorithm excersizing an index covered European style option, using an option price model
+    /// Regression algorithm exercising an index covered European style option, using an option price model
     /// that supports European style options and asserting that the option price model is used.
     /// </summary>
     public class OptionPriceModelForSupportedEuropeanOptionTimeSpanWarmupRegressionAlgorithm : OptionPriceModelForSupportedEuropeanOptionRegressionAlgorithm
@@ -36,6 +36,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 1404;
+        public override long DataPoints => 1393;
     }
 }

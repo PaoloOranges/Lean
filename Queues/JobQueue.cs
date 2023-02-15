@@ -44,6 +44,7 @@ namespace QuantConnect.Queues
         private const string DefaultDataChannelProvider = "DataChannelProvider";
         private bool _liveMode = Config.GetBool("live-mode");
         private static readonly string AccessToken = Config.Get("api-access-token");
+        private static readonly string Channel = Config.Get("data-channel");
         private static readonly string OrganizationId = Config.Get("job-organization-id");
         private static readonly int UserId = Config.GetInt("job-user-id", 0);
         private static readonly int ProjectId = Config.GetInt("job-project-id", 0);
@@ -118,8 +119,8 @@ namespace QuantConnect.Queues
                 TickLimit = Config.GetInt("symbol-tick-limit", 10000),
                 RamAllocation = int.MaxValue,
                 MaximumDataPointsPerChartSeries = Config.GetInt("maximum-data-points-per-chart-series", 4000),
-                StorageLimitMB = Config.GetInt("storage-limit-mb", 5),
-                StorageFileCount = Config.GetInt("storage-file-count", 100),
+                StorageLimit = Config.GetValue("storage-limit", 10737418240L),
+                StorageFileCount = Config.GetInt("storage-file-count", 10000),
                 StoragePermissions = (FileAccess)Config.GetInt("storage-permissions", (int)FileAccess.ReadWrite)
             };
 
@@ -137,7 +138,7 @@ namespace QuantConnect.Queues
                     HistoryProvider = Config.Get("history-provider", DefaultHistoryProvider),
                     DataQueueHandler = dataHandlers,
                     DataChannelProvider = Config.Get("data-channel-provider", DefaultDataChannelProvider),
-                    Channel = AccessToken,
+                    Channel = Channel,
                     UserToken = AccessToken,
                     UserId = UserId,
                     ProjectId = ProjectId,
@@ -146,7 +147,8 @@ namespace QuantConnect.Queues
                     DeployId = algorithmId,
                     Parameters = parameters,
                     Language = Language,
-                    Controls = controls
+                    Controls = controls,
+                    PythonVirtualEnvironment = Config.Get("python-venv")
                 };
 
                 Type brokerageName = null;
@@ -201,7 +203,7 @@ namespace QuantConnect.Queues
                 Type = PacketType.BacktestNode,
                 Algorithm = File.ReadAllBytes(AlgorithmLocation),
                 HistoryProvider = Config.Get("history-provider", DefaultHistoryProvider),
-                Channel = AccessToken,
+                Channel = Channel,
                 UserToken = AccessToken,
                 UserId = UserId,
                 ProjectId = ProjectId,
@@ -210,7 +212,8 @@ namespace QuantConnect.Queues
                 BacktestId = algorithmId,
                 Language = Language,
                 Parameters = parameters,
-                Controls = controls
+                Controls = controls,
+                PythonVirtualEnvironment = Config.Get("python-venv")
             };
 
             return backtestJob;
@@ -231,7 +234,7 @@ namespace QuantConnect.Queues
 
                 // Add this directory to our Python Path so it may be imported properly
                 var pythonFile = new FileInfo(AlgorithmLocation);
-                PythonInitializer.AddPythonPaths(new string[] { pythonFile.Directory.FullName });
+                PythonInitializer.AddAlgorithmLocationPath(pythonFile.Directory.FullName);
             }
 
             return AlgorithmLocation;

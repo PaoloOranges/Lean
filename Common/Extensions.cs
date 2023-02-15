@@ -197,7 +197,7 @@ namespace QuantConnect
                 }
                 catch (WebException ex)
                 {
-                    Log.Error(ex, $"DownloadData(): failed for: '{url}'");
+                    Log.Error(ex, $"DownloadData(): {Messages.Extensions.DownloadDataFailed(url)}");
                     return null;
                 }
             }
@@ -217,7 +217,7 @@ namespace QuantConnect
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, $"DownloadByteArray(): failed for: '{url}'");
+                    Log.Error(ex, $"DownloadByteArray(): {Messages.Extensions.DownloadDataFailed(url)}");
                     return null;
                 }
             }
@@ -301,12 +301,7 @@ namespace QuantConnect
         /// <remarks>The value of this method is normalization</remarks>
         public static string GetZeroPriceMessage(this Symbol symbol)
         {
-            return $"{symbol}: The security does not have an accurate price as it has not yet received a bar of data. " +
-                   "Before placing a trade (or using SetHoldings) warm up your algorithm with SetWarmup, or use slice.Contains(symbol)" +
-                   " to confirm the Slice object has price before using the data. Data does not necessarily all arrive at the same" +
-                   " time so your algorithm should confirm the data is ready before using it. In live trading this can mean you do" +
-                   " not have an active subscription to the asset class you're trying to trade. If using custom data make sure you've" +
-                   " set the 'Value' property.";
+            return Messages.Extensions.ZeroPriceForSecurity(symbol);
         }
 
         /// <summary>
@@ -408,11 +403,11 @@ namespace QuantConnect
                     {
                         token.Cancel(false);
                     }
-                    Log.Trace($"StopSafely(): waiting for '{thread.Name}' thread to stop...");
+                    Log.Trace($"StopSafely(): {Messages.Extensions.WaitingForThreadToStopSafely(thread.Name)}");
                     // just in case we add a time out
                     if (!thread.Join(timeout))
                     {
-                        Log.Error($"StopSafely(): Timeout waiting for '{thread.Name}' thread to stop");
+                        Log.Error($"StopSafely(): {Messages.Extensions.TimeoutWaitingForThreadToStopSafely(thread.Name)}");
                     }
                 }
                 catch (Exception exception)
@@ -626,15 +621,14 @@ namespace QuantConnect
             var objectActivator = ObjectActivator.GetActivator(type);
             if (objectActivator == null)
             {
-                throw new ArgumentException($"Data type \'{type.Name}\' missing parameterless constructor " +
-                    $"E.g. public {type.Name}() {{ }}");
+                throw new ArgumentException(Messages.Extensions.DataTypeMissingParameterlessConstructor(type));
             }
 
             var instance = objectActivator.Invoke(new object[] { type });
             if(instance == null)
             {
                 // shouldn't happen but just in case...
-                throw new ArgumentException($"Failed to create instance of type \'{type.Name}\'");
+                throw new ArgumentException(Messages.Extensions.FailedToCreateInstanceOfType(type));
             }
 
             // we expect 'instance' to inherit BaseData in most cases so we use 'as' versus 'IsAssignableFrom'
@@ -642,7 +636,7 @@ namespace QuantConnect
             var result = instance as BaseData;
             if (result == null)
             {
-                throw new ArgumentException($"Data type \'{type.Name}\' does not inherit required {nameof(BaseData)}");
+                throw new ArgumentException(Messages.Extensions.TypeIsNotBaseData(type));
             }
             return result;
         }
@@ -1178,7 +1172,7 @@ namespace QuantConnect
             if (input.IsNaNOrInfinity())
             {
                 throw new ArgumentException(
-                    $"It is not possible to cast a non-finite floating-point value ({input}) as decimal. Please review math operations and verify the result is valid.",
+                    Messages.Extensions.CannotCastNonFiniteFloatingPointValueToDecimal(input),
                     nameof(input),
                     new NotFiniteNumberException(input)
                 );
@@ -1884,7 +1878,7 @@ namespace QuantConnect
                 if (Time.OneMinute == timeSpan) return Resolution.Minute;
                 if (Time.OneHour   == timeSpan) return Resolution.Hour;
                 if (Time.OneDay    == timeSpan) return Resolution.Daily;
-                throw new InvalidOperationException(Invariant($"Unable to exactly convert time span ('{timeSpan}') to resolution."));
+                throw new InvalidOperationException(Messages.Extensions.UnableToConvertTimeSpanToResolution(timeSpan));
             }
 
             // for non-perfect matches
@@ -1915,7 +1909,7 @@ namespace QuantConnect
 
             if (InvalidSecurityTypes.Add(value))
             {
-                Log.Error($"Extensions.TryParseSecurityType(): Attempted to parse unknown SecurityType: {value}");
+                Log.Error($"Extensions.TryParseSecurityType(): {Messages.Extensions.UnableToParseUnknownSecurityType(value)}");
             }
 
             return false;
@@ -2108,6 +2102,7 @@ namespace QuantConnect
                 case SecurityType.Future:
                 case SecurityType.Cfd:
                 case SecurityType.Crypto:
+                case SecurityType.CryptoFuture:
                 case SecurityType.Index:
                 case SecurityType.IndexOption:
                     return true;
@@ -2169,7 +2164,7 @@ namespace QuantConnect
         {
             if (!securityType.HasOptions() && !securityType.IsOption())
             {
-                throw new ArgumentException($"The SecurityType {securityType} has no default OptionStyle, because it has no options available for it");
+                throw new ArgumentException(Messages.Extensions.NoDefaultOptionStyleForSecurityType(securityType));
             }
 
             switch (securityType)
@@ -2198,7 +2193,7 @@ namespace QuantConnect
                 case "european":
                     return OptionStyle.European;
                 default:
-                    throw new ArgumentException($"Unexpected OptionStyle: {optionStyle}");
+                    throw new ArgumentException(Messages.Extensions.UnknownOptionStyle(optionStyle));
             }
         }
 
@@ -2217,7 +2212,7 @@ namespace QuantConnect
                 case "put":
                     return OptionRight.Put;
                 default:
-                    throw new ArgumentException($"Unexpected OptionRight: {optionRight}");
+                    throw new ArgumentException(Messages.Extensions.UnknownOptionRight(optionRight));
             }
         }
 
@@ -2256,7 +2251,7 @@ namespace QuantConnect
                 case OptionRight.Put:
                     return "put";
                 default:
-                    throw new ArgumentException($"Unexpected OptionRight: {optionRight}");
+                    throw new ArgumentException(Messages.Extensions.UnknownOptionRight(optionRight));
             }
         }
 
@@ -2275,7 +2270,7 @@ namespace QuantConnect
                 case OptionStyle.European:
                     return "european";
                 default:
-                    throw new ArgumentException($"Unexpected OptionStyle: {optionStyle}");
+                    throw new ArgumentException(Messages.Extensions.UnknownOptionStyle(optionStyle));
             }
         }
 
@@ -2306,7 +2301,7 @@ namespace QuantConnect
                 case "openinterestannual":
                     return DataMappingMode.OpenInterestAnnual;
                 default:
-                    throw new ArgumentException($"Unexpected DataMappingMode: {dataMappingMode}");
+                    throw new ArgumentException(Messages.Extensions.UnknownDataMappingMode(dataMappingMode));
             }
         }
 
@@ -2342,6 +2337,8 @@ namespace QuantConnect
                     return "cfd";
                 case SecurityType.Crypto:
                     return "crypto";
+                case SecurityType.CryptoFuture:
+                    return "cryptofuture";
                 default:
                     // just in case
                     return securityType.ToLower();
@@ -2411,6 +2408,7 @@ namespace QuantConnect
             switch (order.Type)
             {
                 case OrderType.Limit:
+                case OrderType.ComboLegLimit:
                     var limitOrder = order as LimitOrder;
                     limitPrice = limitOrder.LimitPrice;
                     break;
@@ -2432,8 +2430,12 @@ namespace QuantConnect
                 case OrderType.Market:
                 case OrderType.MarketOnOpen:
                 case OrderType.MarketOnClose:
+                case OrderType.ComboMarket:
                     limitPrice = order.Price;
                     stopPrice = order.Price;
+                    break;
+                case OrderType.ComboLimit:
+                    limitPrice = order.GroupOrderManager.LimitPrice;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -2448,7 +2450,8 @@ namespace QuantConnect
                 triggerPrice,
                 order.Time,
                 order.Tag,
-                order.Properties);
+                order.Properties,
+                order.GroupOrderManager);
 
             submitOrderRequest.SetOrderId(order.Id);
             var orderTicket = new OrderTicket(transactionManager, submitOrderRequest);
@@ -2606,7 +2609,7 @@ namespace QuantConnect
 
             if (!typeof(MulticastDelegate).IsAssignableFrom(type))
             {
-                throw new ArgumentException($"TryConvertToDelegate cannot be used to convert a PyObject into {type}.");
+                throw new ArgumentException(Messages.Extensions.ConvertToDelegateCannotConverPyObjectToType("TryConvertToDelegate", type));
             }
 
             result = default(T);
@@ -2671,7 +2674,7 @@ namespace QuantConnect
                 return pyObject.AsManagedObject(typeToConvertTo);
             }
         }
-        
+
         /// <summary>
         /// Converts a Python function to a managed function returning a Symbol
         /// </summary>
@@ -2739,7 +2742,7 @@ namespace QuantConnect
             }
             else
             {
-                throw new ArgumentException($"ConvertToDelegate cannot be used to convert a PyObject into {typeof(T)}.");
+                throw new ArgumentException(Messages.Extensions.ConvertToDelegateCannotConverPyObjectToType("ConvertToDelegate", typeof(T)));
             }
         }
 
@@ -2777,10 +2780,7 @@ namespace QuantConnect
                 }
                 catch (Exception e)
                 {
-                    throw new ArgumentException(
-                        $"ConvertToDictionary cannot be used to convert a {inputType} into {targetType}. Reason: {e.Message}",
-                        e
-                    );
+                    throw new ArgumentException(Messages.Extensions.ConvertToDictionaryFailed(inputType, targetType, e.Message), e);
                 }
             }
 
@@ -2817,11 +2817,7 @@ namespace QuantConnect
                         }
                         catch (Exception e)
                         {
-                            throw new ArgumentException(
-                                "Argument type should be Symbol or a list of Symbol. " +
-                                $"Object: {item}. Type: {item.GetPythonType()}",
-                                e
-                            );
+                            throw new ArgumentException(Messages.Extensions.ConvertToSymbolEnumerableFailed(item), e);
                         }
 
                         yield return symbol;
@@ -2869,7 +2865,7 @@ namespace QuantConnect
             {
                 using (Py.GIL())
                 {
-                    throw new ArgumentException($"GetEnumString(): {pyObject.Repr()} is not a C# Type.");
+                    throw new ArgumentException($"GetEnumString(): {Messages.Extensions.ObjectFromPythonIsNotACSharpType(pyObject.Repr())}");
                 }
             }
         }
@@ -3005,9 +3001,27 @@ namespace QuantConnect
         /// <returns></returns>
         public static string RemoveFromEnd(this string s, string ending)
         {
-            if (s.EndsWith(ending))
+            if (s.EndsWith(ending, StringComparison.InvariantCulture))
             {
                 return s.Substring(0, s.Length - ending.Length);
+            }
+            else
+            {
+                return s;
+            }
+        }
+
+        /// <summary>
+        /// Returns a new string in which specified start in the current instance is removed.
+        /// </summary>
+        /// <param name="s">original string value</param>
+        /// <param name="start">the string to be removed</param>
+        /// <returns>Substring with start removed</returns>
+        public static string RemoveFromStart(this string s, string start)
+        {
+            if (!string.IsNullOrEmpty(s) && !string.IsNullOrEmpty(start) && s.StartsWith(start, StringComparison.InvariantCulture))
+            {
+                return s.Substring(start.Length);
             }
             else
             {
@@ -3076,7 +3090,7 @@ namespace QuantConnect
         {
             if (symbol.SecurityType != SecurityType.Future || symbol.IsCanonical())
             {
-                throw new InvalidOperationException("Adjusting a symbol by an offset is currently only supported for non canonical futures");
+                throw new InvalidOperationException(Messages.Extensions.ErrorAdjustingSymbolByOffset);
             }
 
             var expiration = symbol.ID.Date;
@@ -3138,7 +3152,7 @@ namespace QuantConnect
         {
             if(dataProvider == null)
             {
-                throw new ArgumentException($"The provided '{nameof(IDataProvider)}' instance is null. Are you missing some initialization step?");
+                throw new ArgumentException(Messages.Extensions.NullDataProvider);
             }
             var stream = dataProvider.Fetch(file);
             if (stream == null)
@@ -3165,11 +3179,13 @@ namespace QuantConnect
         /// Scale data based on factor function
         /// </summary>
         /// <param name="data">Data to Adjust</param>
-        /// <param name="factor">Function to factor prices by</param>
+        /// <param name="factorFunc">Function to factor prices by</param>
         /// <param name="volumeFactor">Factor to multiply volume/askSize/bidSize/quantity by</param>
+        /// <param name="factor">Price scale</param>
+        /// <param name="sumOfDividends">The current dividend sum</param>
         /// <remarks>Volume values are rounded to the nearest integer, lot size purposefully not considered
         /// as scaling only applies to equities</remarks>
-        public static BaseData Scale(this BaseData data, Func<decimal, decimal> factor, decimal volumeFactor)
+        public static BaseData Scale(this BaseData data, Func<decimal, decimal, decimal, decimal> factorFunc, decimal volumeFactor, decimal factor, decimal sumOfDividends)
         {
             switch (data.DataType)
             {
@@ -3177,10 +3193,10 @@ namespace QuantConnect
                     var tradeBar = data as TradeBar;
                     if (tradeBar != null)
                     {
-                        tradeBar.Open = factor(tradeBar.Open);
-                        tradeBar.High = factor(tradeBar.High);
-                        tradeBar.Low = factor(tradeBar.Low);
-                        tradeBar.Close = factor(tradeBar.Close);
+                        tradeBar.Open = factorFunc(tradeBar.Open, factor, sumOfDividends);
+                        tradeBar.High = factorFunc(tradeBar.High, factor, sumOfDividends);
+                        tradeBar.Low = factorFunc(tradeBar.Low, factor, sumOfDividends);
+                        tradeBar.Close = factorFunc(tradeBar.Close, factor, sumOfDividends);
                         tradeBar.Volume = Math.Round(tradeBar.Volume * volumeFactor);
                     }
                     break;
@@ -3201,14 +3217,14 @@ namespace QuantConnect
 
                     if (tick.TickType == TickType.Trade)
                     {
-                        tick.Value = factor(tick.Value);
+                        tick.Value = factorFunc(tick.Value, factor, sumOfDividends);
                         tick.Quantity = Math.Round(tick.Quantity * volumeFactor);
                         break;
                     }
 
-                    tick.BidPrice = tick.BidPrice != 0 ? factor(tick.BidPrice) : 0;
+                    tick.BidPrice = tick.BidPrice != 0 ? factorFunc(tick.BidPrice, factor, sumOfDividends) : 0;
                     tick.BidSize = Math.Round(tick.BidSize * volumeFactor);
-                    tick.AskPrice = tick.AskPrice != 0 ? factor(tick.AskPrice) : 0;
+                    tick.AskPrice = tick.AskPrice != 0 ? factorFunc(tick.AskPrice, factor, sumOfDividends) : 0;
                     tick.AskSize = Math.Round(tick.AskSize * volumeFactor);
 
                     if (tick.BidPrice == 0)
@@ -3230,17 +3246,17 @@ namespace QuantConnect
                     {
                         if (quoteBar.Ask != null)
                         {
-                            quoteBar.Ask.Open = factor(quoteBar.Ask.Open);
-                            quoteBar.Ask.High = factor(quoteBar.Ask.High);
-                            quoteBar.Ask.Low = factor(quoteBar.Ask.Low);
-                            quoteBar.Ask.Close = factor(quoteBar.Ask.Close);
+                            quoteBar.Ask.Open = factorFunc(quoteBar.Ask.Open, factor, sumOfDividends);
+                            quoteBar.Ask.High = factorFunc(quoteBar.Ask.High, factor, sumOfDividends);
+                            quoteBar.Ask.Low = factorFunc(quoteBar.Ask.Low, factor, sumOfDividends);
+                            quoteBar.Ask.Close = factorFunc(quoteBar.Ask.Close, factor, sumOfDividends);
                         }
                         if (quoteBar.Bid != null)
                         {
-                            quoteBar.Bid.Open = factor(quoteBar.Bid.Open);
-                            quoteBar.Bid.High = factor(quoteBar.Bid.High);
-                            quoteBar.Bid.Low = factor(quoteBar.Bid.Low);
-                            quoteBar.Bid.Close = factor(quoteBar.Bid.Close);
+                            quoteBar.Bid.Open = factorFunc(quoteBar.Bid.Open, factor, sumOfDividends);
+                            quoteBar.Bid.High = factorFunc(quoteBar.Bid.High, factor, sumOfDividends);
+                            quoteBar.Bid.Low = factorFunc(quoteBar.Bid.Low, factor, sumOfDividends);
+                            quoteBar.Bid.Close = factorFunc(quoteBar.Bid.Close, factor, sumOfDividends);
                         }
                         quoteBar.Value = quoteBar.Close;
                         quoteBar.LastAskSize = Math.Round(quoteBar.LastAskSize * volumeFactor);
@@ -3272,21 +3288,62 @@ namespace QuantConnect
             {
                 case DataNormalizationMode.Adjusted:
                 case DataNormalizationMode.SplitAdjusted:
-                    return data?.Scale(p => p * factor, 1/factor);
+                    return data?.Scale(TimesFactor, 1/factor, factor, decimal.Zero);
                 case DataNormalizationMode.TotalReturn:
-                    return data.Scale(p => p * factor + sumOfDividends, 1/factor);
+                    return data.Scale(TimesFactor, 1/factor, factor, sumOfDividends);
 
                 case DataNormalizationMode.BackwardsRatio:
-                    return data.Scale(p => p * factor, 1);
+                    return data.Scale(TimesFactor, 1, factor, decimal.Zero);
                 case DataNormalizationMode.BackwardsPanamaCanal:
-                    return data.Scale(p => p + factor, 1);
+                    return data.Scale(AdditionFactor, 1, factor, decimal.Zero);
                 case DataNormalizationMode.ForwardPanamaCanal:
-                    return data.Scale(p => p + factor, 1);
+                    return data.Scale(AdditionFactor, 1, factor, decimal.Zero);
 
                 case DataNormalizationMode.Raw:
                 default:
                     return data;
             }
+        }
+
+        /// <summary>
+        /// Applies a times factor. We define this so we don't need to create it constantly
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static decimal TimesFactor(decimal target, decimal factor, decimal sumOfDividends)
+        {
+            return target * factor + sumOfDividends;
+        }
+
+        /// <summary>
+        /// Applies an addition factor. We define this so we don't need to create it constantly
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static decimal AdditionFactor(decimal target, decimal factor, decimal _)
+        {
+            return target + factor;
+        }
+
+        /// <summary>
+        /// Helper method to determine if price scales need an update based on the given data point
+        /// </summary>
+        public static DateTime GetUpdatePriceScaleFrontier(this BaseData data)
+        {
+            if (data != null)
+            {
+                var priceScaleFrontier = data.Time;
+                if (data.Time.Date != data.EndTime.Date && data.EndTime.TimeOfDay > TimeSpan.Zero)
+                {
+                    // if the data point goes from one day to another after midnight we use EndTime, this is due to differences between 'data' and 'exchage' time zone,
+                    // for example: NYMEX future CL 'data' TZ is UTC while 'exchange' TZ is NY, so daily bars go from 8PM 'X day' to 8PM 'X+1 day'. Note that the data
+                    // in the daily bar itself is filtered by exchange open, so it has data from 09:30 'X+1 day' to 17:00 'X+1 day' as expected.
+                    // A potential solution to avoid the need of this check is to adjust the daily data time zone to match the exchange time zone, following this example above
+                    // the daily bar would go from midnight X+1 day to midnight X+2
+                    // TODO: see related issue https://github.com/QuantConnect/Lean/issues/6964 which would avoid the need for this
+                    priceScaleFrontier = data.EndTime;
+                }
+                return priceScaleFrontier;
+            }
+            return DateTime.MinValue;
         }
 
         /// <summary>
@@ -3353,7 +3410,7 @@ namespace QuantConnect
         {
             if (source == null || source.Length == 0)
             {
-                throw new ArgumentException($"Source cannot be null or empty.");
+                throw new ArgumentException(Messages.Extensions.NullOrEmptySourceToConvertToHexString);
             }
 
             var hex = new StringBuilder(source.Length * 2);
@@ -3430,7 +3487,7 @@ namespace QuantConnect
         /// </summary>
         public static void SetRuntimeError(this IAlgorithm algorithm, Exception exception, string context)
         {
-            Log.Error(exception, $"Extensions.SetRuntimeError(): RuntimeError at {algorithm.UtcTime} UTC. Context: {context}");
+            Log.Error(exception, $"Extensions.SetRuntimeError(): {Messages.Extensions.RuntimeError(algorithm, context)}");
             exception = StackExceptionInterpreter.Instance.Value.Interpret(exception);
             algorithm.RunTimeError = exception;
             algorithm.SetStatus(AlgorithmStatus.RuntimeError);
@@ -3448,7 +3505,7 @@ namespace QuantConnect
         {
             if (!symbol.SecurityType.IsOption())
             {
-                throw new ArgumentException("CreateOptionChain requires an option symbol.");
+                throw new ArgumentException(Messages.Extensions.CreateOptionChainRequiresOptionSymbol);
             }
 
             // rewrite non-canonical symbols to be canonical
@@ -3500,7 +3557,7 @@ namespace QuantConnect
             // force option chain security to not be directly tradable AFTER it's configured to ensure it's not overwritten
             optionChain.IsTradable = false;
 
-            return new OptionChainUniverse(optionChain, settings, algorithm.LiveMode);
+            return new OptionChainUniverse(optionChain, settings);
         }
 
         /// <summary>
@@ -3562,7 +3619,7 @@ namespace QuantConnect
         /// <summary>
         /// Centralized logic used at the top of the subscription enumerator stacks to determine if we should emit base data points
         /// based on the configuration for this subscription and the type of data we are handling.
-        /// 
+        ///
         /// Currently we only want to emit split/dividends/delisting events for non internal <see cref="TradeBar"/> configurations
         /// this last part is because equities also have <see cref="QuoteBar"/> subscriptions which will also subscribe to the
         /// same aux events and we don't want duplicate emits of these events in the TimeSliceFactory
@@ -3577,8 +3634,8 @@ namespace QuantConnect
         /// Reference PR #5485 and related issues for more.</remarks>
         public static bool ShouldEmitData(this SubscriptionDataConfig config, BaseData data, bool isUniverse = false)
         {
-            // For now we are only filtering Auxiliary data; so if its another type just return true
-            if (data.DataType != MarketDataType.Auxiliary)
+            // For now we are only filtering Auxiliary data; so if its another type just return true or if it's a margin interest rate which we want to emit always
+            if (data.DataType != MarketDataType.Auxiliary || config.Type == typeof(MarginInterestRate))
             {
                 return true;
             }
@@ -3605,7 +3662,7 @@ namespace QuantConnect
             {
                 return (data as Delisting)?.Type == DelistingType.Delisted;
             }
-            
+
             if (!(type == typeof(Delisting) || type == typeof(Split) || type == typeof(Dividend)))
             {
                 return true;
@@ -3737,6 +3794,49 @@ namespace QuantConnect
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// Gets the greatest common divisor of a list of numbers
+        /// </summary>
+        /// <param name="values">List of numbers which greatest common divisor is requested</param>
+        /// <returns>The greatest common divisor for the given list of numbers</returns>
+        public static int GreatestCommonDivisor(this IEnumerable<int> values)
+        {
+            int? result = null;
+            foreach (var value in values)
+            {
+                if (result.HasValue)
+                {
+                    result = GreatestCommonDivisor(result.Value, value);
+                }
+                else
+                {
+                    result = value;
+                }
+            }
+
+            if (!result.HasValue)
+            {
+                throw new ArgumentException(Messages.Extensions.GreatestCommonDivisorEmptyList);
+            }
+
+            return result.Value;
+        }
+
+        /// <summary>
+        /// Gets the greatest common divisor of two numbers
+        /// </summary>
+        private static int GreatestCommonDivisor(int a, int b)
+        {
+            int remainder;
+            while (b != 0)
+            {
+                remainder = a % b;
+                a = b;
+                b = remainder;
+            }
+            return Math.Abs(a);
         }
     }
 }

@@ -18,14 +18,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using QuantConnect.Data;
 using System.Collections.Concurrent;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Util;
-using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Securities
 {
@@ -40,7 +38,7 @@ namespace QuantConnect.Securities
         /// Event fired when a <see cref="Cash"/> instance is added or removed, and when
         /// the <see cref="Cash.Updated"/> is triggered for the currently hold instances
         /// </summary>
-        public event EventHandler<UpdateType> Updated;
+        public event EventHandler<CashBookUpdatedEventArgs> Updated;
 
         /// <summary>
         /// Gets the base currency used
@@ -92,10 +90,12 @@ namespace QuantConnect.Securities
         /// <param name="quantity">The amount of new cash to start</param>
         /// <param name="conversionRate">The conversion rate used to determine the initial
         /// portfolio value/starting capital impact caused by this currency position.</param>
-        public void Add(string symbol, decimal quantity, decimal conversionRate)
+        /// <returns>The added cash instance</returns>
+        public Cash Add(string symbol, decimal quantity, decimal conversionRate)
         {
             var cash = new Cash(symbol, quantity, conversionRate);
-            Add(symbol, cash);
+            // let's return the cash instance we are using
+            return AddIternal(symbol, cash);
         }
 
         /// <summary>
@@ -158,12 +158,12 @@ namespace QuantConnect.Securities
 
             if (source.ConversionRate == 0)
             {
-                throw new ArgumentException($"The conversion rate for {sourceCurrency} is not available.");
+                throw new ArgumentException(Messages.CashBook.ConversionRateNotFound(sourceCurrency));
             }
 
             if (destination.ConversionRate == 0)
             {
-                throw new ArgumentException($"The conversion rate for {destinationCurrency} is not available.");
+                throw new ArgumentException(Messages.CashBook.ConversionRateNotFound(destinationCurrency));
             }
 
             var conversionRate = source.ConversionRate / destination.ConversionRate;
@@ -194,19 +194,7 @@ namespace QuantConnect.Securities
         /// <filterpriority>2</filterpriority>
         public override string ToString()
         {
-            var sb = new StringBuilder();
-            sb.AppendLine(Invariant($"Symbol {"Quantity",13}    {"Conversion",10} = Value in {AccountCurrency}"));
-            foreach (var value in _currencies.Select(x => x.Value))
-            {
-                sb.AppendLine(value.ToString(AccountCurrency));
-            }
-            sb.AppendLine("-------------------------------------------------");
-            sb.AppendLine("CashBook Total Value:                " +
-                Invariant($"{Currencies.GetCurrencySymbol(AccountCurrency)}") +
-                Invariant($"{Math.Round(TotalValueInAccountCurrency, 2).ToStringInvariant()}")
-            );
-
-            return sb.ToString();
+            return Messages.CashBook.ToString(this);
         }
 
         #region IDictionary Implementation
@@ -242,19 +230,7 @@ namespace QuantConnect.Securities
         /// <param name="value">Value.</param>
         public void Add(string symbol, Cash value)
         {
-            if (symbol == Currencies.NullCurrency)
-            {
-                return;
-            }
-            // we link our Updated event with underlying cash instances
-            // so interested listeners just subscribe to our event
-            value.Updated += OnCashUpdate;
-
-            var alreadyExisted = Remove(symbol, calledInternally: true);
-
-            _currencies.AddOrUpdate(symbol, value);
-
-            OnUpdate(alreadyExisted ? UpdateType.Updated : UpdateType.Added);
+            AddIternal(symbol, value);
         }
 
         /// <summary>
@@ -263,7 +239,7 @@ namespace QuantConnect.Securities
         public void Clear()
         {
             _currencies.Clear();
-            OnUpdate(UpdateType.Removed);
+            OnUpdate(CashBookUpdateType.Removed, null);
         }
 
         /// <summary>
@@ -335,13 +311,12 @@ namespace QuantConnect.Securities
             {
                 if (symbol == Currencies.NullCurrency)
                 {
-                    throw new InvalidOperationException(
-                        "Unexpected request for NullCurrency Cash instance");
+                    throw new InvalidOperationException(Messages.CashBook.UnexpectedRequestForNullCurrency);
                 }
                 Cash cash;
                 if (!_currencies.TryGetValue(symbol, out cash))
                 {
-                    throw new KeyNotFoundException($"This cash symbol ({symbol}) was not found in your cash book.");
+                    throw new KeyNotFoundException(Messages.CashBook.CashSymbolNotFound(symbol));
                 }
                 return cash;
             }
@@ -399,6 +374,35 @@ namespace QuantConnect.Securities
 
         #endregion
 
+        private Cash AddIternal(string symbol, Cash value)
+        {
+            if (symbol == Currencies.NullCurrency)
+            {
+                return null;
+            }
+
+            if (!_currencies.TryGetValue(symbol, out var cash))
+            {
+                // we link our Updated event with underlying cash instances
+                // so interested listeners just subscribe to our event
+                value.Updated += OnCashUpdate;
+                _currencies.AddOrUpdate(symbol, value);
+
+                OnUpdate(CashBookUpdateType.Added, value);
+
+                return value;
+            }
+            else
+            {
+                // override the values, it will trigger an update event already
+                // we keep the instance because it might be used by securities already
+                cash.ConversionRate = value.ConversionRate;
+                cash.SetAmount(value.Amount);
+
+                return cash;
+            }
+        }
+
         private bool Remove(string symbol, bool calledInternally)
         {
             Cash cash = null;
@@ -407,7 +411,7 @@ namespace QuantConnect.Securities
             {
                 if (!calledInternally)
                 {
-                    Log.Error($"CashBook.Remove(): Failed to remove the cash book record for symbol {symbol}");
+                    Log.Error("CashBook.Remove(): " + Messages.CashBook.FailedToRemoveRecord(symbol));
                 }
             }
             else
@@ -415,7 +419,7 @@ namespace QuantConnect.Securities
                 cash.Updated -= OnCashUpdate;
                 if (!calledInternally)
                 {
-                    OnUpdate(UpdateType.Removed);
+                    OnUpdate(CashBookUpdateType.Removed, cash);
                 }
             }
             return removed;
@@ -423,31 +427,12 @@ namespace QuantConnect.Securities
 
         private void OnCashUpdate(object sender, EventArgs eventArgs)
         {
-            OnUpdate(UpdateType.Updated);
+            OnUpdate(CashBookUpdateType.Updated, sender as Cash);
         }
 
-        private void OnUpdate(UpdateType updateType)
+        private void OnUpdate(CashBookUpdateType updateType, Cash cash)
         {
-            Updated?.Invoke(this, updateType);
-        }
-
-        /// <summary>
-        /// The different types of <see cref="Updated"/> events
-        /// </summary>
-        public enum UpdateType
-        {
-            /// <summary>
-            /// A new <see cref="Cash.Symbol"/> was added (0)
-            /// </summary>
-            Added,
-            /// <summary>
-            /// One or more <see cref="Cash"/> instances were removed (1)
-            /// </summary>
-            Removed,
-            /// <summary>
-            /// An existing <see cref="Cash.Symbol"/> was updated (2)
-            /// </summary>
-            Updated
+            Updated?.Invoke(this, new CashBookUpdatedEventArgs(updateType, cash));
         }
     }
 }

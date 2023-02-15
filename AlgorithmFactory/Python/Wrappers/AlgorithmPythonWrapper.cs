@@ -395,6 +395,21 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         public SubscriptionManager SubscriptionManager => _baseAlgorithm.SubscriptionManager;
 
         /// <summary>
+        /// The project id associated with this algorithm if any
+        /// </summary>
+        public int ProjectId
+        {
+            set
+            {
+                _baseAlgorithm.ProjectId = value;
+            }
+            get
+            {
+                return _baseAlgorithm.ProjectId;
+            }
+        }
+
+        /// <summary>
         /// Current date/time in the algorithm's local time zone
         /// </summary>
         public DateTime Time => _baseAlgorithm.Time;
@@ -439,7 +454,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <param name="market">The market the requested security belongs to, such as 'usa' or 'fxcm'</param>
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice.</param>
         /// <param name="leverage">leverage for this security</param>
-        /// <param name="extendedMarketHours">ExtendedMarketHours send in data from 4am - 8pm, not used for FOREX</param>
+        /// <param name="extendedMarketHours">Use extended market hours data</param>
         /// <param name="dataMappingMode">The contract mapping mode to use for the security</param>
         /// <param name="dataNormalizationMode">The price scaling mode to use for the security</param>
         public Security AddSecurity(SecurityType securityType, string symbol, Resolution? resolution, string market, bool fillDataForward, decimal leverage, bool extendedMarketHours,
@@ -453,9 +468,11 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <param name="resolution">The <see cref="Resolution"/> of market data, Tick, Second, Minute, Hour, or Daily. Default is <see cref="Resolution.Minute"/></param>
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice. Default is <value>true</value></param>
         /// <param name="leverage">The requested leverage for this equity. Default is set by <see cref="SecurityInitializer"/></param>
+        /// <param name="extendedMarketHours">Use extended market hours data</param>
         /// <returns>The new <see cref="Future"/> security</returns>
-        public Future AddFutureContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m)
-            => _baseAlgorithm.AddFutureContract(symbol, resolution, fillDataForward, leverage);
+        public Future AddFutureContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m,
+            bool extendedMarketHours = false)
+            => _baseAlgorithm.AddFutureContract(symbol, resolution, fillDataForward, leverage, extendedMarketHours);
 
         /// <summary>
         /// Creates and adds a new single <see cref="Option"/> contract to the algorithm
@@ -464,9 +481,10 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <param name="resolution">The <see cref="Resolution"/> of market data, Tick, Second, Minute, Hour, or Daily. Default is <see cref="Resolution.Minute"/></param>
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice. Default is <value>true</value></param>
         /// <param name="leverage">The requested leverage for this equity. Default is set by <see cref="SecurityInitializer"/></param>
+        /// <param name="extendedMarketHours">Use extended market hours data</param>
         /// <returns>The new <see cref="Option"/> security</returns>
-        public Option AddOptionContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m)
-            => _baseAlgorithm.AddOptionContract(symbol, resolution, fillDataForward, leverage);
+        public Option AddOptionContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m, bool extendedMarketHours = false)
+            => _baseAlgorithm.AddOptionContract(symbol, resolution, fillDataForward, leverage, extendedMarketHours);
 
         /// <summary>
         /// Invoked at the end of every time step. This allows the algorithm
@@ -508,6 +526,11 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         public bool GetLocked() => _baseAlgorithm.GetLocked();
 
         /// <summary>
+        /// Gets a read-only dictionary with all current parameters
+        /// </summary>
+        public IReadOnlyDictionary<string, string> GetParameters() => _baseAlgorithm.GetParameters();
+
+        /// <summary>
         /// Gets the parameter with the specified name. If a parameter with the specified name does not exist,
         /// the given default value is returned if any, else null
         /// </summary>
@@ -515,6 +538,33 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <param name="defaultValue">The default value to return</param>
         /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
         public string GetParameter(string name, string defaultValue = null) => _baseAlgorithm.GetParameter(name, defaultValue);
+
+        /// <summary>
+        /// Gets the parameter with the specified name parsed as an integer. If a parameter with the specified name does not exist,
+        /// or the conversion is not possible, the given default value is returned
+        /// </summary>
+        /// <param name="name">The name of the parameter to get</param>
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
+        public int GetParameter(string name, int defaultValue) => _baseAlgorithm.GetParameter(name, defaultValue);
+
+        /// <summary>
+        /// Gets the parameter with the specified name parsed as a double. If a parameter with the specified name does not exist,
+        /// or the conversion is not possible, the given default value is returned
+        /// </summary>
+        /// <param name="name">The name of the parameter to get</param>
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
+        public double GetParameter(string name, double defaultValue) => _baseAlgorithm.GetParameter(name, defaultValue);
+
+        /// <summary>
+        /// Gets the parameter with the specified name parsed as a decimal. If a parameter with the specified name does not exist,
+        /// or the conversion is not possible, the given default value is returned
+        /// </summary>
+        /// <param name="name">The name of the parameter to get</param>
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
+        public decimal GetParameter(string name, decimal defaultValue) => _baseAlgorithm.GetParameter(name, defaultValue);
 
         /// <summary>
         /// Initialise the Algorithm and Prepare Required Data:
@@ -729,6 +779,17 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         }
 
         /// <summary>
+        /// Will submit an order request to the algorithm
+        /// </summary>
+        /// <param name="request">The request to submit</param>
+        /// <remarks>Will run order prechecks, which include making sure the algorithm is not warming up, security is added and has data among others</remarks>
+        /// <returns>The order ticket</returns>
+        public OrderTicket SubmitOrderRequest(SubmitOrderRequest request)
+        {
+            return _baseAlgorithm.SubmitOrderRequest(request);
+        }
+
+        /// <summary>
         /// Option assignment event handler. On an option assignment event for short legs the resulting information is passed to this method.
         /// </summary>
         /// <param name="assignmentEvent">Option exercise event details containing details of the assignment</param>
@@ -900,7 +961,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         public void SetLocked() => _baseAlgorithm.SetLocked();
 
         /// <summary>
-        /// Set the maximum number of orders the algortihm is allowed to process.
+        /// Set the maximum number of orders the algorithm is allowed to process.
         /// </summary>
         /// <param name="max">Maximum order count int</param>
         public void SetMaximumOrders(int max) => _baseAlgorithm.SetMaximumOrders(max);

@@ -1202,6 +1202,26 @@ namespace QuantConnect.Securities.Future
                     return lastFriday.Add(new TimeSpan(15, 0, 0));
                 })
             },
+            // Ether (ETH): https://www.cmegroup.com/markets/cryptocurrencies/ether/ether.contractSpecs.html
+            {Symbol.Create(Futures.Currencies.ETH, SecurityType.Future, Market.CME), (time =>
+                {
+                    // Monthly contracts listed for 6 consecutive months, quarterly contracts (Mar, Jun, Sep, Dec) listed for 4 additional quarters and a second Dec contract if only one is listed.
+                    // Trading terminates at 4:00 p.m. London time on the last Friday of the contract month that is either a London or U.S. business day. If the last Friday of the contract month day is not a business day in both London and the U.S., trading terminates on the prior London or U.S. business day.
+                    var lastFriday = FuturesExpiryUtilityFunctions.LastFriday(time);
+
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry(Market.CME, Futures.Currencies.ETH, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastFriday))
+                    {
+                        lastFriday = FuturesExpiryUtilityFunctions.AddBusinessDays(lastFriday, -1);
+                    }
+
+                    return lastFriday.Add(new TimeSpan(15, 0, 0));
+                })
+            },
             // Canadian Dollar/Japanese Yen (CJY): https://www.cmegroup.com/trading/fx/g10/canadian-dollar-japanese-yen_contract_specifications.html
             {Symbol.Create(Futures.Currencies.CADJPY, SecurityType.Future, Market.CME), (time =>
                 {
@@ -2046,15 +2066,14 @@ namespace QuantConnect.Securities.Future
                     // Trading in the current delivery month shall cease on the third business day prior to the twenty-fifth calendar day of the month preceding the delivery month. If the twenty-fifth calendar day of the month is a non-business day, trading shall cease on the third business day prior to the last business day preceding the twenty-fifth calendar day. In the event that the official Exchange holiday schedule changes subsequent to the listing of a Crude Oil futures, the originally listed expiration date shall remain in effect.In the event that the originally listed expiration day is declared a holiday, expiration will move to the business day immediately prior.
                     var twentyFifth = new DateTime(time.Year,time.Month,25);
                     twentyFifth = twentyFifth.AddMonths(-1);
-                    if(FuturesExpiryUtilityFunctions.NotHoliday(twentyFifth))
+
+                    var businessDays = -3;
+                    if(!FuturesExpiryUtilityFunctions.NotHoliday(twentyFifth))
                     {
-                        return FuturesExpiryUtilityFunctions.AddBusinessDays(twentyFifth,-3);
+                        // if the 25th is a holiday we substract 1 extra bussiness day
+                        businessDays -= 1;
                     }
-                    else
-                    {
-                        var lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(twentyFifth,-1);
-                        return FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay,-3);
-                    }
+                    return FuturesExpiryUtilityFunctions.AddBusinessDays(twentyFifth, businessDays);
                 })
             },
             // Gulf Coast CBOB Gasoline A2 (Platts) vs. RBOB Gasoline (CRB): https://www.cmegroup.com/trading/energy/refined-products/gulf-coast-cbob-gasoline-a2-platts-vs-rbob-spread-swap_contract_specifications.html
@@ -2844,7 +2863,7 @@ namespace QuantConnect.Securities.Future
                         // Good Friday
                         FuturesExpiryUtilityFunctions.GetGoodFriday(time.Year)
                     };
-                   
+
                     var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 3, holidays);
 
                     return lastBusinessDay.Add(new TimeSpan(13, 25, 0));
@@ -3250,11 +3269,18 @@ namespace QuantConnect.Securities.Future
 
                     // Trading terminates 4 business days prior to the 25th calendar day of the month prior to the
                     // contract month (1 business day prior to CL LTD)
+                    // If the 25th calendar day is not a business day, trading terminates 5 business days before the 25th calendar day of the month prior to the contract month.
 
                     var previousMonth = time.AddMonths(-1);
                     var twentyFifthDay = new DateTime(previousMonth.Year, previousMonth.Month, 25);
-                    var twentyFifthDayLessFour = FuturesExpiryUtilityFunctions.AddBusinessDays(twentyFifthDay, -4);
-                    return twentyFifthDayLessFour;
+
+                    var businessDays = -4;
+                    if(!FuturesExpiryUtilityFunctions.NotHoliday(twentyFifthDay))
+                    {
+                        // if the 25th is a holiday we substract 1 extra bussiness day
+                        businessDays -= 1;
+                    }
+                    return FuturesExpiryUtilityFunctions.AddBusinessDays(twentyFifthDay, businessDays);
                 })
             },
             // Micro Singapore FOB Marine Fuel 0.5% (Platts) Futures (S50): https://www.cmegroup.com/markets/energy/refined-products/micro-singapore-fob-marine-fuel-05-platts.contractSpecs.html
@@ -3417,7 +3443,7 @@ namespace QuantConnect.Securities.Future
             // Micro Ether Futures (MET): https://www.cmegroup.com/markets/cryptocurrencies/ether/micro-ether.contractSpecs.html
             {Symbol.Create(Futures.Currencies.MicroEther, SecurityType.Future, Market.CME), (time =>
                 {
-                    // Monthly contracts listed for 6 consecutive months and 2 additional Dec contract months. 
+                    // Monthly contracts listed for 6 consecutive months and 2 additional Dec contract months.
 
                     // Trading terminates at 4:00 p.m. London time on the last Friday of the contract month that
                     // is either a London or U.S. business day. If the last Friday of the contract month day is
@@ -3471,63 +3497,6 @@ namespace QuantConnect.Securities.Future
                     }
 
                     return lastFriday.Add(new TimeSpan(15, 0, 0));
-                })
-            },
-            // BTIC on Micro Ether Futures (MRB): https://www.cmegroup.com/markets/cryptocurrencies/ether/micro-ether.contractSpecs.html
-            {Symbol.Create(Futures.Currencies.BTICMicroEther, SecurityType.Future, Market.CME), (time =>
-                {
-                    // Monthly contracts listed for 6 consecutive months and 2 additional Dec contract months.
-
-                    // Trading terminates at 4:00 p.m. London time on the last Friday of the contract month.
-                    // If this is not both a London and U.S. business day, trading terminates on the prior
-                    // London and the U.S. business day.
-
-                    // BTIC: Trading terminates at 4:00 p.m. London time on the last Thursday of the contract
-                    // month.If this is not both a London and U.S. business day, trading terminates on the prior
-                    // London and the U.S. business day.
-
-                    var lastThursday = FuturesExpiryUtilityFunctions.LastThursday(time);
-
-                    var holidays = MarketHoursDatabase.FromDataFolder()
-                        .GetEntry(Market.CME, Futures.Currencies.BTICMicroEther, SecurityType.Future)
-                        .ExchangeHours
-                        .Holidays;
-
-                    while (holidays.Contains(lastThursday))
-                    {
-                        lastThursday = FuturesExpiryUtilityFunctions.AddBusinessDays(lastThursday, -1);
-                    }
-
-                    return lastThursday.Add(new TimeSpan(15, 0, 0));
-                })
-            },
-            // BTIC on Micro Bitcoin Futures (MIB): https://www.cmegroup.com/markets/cryptocurrencies/bitcoin/micro-bitcoin.contractSpecs.html
-            {Symbol.Create(Futures.Currencies.BTICMicroBTC, SecurityType.Future, Market.CME), (time =>
-                {
-                    // Monthly contracts listed for 6 consecutive months and 2 additional Dec contract months.
-                    // If the 6 consecutive months includes Dec, list only 1 additional Dec contract month.
-
-                    // Trading terminates at 4:00 p.m. London time on the last Friday of the contract month.
-                    // If this is not both a London and U.S. business day, trading terminates on the prior
-                    // London and the U.S. business day.
-
-                    // BTIC: Trading terminates at 4:00 p.m. London time on the last Thursday of the contract
-                    // month.If this is not both a London and U.S. business day, trading terminates on the prior
-                    // London and the U.S. business day.
-
-                    var lastThursday = FuturesExpiryUtilityFunctions.LastThursday(time);
-
-                    var holidays = MarketHoursDatabase.FromDataFolder()
-                        .GetEntry(Market.CME, Futures.Currencies.BTICMicroBTC, SecurityType.Future)
-                        .ExchangeHours
-                        .Holidays;
-
-                    while (holidays.Contains(lastThursday))
-                    {
-                        lastThursday = FuturesExpiryUtilityFunctions.AddBusinessDays(lastThursday, -1);
-                    }
-
-                    return lastThursday.Add(new TimeSpan(15, 0, 0));
                 })
             }
         };

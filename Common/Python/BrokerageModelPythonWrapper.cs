@@ -305,5 +305,30 @@ namespace QuantConnect.Python
                 return (_model.GetShortableProvider() as PyObject).GetAndDispose<IShortableProvider>();
             }
         }
+
+        /// <summary>
+        /// Convenience method to get the underlying <see cref="IBrokerageModel"/> object from the wrapper.
+        /// </summary>
+        /// <returns>Underlying <see cref="IBrokerageModel"/> object</returns>
+        public IBrokerageModel GetModel()
+        {
+            using (Py.GIL())
+            {
+                return (_model as PyObject).AsManagedObject(typeof(IBrokerageModel)) as IBrokerageModel;
+            }
+        }
+
+        /// <summary>
+        /// Gets a new margin interest rate model for the security
+        /// </summary>
+        /// <param name="security">The security to get a margin interest rate model for</param>
+        /// <returns>The margin interest rate model for this brokerage</returns>
+        public IMarginInterestRateModel GetMarginInterestRateModel(Security security)
+        {
+            using (Py.GIL())
+            {
+                return (_model.GetMarginInterestRateModel(security) as PyObject).GetAndDispose<IMarginInterestRateModel>();
+            }
+        }
     }
 }

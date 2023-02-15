@@ -72,9 +72,21 @@ namespace QuantConnect
         public IDictionary<string, string> RuntimeStatistics;
 
         /// <summary>
+        /// State of the result packet.
+        /// </summary>
+        [JsonProperty(PropertyName = "State", NullValueHandling = NullValueHandling.Ignore)]
+        public IDictionary<string, string> State;
+
+        /// <summary>
         /// Server status information, including CPU/RAM usage, ect...
         /// </summary>
         [JsonProperty(PropertyName = "ServerStatistics", NullValueHandling = NullValueHandling.Ignore)]
         public IDictionary<string, string> ServerStatistics;
+
+        /// <summary>
+        /// The algorithm's configuration required for report generation
+        /// </summary>
+        [JsonProperty(PropertyName = "AlgorithmConfiguration", NullValueHandling = NullValueHandling.Ignore)]
+        public AlgorithmConfiguration AlgorithmConfiguration;
     }
 }

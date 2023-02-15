@@ -13,18 +13,18 @@
  * limitations under the License.
 */
 
-using System;
-using System.Linq;
-using System.Collections.Generic;
-using QuantConnect.Interfaces;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
+using QuantConnect.Interfaces;
 using QuantConnect.Securities.Option;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
-    /// Base regression algorithm excersizing for exercising different style options with option price models that migth
+    /// Base regression algorithm exercising different style options with option price models that might
     /// or might not support them. Also, if the option style is supported, greeks are asserted to be accesible and have valid values.
     /// </summary>
     public abstract class OptionPriceModelForOptionStylesBaseRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
@@ -107,7 +107,7 @@ namespace QuantConnect.Algorithm.CSharp
                     }
                 }
 
-                // Greeks shpould be valid if they were successfuly accessed for supported option style
+                // Greeks should be valid if they were successfuly accessed for supported option style
                 if (_optionStyleIsSupported)
                 {
                     if (greeks.Delta == 0m && greeks.Gamma == 0m && greeks.Theta == 0m && greeks.Vega == 0m && greeks.Rho == 0m)
@@ -115,6 +115,8 @@ namespace QuantConnect.Algorithm.CSharp
                         throw new Exception($"Expected greeks to not be zero simultaneously for {contract.Symbol.Value}, an {_option.Style} style option, using {_option?.PriceModel.GetType().Name}, but they were");
                     }
 
+                    // Delta can be {-1, 0, 1} if the price is too wild, rho can be 0 if risk free rate is 0
+                    // Vega can be 0 if the price is very off from theoretical price, Gamma = 0 if Delta belongs to {-1, 1}
                     if (((contract.Right == OptionRight.Call && (greeks.Delta < 0m || greeks.Delta > 1m || greeks.Rho < 0m))
                         || (contract.Right == OptionRight.Put && (greeks.Delta < -1m || greeks.Delta > 0m || greeks.Rho > 0m))
                         || greeks.Vega < 0m || greeks.Gamma < 0m))

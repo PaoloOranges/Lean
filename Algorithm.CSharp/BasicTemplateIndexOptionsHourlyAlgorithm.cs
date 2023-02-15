@@ -38,7 +38,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 2212;
+        public override long DataPoints => 2136;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -91,7 +91,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
             {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "f21910eb98ceaa39e02020de95354d86"}
+            {"OrderListHash", "482414c332d7780590e4a157dff60b85"}
         };
     }
 }

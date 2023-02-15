@@ -13,7 +13,11 @@
  * limitations under the License.
 */
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace QuantConnect
 {
@@ -243,6 +247,37 @@ namespace QuantConnect
         {
             string currencySymbol;
             return CurrencySymbols.TryGetValue(currency, out currencySymbol) ? currencySymbol : currency;
+        }
+
+        /// <summary>
+        /// Converts the string representation of number with currency in the format {currency}{value} to its decimal equivalent.
+        /// It throws if the value cannot be converted to a decimal number.
+        /// </summary>
+        /// <param name="value">The value with currency</param>
+        /// <returns>The decimal equivalent to the value</returns>
+        public static decimal Parse(string value)
+        {
+            decimal parsedValue;
+
+            if (!TryParse(value, out parsedValue))
+            {
+                throw new ArgumentException(Messages.Currencies.FailedConversionToDecimal(value));
+            }
+
+            return parsedValue;
+        }
+
+        /// <summary>
+        /// Converts the string representation of number with currency in the format {currency}{value} to its decimal equivalent.
+        /// </summary>
+        /// <param name="value">The value with currency</param>
+        /// <param name="parsedValue">The decimal equivalent to the string value after conversion</param>
+        /// <returns>True if the value was succesfuly converted</returns>
+        public static bool TryParse(string value, out decimal parsedValue)
+        {
+            // Strip out the currency (any character before the first number) ignoring blank spaces since they are not supposed to be in numbers with currency
+            value = Regex.Replace(value, @"^[^\d\s-+]+", string.Empty);
+            return decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out parsedValue);
         }
     }
 }

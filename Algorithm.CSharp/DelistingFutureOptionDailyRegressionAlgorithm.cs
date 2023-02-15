@@ -14,6 +14,7 @@
 */
 
 using System.Collections.Generic;
+using QuantConnect.Orders;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -28,7 +29,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 15192;
+        public override long DataPoints => 13676;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
@@ -42,7 +43,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Drawdown", "0.100%"},
             {"Expectancy", "-0.678"},
             {"Net Profit", "-0.111%"},
-            {"Sharpe Ratio", "-0.965"},
+            {"Sharpe Ratio", "-0.951"},
             {"Probabilistic Sharpe Ratio", "0.000%"},
             {"Loss Rate", "80%"},
             {"Win Rate", "20%"},
@@ -51,17 +52,17 @@ namespace QuantConnect.Algorithm.CSharp
             {"Beta", "-0.001"},
             {"Annual Standard Deviation", "0.001"},
             {"Annual Variance", "0"},
-            {"Information Ratio", "-1.073"},
+            {"Information Ratio", "-1.075"},
             {"Tracking Error", "0.107"},
-            {"Treynor Ratio", "1.349"},
-            {"Total Fees", "$14.80"},
+            {"Treynor Ratio", "1.338"},
+            {"Total Fees", "$19.76"},
             {"Estimated Strategy Capacity", "$2400000.00"},
             {"Lowest Capacity Asset", "DC V5E8PHPRCHJ8|DC V5E8P9SH0U0X"},
             {"Fitness Score", "0"},
             {"Kelly Criterion Estimate", "0"},
             {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "-0.128"},
-            {"Return Over Maximum Drawdown", "-0.992"},
+            {"Sortino Ratio", "-0.126"},
+            {"Return Over Maximum Drawdown", "-0.997"},
             {"Portfolio Turnover", "0"},
             {"Total Insights Generated", "0"},
             {"Total Insights Closed", "0"},
@@ -76,7 +77,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
             {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "2152bd1d4f1770068595a4c3bc8585ee"}
+            {"OrderListHash", "19ecd0218cb70c5d7fefcb5741a7d82b"}
         };
     }
 }

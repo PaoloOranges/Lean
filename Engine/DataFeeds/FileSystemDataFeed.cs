@@ -47,7 +47,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         private IDataProvider _dataProvider;
         private IDataCacheProvider _cacheProvider;
         private SubscriptionCollection _subscriptions;
-        private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private SubscriptionDataReaderSubscriptionEnumeratorFactory _subscriptionFactory;
 
         /// <summary>
@@ -75,7 +74,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             _dataProvider = dataProvider;
             _timeProvider = dataFeedTimeProvider.FrontierTimeProvider;
             _subscriptions = subscriptionManager.DataFeedSubscriptions;
-            _cancellationTokenSource = new CancellationTokenSource();
             _cacheProvider = new ZipDataCacheProvider(dataProvider, isDataEphemeral: false);
             _subscriptionFactory = new SubscriptionDataReaderSubscriptionEnumeratorFactory(
                 _resultHandler,
@@ -99,7 +97,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         private IEnumerator<BaseData> CreateDataEnumerator(SubscriptionRequest request, Resolution? fillForwardResolution)
         {
             // ReSharper disable once PossibleMultipleEnumeration
-            if (!request.TradableDays.Any())
+            if (!request.TradableDaysInDataTimeZone.Any())
             {
                 _algorithm.Error(
                     $"No data loaded for {request.Security.Symbol} because there were no tradeable dates for this security."
@@ -129,7 +127,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 var warmupRequest = new SubscriptionRequest(request, endTimeUtc: pivotTimeUtc,
                     configuration: new SubscriptionDataConfig(request.Configuration, resolution: _algorithm.Settings.WarmupResolution));
                 IEnumerator<BaseData> warmupEnumerator = null;
-                if (warmupRequest.TradableDays.Any()
+                if (warmupRequest.TradableDaysInDataTimeZone.Any()
                     // since we change the resolution, let's validate it's still valid configuration (example daily equity quotes are not!)
                     && LeanData.IsValidConfiguration(warmupRequest.Configuration.SecurityType, warmupRequest.Configuration.Resolution, warmupRequest.Configuration.TickType))
                 {
@@ -253,7 +251,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             {
                 IsActive = false;
                 Log.Trace("FileSystemDataFeed.Exit(): Start. Setting cancellation token...");
-                _cancellationTokenSource.Cancel();
                 _subscriptionFactory?.DisposeSafely();
                 _cacheProvider.DisposeSafely();
                 Log.Trace("FileSystemDataFeed.Exit(): Exit Finished.");

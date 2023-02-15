@@ -268,13 +268,14 @@ namespace QuantConnect.Lean.Engine.Setup
                         // set the object store
                         algorithm.SetObjectStore(parameters.ObjectStore);
 
-                        // If we're going to receive market data from IB,
-                        // set the default subscription limit to 100,
-                        // algorithms can override this setting in the Initialize method
-                        if (brokerage.ToString().EndsWith("InteractiveBrokersBrokerage") &&
-                            liveJob.DataQueueHandler.EndsWith("InteractiveBrokersBrokerage"))
+                        // If we're going to receive market data from IB, set the default subscription limit to 100, algorithms can override this setting in the Initialize method
+                        if (liveJob.DataQueueHandler.Contains("InteractiveBrokersBrokerage", StringComparison.InvariantCultureIgnoreCase))
                         {
                             algorithm.Settings.DataSubscriptionLimit = 100;
+                            var message = $"Detected 'InteractiveBrokers' data feed. Adjusting algorithm Settings.DataSubscriptionLimit to {algorithm.Settings.DataSubscriptionLimit}." +
+                            $" Can override this setting on Initialize.";
+                            algorithm.Debug(message);
+                            Log.Trace($"BrokerageSetupHandler.Setup(): {message}");
                         }
 
                         //Initialise the algorithm, get the required data:
@@ -332,7 +333,7 @@ namespace QuantConnect.Lean.Engine.Setup
                 if (liveJob.BrokerageData.TryGetValue(MaxAllocationLimitConfig, out maxCashLimitStr))
                 {
                     var maxCashLimit = decimal.Parse(maxCashLimitStr, NumberStyles.Any, CultureInfo.InvariantCulture);
-                    
+
                     // If allocation exceeded by more than $10,000; block deployment
                     if (algorithm.Portfolio.TotalPortfolioValue > (maxCashLimit + 10000m))
                     {
@@ -392,7 +393,7 @@ namespace QuantConnect.Lean.Engine.Setup
         {
             var supportedSecurityTypes = new HashSet<SecurityType>
             {
-                SecurityType.Equity, SecurityType.Forex, SecurityType.Cfd, SecurityType.Option, SecurityType.Future, SecurityType.FutureOption, SecurityType.IndexOption, SecurityType.Crypto
+                SecurityType.Equity, SecurityType.Forex, SecurityType.Cfd, SecurityType.Option, SecurityType.Future, SecurityType.FutureOption, SecurityType.IndexOption, SecurityType.Crypto, SecurityType.CryptoFuture
             };
 
             Log.Trace("BrokerageSetupHandler.Setup(): Fetching open orders from brokerage...");
@@ -492,12 +493,12 @@ namespace QuantConnect.Lean.Engine.Setup
                 if (symbol.SecurityType.IsOption())
                 {
                     // add current option contract to the system
-                    security = algorithm.AddOptionContract(symbol, resolution, fillForward, leverage);
+                    security = algorithm.AddOptionContract(symbol, resolution, fillForward, leverage, extendedHours);
                 }
                 else if (symbol.SecurityType == SecurityType.Future)
                 {
                     // add current future contract to the system
-                    security = algorithm.AddFutureContract(symbol, resolution, fillForward, leverage);
+                    security = algorithm.AddFutureContract(symbol, resolution, fillForward, leverage, extendedHours);
                 }
                 else
                 {
