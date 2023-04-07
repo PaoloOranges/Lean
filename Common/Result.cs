@@ -29,12 +29,6 @@ namespace QuantConnect
     public class Result
     {
         /// <summary>
-        /// Contains population averages scores over the life of the algorithm
-        /// </summary>
-        [JsonProperty(PropertyName = "AlphaRuntimeStatistics", NullValueHandling = NullValueHandling.Ignore)]
-        public AlphaRuntimeStatistics AlphaRuntimeStatistics;
-
-        /// <summary>
         /// Charts updates for the live algorithm since the last result packet
         /// </summary>
         [JsonProperty(PropertyName = "Charts", NullValueHandling = NullValueHandling.Ignore)]
@@ -72,9 +66,21 @@ namespace QuantConnect
         public IDictionary<string, string> RuntimeStatistics;
 
         /// <summary>
+        /// State of the result packet.
+        /// </summary>
+        [JsonProperty(PropertyName = "State", NullValueHandling = NullValueHandling.Ignore)]
+        public IDictionary<string, string> State;
+
+        /// <summary>
         /// Server status information, including CPU/RAM usage, ect...
         /// </summary>
         [JsonProperty(PropertyName = "ServerStatistics", NullValueHandling = NullValueHandling.Ignore)]
         public IDictionary<string, string> ServerStatistics;
+
+        /// <summary>
+        /// The algorithm's configuration required for report generation
+        /// </summary>
+        [JsonProperty(PropertyName = "AlgorithmConfiguration", NullValueHandling = NullValueHandling.Ignore)]
+        public AlgorithmConfiguration AlgorithmConfiguration;
     }
 }

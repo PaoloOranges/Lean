@@ -41,6 +41,61 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators
     public class FillForwardEnumeratorTests
     {
         [Test]
+        public void FillForwardsUntilSubscriptionEnd()
+        {
+            var dataResolution = Time.OneHour;
+            var fillForwardResolution = Time.OneHour;
+
+            var time = new DateTime(2017, 7, 20, 0, 0, 0);
+            var subscriptionEndTime = time.AddDays(1);
+
+            var enumerator = new List<BaseData>
+            {
+                new TradeBar { Time = time, Value = 1, Period = dataResolution, Volume = 100},
+                new TradeBar { Time = time.AddDays(5), Value = 1, Period = dataResolution, Volume = 100},
+            }.GetEnumerator();
+
+            var exchange = new EquityExchange(SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork));
+            using var fillForwardEnumerator = new FillForwardEnumerator(enumerator, exchange, Ref.Create(fillForwardResolution), false, subscriptionEndTime, dataResolution, exchange.TimeZone);
+
+            var dataCount = 0;
+            while (fillForwardEnumerator.MoveNext())
+            {
+                dataCount++;
+                Assert.IsFalse(fillForwardEnumerator.Current.EndTime > subscriptionEndTime);
+            }
+            Assert.AreEqual(24, dataCount);
+        }
+
+        [Test]
+        public void DelistingEvents()
+        {
+            var dataResolution = Time.OneMinute;
+            var fillForwardResolution = Time.OneMinute;
+
+            var time = new DateTime(2017, 7, 20, 0, 0, 0);
+
+            var enumerator = new List<BaseData>
+            {
+                new Delisting(Symbols.SPY, time, 100, DelistingType.Warning),
+                new Delisting(Symbols.SPY, time.AddDays(1), 100, DelistingType.Delisted),
+                new TradeBar { Time = time.AddDays(2), Value = 1, Period = dataResolution, Volume = 100},
+            }.GetEnumerator();
+
+            var exchange = new OptionExchange(SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork));
+            using var fillForwardEnumerator = new FillForwardEnumerator(enumerator, exchange, Ref.Create(fillForwardResolution), false, time.AddDays(10), dataResolution, exchange.TimeZone);
+
+            Assert.IsTrue(fillForwardEnumerator.MoveNext());
+            Assert.AreEqual(DelistingType.Warning, ((Delisting)fillForwardEnumerator.Current).Type);
+
+            Assert.IsTrue(fillForwardEnumerator.MoveNext());
+            Assert.AreEqual(DelistingType.Delisted, ((Delisting)fillForwardEnumerator.Current).Type);
+
+            // even if there's more data emitted in the base enumerator we've passed the delisting date!
+            Assert.IsFalse(fillForwardEnumerator.MoveNext());
+        }
+
+        [Test]
         // reproduces GH issue 4392 causing fill forward bars not to advance
         // the nature of the bug was rounding down in exchange tz versus data timezone
         public void GetReferenceDateIntervals_RoundDown()
@@ -1148,7 +1203,6 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators
 
             AlgorithmRunner.RunLocalBacktest(parameter.Algorithm,
                 parameter.Statistics,
-                parameter.AlphaStatistics,
                 parameter.Language,
                 parameter.ExpectedFinalStatus,
                 setupHandler: "FillForwardTestSetupHandler");
@@ -1921,7 +1975,6 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators
 
             AlgorithmRunner.RunLocalBacktest(parameter.Algorithm,
                 parameter.Statistics,
-                parameter.AlphaStatistics,
                 parameter.Language,
                 parameter.ExpectedFinalStatus,
                 setupHandler: "FillForwardDaylightMovementTestSetupHandler");

@@ -14,12 +14,10 @@
 */
 
 using System;
-using System.IO;
 using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Logging;
 using QuantConnect.Interfaces;
-using QuantConnect.Data.Market;
 using System.Collections.Generic;
 using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.UniverseSelection;
@@ -213,6 +211,15 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 CacheSize = megaBytesToUse / 12;
                 Log.Trace($"TextSubscriptionDataSourceReader.SetCacheSize(): Setting cache size to {CacheSize} items");
             }
+        }
+
+        /// <summary>
+        /// Will clear the data cache.
+        /// Used for testing different time zones for the same data set and allow a clean fresh start for each backtest
+        /// </summary>
+        public static void ClearCache()
+        {
+            BaseDataSourceCache = new();
         }
     }
 }

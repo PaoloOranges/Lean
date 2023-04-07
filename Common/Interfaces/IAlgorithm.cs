@@ -14,21 +14,22 @@
 */
 
 using System;
-using System.Collections.Generic;
 using NodaTime;
+using QuantConnect.Data;
+using QuantConnect.Orders;
+using QuantConnect.Storage;
 using QuantConnect.Benchmarks;
 using QuantConnect.Brokerages;
-using QuantConnect.Data;
-using QuantConnect.Data.UniverseSelection;
-using QuantConnect.Notifications;
-using QuantConnect.Orders;
 using QuantConnect.Scheduling;
 using QuantConnect.Securities;
+using QuantConnect.Notifications;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
-using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Securities.Future;
 using QuantConnect.Securities.Option;
-using QuantConnect.Storage;
+using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Algorithm.Framework.Alphas;
+using QuantConnect.Algorithm.Framework.Alphas.Analysis;
 
 namespace QuantConnect.Interfaces
 {
@@ -66,6 +67,15 @@ namespace QuantConnect.Interfaces
         SubscriptionManager SubscriptionManager
         {
             get;
+        }
+
+        /// <summary>
+        /// The project id associated with this algorithm if any
+        /// </summary>
+        int ProjectId
+        {
+            get;
+            set;
         }
 
         /// <summary>
@@ -322,6 +332,14 @@ namespace QuantConnect.Interfaces
         }
 
         /// <summary>
+        /// Gets the insight manager
+        /// </summary>
+        InsightManager Insights
+        {
+            get;
+        }
+
+        /// <summary>
         /// Gets the object store, used for persistence
         /// </summary>
         ObjectStore ObjectStore { get; }
@@ -348,6 +366,11 @@ namespace QuantConnect.Interfaces
         void OnWarmupFinished();
 
         /// <summary>
+        /// Gets a read-only dictionary with all current parameters
+        /// </summary>
+        IReadOnlyDictionary<string, string> GetParameters();
+
+        /// <summary>
         /// Gets the parameter with the specified name. If a parameter with the specified name does not exist,
         /// the given default value is returned if any, else null
         /// </summary>
@@ -355,6 +378,33 @@ namespace QuantConnect.Interfaces
         /// <param name="defaultValue">The default value to return</param>
         /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
         string GetParameter(string name, string defaultValue = null);
+
+        /// <summary>
+        /// Gets the parameter with the specified name parsed as an integer. If a parameter with the specified name does not exist,
+        /// or the conversion is not possible, the given default value is returned
+        /// </summary>
+        /// <param name="name">The name of the parameter to get</param>
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
+        int GetParameter(string name, int defaultValue);
+
+        /// <summary>
+        /// Gets the parameter with the specified name parsed as a double. If a parameter with the specified name does not exist,
+        /// or the conversion is not possible, the given default value is returned
+        /// </summary>
+        /// <param name="name">The name of the parameter to get</param>
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
+        double GetParameter(string name, double defaultValue);
+
+        /// <summary>
+        /// Gets the parameter with the specified name parsed as a decimal. If a parameter with the specified name does not exist,
+        /// or the conversion is not possible, the given default value is returned
+        /// </summary>
+        /// <param name="name">The name of the parameter to get</param>
+        /// <param name="defaultValue">The default value to return</param>
+        /// <returns>The value of the specified parameter, or defaultValue if not found or null if there's no default value</returns>
+        decimal GetParameter(string name, decimal defaultValue);
 
         /// <summary>
         /// Sets the parameters from the dictionary
@@ -377,24 +427,6 @@ namespace QuantConnect.Interfaces
         /// <param name="brokerageModel">The brokerage model used to emulate the real
         /// brokerage</param>
         void SetBrokerageModel(IBrokerageModel brokerageModel);
-
-        // <summary>
-        // v1.0 Handler for Tick Events [DEPRECATED June-2014]
-        // </summary>
-        // <param name="ticks">Tick Data Packet</param>
-        //void OnTick(Dictionary<string, List<Tick>> ticks);
-
-        // <summary>
-        // v1.0 Handler for TradeBar Events [DEPRECATED June-2014]
-        // </summary>
-        // <param name="tradebars">TradeBar Data Packet</param>
-        //void OnTradeBar(Dictionary<string, TradeBar> tradebars);
-
-        // <summary>
-        // v2.0 Handler for Generic Data Events
-        // </summary>
-        //void OnData(Ticks ticks);
-        //void OnData(TradeBars tradebars);
 
         /// <summary>
         /// v3.0 Handler for all data types
@@ -479,6 +511,14 @@ namespace QuantConnect.Interfaces
         /// </summary>
         /// <param name="newEvent">Event information</param>
         void OnOrderEvent(OrderEvent newEvent);
+
+        /// <summary>
+        /// Will submit an order request to the algorithm
+        /// </summary>
+        /// <param name="request">The request to submit</param>
+        /// <remarks>Will run order prechecks, which include making sure the algorithm is not warming up, security is added and has data among others</remarks>
+        /// <returns>The order ticket</returns>
+        OrderTicket SubmitOrderRequest(SubmitOrderRequest request);
 
         /// <summary>
         /// Option assignment event handler. On an option assignment event for short legs the resulting information is passed to this method.
@@ -573,8 +613,9 @@ namespace QuantConnect.Interfaces
         /// <param name="resolution">The <see cref="Resolution"/> of market data, Tick, Second, Minute, Hour, or Daily. Default is <see cref="Resolution.Minute"/></param>
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice. Default is <value>true</value></param>
         /// <param name="leverage">The requested leverage for this equity. Default is set by <see cref="SecurityInitializer"/></param>
+        /// <param name="extendedMarketHours">Show the after market data as well</param>
         /// <returns>The new <see cref="Future"/> security</returns>
-        Future AddFutureContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m);
+        Future AddFutureContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m, bool extendedMarketHours = false);
 
         /// <summary>
         /// Creates and adds a new single <see cref="Option"/> contract to the algorithm
@@ -583,8 +624,9 @@ namespace QuantConnect.Interfaces
         /// <param name="resolution">The <see cref="Resolution"/> of market data, Tick, Second, Minute, Hour, or Daily. Default is <see cref="Resolution.Minute"/></param>
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice. Default is <value>true</value></param>
         /// <param name="leverage">The requested leverage for this equity. Default is set by <see cref="SecurityInitializer"/></param>
+        /// <param name="extendedMarketHours">Show the after market data as well</param>
         /// <returns>The new <see cref="Option"/> security</returns>
-        Option AddOptionContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m);
+        Option AddOptionContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m, bool extendedMarketHours = false);
 
         /// <summary>
         /// Removes the security with the specified symbol. This will cancel all
@@ -635,7 +677,7 @@ namespace QuantConnect.Interfaces
         void SetFinishedWarmingUp();
 
         /// <summary>
-        /// Set the maximum number of orders the algortihm is allowed to process.
+        /// Set the maximum number of orders the algorithm is allowed to process.
         /// </summary>
         /// <param name="max">Maximum order count int</param>
         void SetMaximumOrders(int max);

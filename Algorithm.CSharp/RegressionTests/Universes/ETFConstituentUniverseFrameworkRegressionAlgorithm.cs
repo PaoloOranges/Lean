@@ -48,7 +48,12 @@ namespace QuantConnect.Algorithm.CSharp
             var spy = QuantConnect.Symbol.Create("SPY", SecurityType.Equity, Market.USA);
 
             UniverseSettings.Resolution = Resolution.Hour;
-            AddUniverse(Universe.ETF(spy, UniverseSettings, FilterETFConstituents));
+            AddUniverseWrapper(spy);
+        }
+
+        protected virtual void AddUniverseWrapper(Symbol symbol)
+        {
+            AddUniverse(Universe.ETF(symbol, UniverseSettings, FilterETFConstituents));
         }
 
         /// <summary>
@@ -195,7 +200,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public virtual Language[] Languages { get; } = { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -234,25 +239,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Fees", "$4.00"},
             {"Estimated Strategy Capacity", "$1300000000.00"},
             {"Lowest Capacity Asset", "AIG R735QTJ8XC9X"},
-            {"Fitness Score", "0.001"},
-            {"Kelly Criterion Estimate", "1.528"},
-            {"Kelly Criterion Probability Value", "0.091"},
-            {"Sortino Ratio", "4.929"},
-            {"Return Over Maximum Drawdown", "8.624"},
-            {"Portfolio Turnover", "0.001"},
-            {"Total Insights Generated", "1108"},
-            {"Total Insights Closed", "1080"},
-            {"Total Insights Analysis Completed", "1080"},
-            {"Long Insight Count", "277"},
-            {"Short Insight Count", "831"},
-            {"Long/Short Ratio", "33.33%"},
-            {"Estimated Monthly Alpha Value", "$4169774.3402"},
-            {"Total Accumulated Estimated Alpha Value", "$8322174.6207"},
-            {"Mean Population Estimated Insight Value", "$7705.7172"},
-            {"Mean Population Direction", "49.7222%"},
-            {"Mean Population Magnitude", "49.7222%"},
-            {"Rolling Averaged Population Direction", "56.0724%"},
-            {"Rolling Averaged Population Magnitude", "56.0724%"},
+            {"Portfolio Turnover", "0.12%"},
             {"OrderListHash", "eb27e818f4a6609329a52feeb74bd554"}
         };
     }

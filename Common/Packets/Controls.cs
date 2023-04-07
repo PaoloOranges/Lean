@@ -62,6 +62,12 @@ namespace QuantConnect.Packets
         public decimal CpuAllocation;
 
         /// <summary>
+        /// The user live log limit
+        /// </summary>
+        [JsonProperty(PropertyName = "iLiveLogLimit")]
+        public int LiveLogLimit;
+
+        /// <summary>
         /// The user backtesting log limit
         /// </summary>
         [JsonProperty(PropertyName = "iBacktestLogLimit")]
@@ -113,13 +119,13 @@ namespace QuantConnect.Packets
         /// <summary>
         /// Limits the total size of storage used by <see cref="IObjectStore"/>
         /// </summary>
-        [JsonProperty(PropertyName = "storageLimitMB")]
-        public int StorageLimitMB;
+        [JsonProperty(PropertyName = "storageLimit")]
+        public long StorageLimit;
 
         /// <summary>
         /// Limits the number of files to be held under the <see cref="IObjectStore"/>
         /// </summary>
-        [JsonProperty(PropertyName = "storageFileCountMB")]
+        [JsonProperty(PropertyName = "storageFileCount")]
         public int StorageFileCount;
 
         /// <summary>
@@ -158,8 +164,8 @@ namespace QuantConnect.Packets
             BacktestingMaxInsights = 10000;
             MaximumDataPointsPerChartSeries = 4000;
             SecondTimeOut = 300;
-            StorageLimitMB = 5;
-            StorageFileCount = 100;
+            StorageLimit = 10737418240;
+            StorageFileCount = 10000;
             PersistenceIntervalSeconds = 5;
             StoragePermissions = FileAccess.ReadWrite;
 

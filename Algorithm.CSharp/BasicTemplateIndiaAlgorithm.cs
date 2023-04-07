@@ -43,13 +43,13 @@ namespace QuantConnect.Algorithm.CSharp
             // Equities Resolutions: Tick, Second, Minute, Hour, Daily.
             AddEquity("YESBANK", Resolution.Minute, Market.India);
 
-            //Set Order Prperties as per the requirements for order placement
+            //Set Order Properties as per the requirements for order placement
             DefaultOrderProperties = new IndiaOrderProperties(exchange: Exchange.NSE);
             //override default productType value set in config.json if needed - order specific productType value
             //DefaultOrderProperties = new IndiaOrderProperties(exchange: Exchange.NSE, IndiaOrderProperties.IndiaProductType.CNC);
 
             // General Debug statement for acknowledgement
-            Debug("Intialization Done");
+            Debug("Initialization Done");
         }
 
         /// <summary>
@@ -119,25 +119,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Fees", "₹6.00"},
             {"Estimated Strategy Capacity", "₹61000000000.00"},
             {"Lowest Capacity Asset", "YESBANK UL"},
-            {"Fitness Score", "0"},
-            {"Kelly Criterion Estimate", "0"},
-            {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "-0.247"},
-            {"Return Over Maximum Drawdown", "-1.104"},
-            {"Portfolio Turnover", "0"},
-            {"Total Insights Generated", "0"},
-            {"Total Insights Closed", "0"},
-            {"Total Insights Analysis Completed", "0"},
-            {"Long Insight Count", "0"},
-            {"Short Insight Count", "0"},
-            {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "₹0"},
-            {"Total Accumulated Estimated Alpha Value", "₹0"},
-            {"Mean Population Estimated Insight Value", "₹0"},
-            {"Mean Population Direction", "0%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
+            {"Portfolio Turnover", "0.00%"},
             {"OrderListHash", "6cc69218edd7bd461678b9ee0c575db5"}
         };
     }

@@ -31,6 +31,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// </summary>
     public class PortfolioRebalanceOnSecurityChangesRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
+        private int _generatedInsightsCount;
         private Dictionary<Symbol, DateTime> _lastOrderFilled;
 
         /// <summary>
@@ -62,6 +63,8 @@ namespace QuantConnect.Algorithm.CSharp
             SetExecution(new ImmediateExecutionModel());
 
             _lastOrderFilled = new Dictionary<Symbol, DateTime>();
+
+            InsightsGenerated += (_, e) => _generatedInsightsCount += e.Insights.Length;
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
@@ -79,6 +82,16 @@ namespace QuantConnect.Algorithm.CSharp
                 _lastOrderFilled[orderEvent.Symbol] = UtcTime;
 
                 Debug($"{orderEvent}");
+            }
+        }
+
+        public override void OnEndOfAlgorithm()
+        {
+            if (Insights.Count == _generatedInsightsCount)
+            {
+                // The number of insights is modified by the Portfolio Construction Model,
+                // since it removes expired insights and insights from removed securities 
+                throw new Exception($"The number of insights in the insight manager should be different of the number of all insights generated ({_generatedInsightsCount})");
             }
         }
 
@@ -129,25 +142,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Fees", "$264.99"},
             {"Estimated Strategy Capacity", "$55000000.00"},
             {"Lowest Capacity Asset", "IBM R735QTJ8XC9X"},
-            {"Fitness Score", "0.027"},
-            {"Kelly Criterion Estimate", "-0.996"},
-            {"Kelly Criterion Probability Value", "1"},
-            {"Sortino Ratio", "-0.323"},
-            {"Return Over Maximum Drawdown", "-0.15"},
-            {"Portfolio Turnover", "0.06"},
-            {"Total Insights Generated", "534"},
-            {"Total Insights Closed", "534"},
-            {"Total Insights Analysis Completed", "534"},
-            {"Long Insight Count", "534"},
-            {"Short Insight Count", "0"},
-            {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$-389341000"},
-            {"Total Accumulated Estimated Alpha Value", "$-9476668000"},
-            {"Mean Population Estimated Insight Value", "$-17746570"},
-            {"Mean Population Direction", "0%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
+            {"Portfolio Turnover", "5.06%"},
             {"OrderListHash", "bdb23325dc6c1fa04f63a329346be794"}
         };
     }

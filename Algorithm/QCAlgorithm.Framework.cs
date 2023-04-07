@@ -24,13 +24,13 @@ using QuantConnect.Algorithm.Framework.Risk;
 using QuantConnect.Algorithm.Framework.Selection;
 using QuantConnect.Data;
 using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Securities;
 using QuantConnect.Util;
 
 namespace QuantConnect.Algorithm
 {
     public partial class QCAlgorithm
     {
-        private readonly ISecurityValuesProvider _securityValuesProvider;
         private bool _isEmitWarmupInsightWarningSent;
         private bool _isEmitDelistedInsightWarningSent;
 
@@ -52,6 +52,12 @@ namespace QuantConnect.Algorithm
         /// </summary>
         [DocumentationAttribute(AlgorithmFramework)]
         public IAlphaModel Alpha { get; set; }
+
+        /// <summary>
+        /// Gets the insight manager
+        /// </summary>
+        [DocumentationAttribute(AlgorithmFramework)]
+        public InsightManager Insights { get; private set; }
 
         /// <summary>
         /// Gets or sets the portfolio construction model
@@ -78,20 +84,14 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(AlgorithmFramework)]
         public void FrameworkPostInitialize()
         {
-            //Prevents execution in the case of cash brokerage with IExecutionModel and IPortfolioConstructionModel
-            if (PortfolioConstruction.GetType() != typeof(NullPortfolioConstructionModel)
-                && Execution.GetType() != typeof(NullExecutionModel)
-                && BrokerageModel.AccountType == AccountType.Cash)
-            {
-                throw new InvalidOperationException($"Non null {nameof(IExecutionModel)} and {nameof(IPortfolioConstructionModel)} are currently unsuitable for Cash Modeled brokerages (e.g. GDAX) and may result in unexpected trades."
-                                                    + " To prevent possible user error we've restricted them to Margin trading. You can select margin account types with"
-                                                    + $" SetBrokerage( ... AccountType.Margin). Or please set them to {nameof(NullExecutionModel)}, {nameof(NullPortfolioConstructionModel)}");
-            }
             foreach (var universe in UniverseSelection.CreateUniverses(this))
             {
-                // on purpose we don't call 'AddUniverse' here so that these universes don't get registered as user added
-                // this is so that later during 'UniverseSelection.CreateUniverses' we wont remove them from UniverseManager
-                _pendingUniverseAdditions.Add(universe);
+                lock(_pendingUniverseAdditionsLock)
+                {
+                    // on purpose we don't call 'AddUniverse' here so that these universes don't get registered as user added
+                    // this is so that later during 'UniverseSelection.CreateUniverses' we wont remove them from UniverseManager
+                    _pendingUniverseAdditions.Add(universe);
+                }
             }
 
             if (DebugMode)
@@ -149,6 +149,9 @@ namespace QuantConnect.Algorithm
                     UniverseManager.Add(ukvp);
                 }
             }
+
+            // update scores
+            Insights.Step(UtcTime);
 
             // we only want to run universe selection if there's no data available in the slice
             if (!slice.HasData)
@@ -446,7 +449,8 @@ namespace QuantConnect.Algorithm
             List<Insight> validInsights = null;
             for (var i = 0; i < insights.Length; i++)
             {
-                if (Securities[insights[i].Symbol].IsDelisted)
+                var security = Securities[insights[i].Symbol];
+                if (security.IsDelisted)
                 {
                     if (!_isEmitDelistedInsightWarningSent)
                     {
@@ -467,7 +471,7 @@ namespace QuantConnect.Algorithm
                 else
                 {
                     // Initialize the insight fields
-                    insights[i] = InitializeInsightFields(insights[i]);
+                    insights[i] = InitializeInsightFields(insights[i], security);
 
                     // If we already had an invalid insight, this will have been initialized storing the valid ones.
                     if (validInsights != null)
@@ -485,11 +489,20 @@ namespace QuantConnect.Algorithm
         /// Helper class used to set values not required to be set by alpha models
         /// </summary>
         /// <param name="insight">The <see cref="Insight"/> to set the values for</param>
+        /// <param name="security">The <see cref="Security"/> instance associated with this insight</param>
         /// <returns>The same <see cref="Insight"/> instance with the values set</returns>
-        private Insight InitializeInsightFields(Insight insight)
+        private Insight InitializeInsightFields(Insight insight, Security security)
         {
             insight.GeneratedTimeUtc = UtcTime;
-            insight.ReferenceValue = _securityValuesProvider.GetValues(insight.Symbol).Get(insight.Type);
+            switch (insight.Type)
+            {
+                case InsightType.Price:
+                    insight.ReferenceValue = security.Price;
+                    break;
+                case InsightType.Volatility:
+                    insight.ReferenceValue = security.VolatilityModel.Volatility;
+                    break;
+            }
             insight.SourceModel = string.IsNullOrEmpty(insight.SourceModel) ? Alpha.GetModelName() : insight.SourceModel;
 
             var exchangeHours = MarketHoursDatabase.GetExchangeHours(insight.Symbol.ID.Market, insight.Symbol, insight.Symbol.SecurityType);

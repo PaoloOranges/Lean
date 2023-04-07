@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,7 +15,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -79,18 +78,12 @@ namespace QuantConnect.Api
                 writer.WriteStartArray();
                 foreach (var keyValuePair in optimizationBacktest.Statistics.OrderBy(pair => pair.Key))
                 {
-                    var statistic = keyValuePair.Value.Replace("%", string.Empty);
-                    foreach (var currencySymbol in Currencies.CurrencySymbols.Values)
-                    {
-                        statistic = statistic.Replace(currencySymbol, string.Empty);
-                    }
-
-                    if (string.IsNullOrEmpty(statistic))
+                    if(keyValuePair.Key == PerformanceMetrics.PortfolioTurnover)
                     {
                         continue;
                     }
-
-                    if (decimal.TryParse(statistic, NumberStyles.Any, CultureInfo.InvariantCulture, out var result))
+                    var statistic = keyValuePair.Value.Replace("%", string.Empty);
+                    if (Currencies.TryParse(statistic, out var result))
                     {
                         writer.WriteValue(result);
                     }

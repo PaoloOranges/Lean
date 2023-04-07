@@ -30,6 +30,21 @@ namespace QuantConnect.Commands
         public Symbol Symbol { get; set; }
 
         /// <summary>
+        /// Gets or sets the string ticker symbol
+        /// </summary>
+        public string Ticker { get; set; }
+
+        /// <summary>
+        /// Gets or sets the security type of the ticker.
+        /// </summary>
+        public SecurityType SecurityType { get; set; }
+
+        /// <summary>
+        /// Gets or sets the market the ticker resides in
+        /// </summary>
+        public string Market { get; set; }
+
+        /// <summary>
         /// Gets or sets the order type to be submted
         /// </summary>
         public OrderType OrderType { get; set; }
@@ -60,21 +75,22 @@ namespace QuantConnect.Commands
         /// <param name="algorithm">The algorithm to run this command against</param>
         public override CommandResultPacket Run(IAlgorithm algorithm)
         {
+            Symbol = GetSymbol(Ticker, SecurityType, Market, Symbol);
             var request = new SubmitOrderRequest(OrderType, Symbol.SecurityType, Symbol, Quantity, StopPrice, LimitPrice, DateTime.UtcNow, Tag);
-            var ticket = algorithm.Transactions.ProcessRequest(request);
+            var ticket = algorithm.SubmitOrderRequest(request);
             var response = ticket.GetMostRecentOrderResponse();
-            var message = $"{OrderType} for {Quantity} units of {Symbol}: {response}";
+            var message = Messages.OrderCommand.CommandInfo(OrderType, Symbol, Quantity, response);
 
-            if (response.IsSuccess)
-            {
-                algorithm.Debug(message);
-            }
-            else
+            if (response.IsError)
             {
                 algorithm.Error(message);
             }
+            else
+            {
+                algorithm.Debug(message);
+            }
 
-            return new CommandResultPacket(this, response.IsSuccess);
+            return new CommandResultPacket(this, success: !response.IsError);
         }
 
         /// <summary>
@@ -86,6 +102,7 @@ namespace QuantConnect.Commands
         /// <filterpriority>2</filterpriority>
         public override string ToString()
         {
+            Symbol = GetSymbol(Ticker, SecurityType, Market, Symbol);
             // delegate to the order request
             return new SubmitOrderRequest(OrderType, Symbol.SecurityType, Symbol, Quantity, StopPrice, LimitPrice, DateTime.UtcNow, Tag).ToString();
         }

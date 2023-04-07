@@ -63,7 +63,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Order fill event handler. On an order fill update the resulting information is passed to this method.
         /// </summary>
-        /// <param name="orderEvent">Order event details containing details of the evemts</param>
+        /// <param name="orderEvent">Order event details containing details of the events</param>
         /// <remarks>This method can be called asynchronously and so should only be used by seasoned C# experts. Ensure you use proper locks on thread-unsafe objects</remarks>
         public override void OnOrderEvent(OrderEvent orderEvent)
         {
@@ -117,25 +117,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Fees", "$41.65"},
             {"Estimated Strategy Capacity", "$2100000.00"},
             {"Lowest Capacity Asset", "IBM R735QTJ8XC9X"},
-            {"Fitness Score", "0.999"},
-            {"Kelly Criterion Estimate", "34.359"},
-            {"Kelly Criterion Probability Value", "0.442"},
-            {"Sortino Ratio", "79228162514264337593543950335"},
-            {"Return Over Maximum Drawdown", "437.491"},
-            {"Portfolio Turnover", "1.083"},
-            {"Total Insights Generated", "5"},
-            {"Total Insights Closed", "3"},
-            {"Total Insights Analysis Completed", "3"},
-            {"Long Insight Count", "3"},
-            {"Short Insight Count", "2"},
-            {"Long/Short Ratio", "150.0%"},
-            {"Estimated Monthly Alpha Value", "$801912.7740"},
-            {"Total Accumulated Estimated Alpha Value", "$129197.0580"},
-            {"Mean Population Estimated Insight Value", "$43065.6860"},
-            {"Mean Population Direction", "100%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "100%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
+            {"Portfolio Turnover", "146.73%"},
             {"OrderListHash", "ac25829306d9fb41b6fc8eebf438c505"}
         };
     }

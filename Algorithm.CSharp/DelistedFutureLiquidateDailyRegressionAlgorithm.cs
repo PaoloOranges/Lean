@@ -28,7 +28,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 1637;
+        public override long DataPoints => 1850;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
@@ -38,44 +38,26 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "2"},
             {"Average Win", "7.78%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "38.034%"},
-            {"Drawdown", "1.000%"},
+            {"Compounding Annual Return", "38.033%"},
+            {"Drawdown", "0.200%"},
             {"Expectancy", "0"},
             {"Net Profit", "7.779%"},
-            {"Sharpe Ratio", "2.639"},
-            {"Probabilistic Sharpe Ratio", "93.699%"},
+            {"Sharpe Ratio", "3.2"},
+            {"Probabilistic Sharpe Ratio", "99.459%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.206"},
-            {"Beta", "0.13"},
-            {"Annual Standard Deviation", "0.098"},
-            {"Annual Variance", "0.01"},
-            {"Information Ratio", "-1.152"},
-            {"Tracking Error", "0.121"},
-            {"Treynor Ratio", "1.981"},
-            {"Total Fees", "$1.85"},
-            {"Estimated Strategy Capacity", "$62000000000.00"},
+            {"Alpha", "0.149"},
+            {"Beta", "0.271"},
+            {"Annual Standard Deviation", "0.08"},
+            {"Annual Variance", "0.006"},
+            {"Information Ratio", "-1.446"},
+            {"Tracking Error", "0.098"},
+            {"Treynor Ratio", "0.946"},
+            {"Total Fees", "$2.15"},
+            {"Estimated Strategy Capacity", "$60000000000.00"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
-            {"Fitness Score", "0.018"},
-            {"Kelly Criterion Estimate", "0"},
-            {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "4.641"},
-            {"Return Over Maximum Drawdown", "39.421"},
-            {"Portfolio Turnover", "0.019"},
-            {"Total Insights Generated", "0"},
-            {"Total Insights Closed", "0"},
-            {"Total Insights Analysis Completed", "0"},
-            {"Long Insight Count", "0"},
-            {"Short Insight Count", "0"},
-            {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$0"},
-            {"Total Accumulated Estimated Alpha Value", "$0"},
-            {"Mean Population Estimated Insight Value", "$0"},
-            {"Mean Population Direction", "0%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
+            {"Portfolio Turnover", "1.96%"},
             {"OrderListHash", "bbd8ee011b21ef33f4b15b0509c96bbb"}
         };
     }

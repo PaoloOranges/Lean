@@ -151,16 +151,7 @@ namespace QuantConnect
         /// </summary>
         public override string ToString()
         {
-            var value = Invariant($"{Symbol.Value}: {Quantity} @ ") +
-                Invariant($"{CurrencySymbol}{AveragePrice} - ") +
-                Invariant($"Market: {CurrencySymbol}{MarketPrice}");
-
-            if (ConversionRate != 1m)
-            {
-                value += Invariant($" - Conversion: {ConversionRate}");
-            }
-
-            return value;
+            return Messages.Holding.ToString(this);
         }
     }
 
@@ -310,6 +301,11 @@ namespace QuantConnect
         /// For index options traded on American markets, they tend to be European-style options and are Cash-settled.
         /// </remarks>
         IndexOption,
+
+        /// <summary>
+        /// Crypto futures
+        /// </summary>
+        CryptoFuture,
     }
 
     /// <summary>
@@ -523,7 +519,7 @@ namespace QuantConnect
             Initialized = false;
             HasSubscribers = true;
             Status = AlgorithmStatus.Running;
-            ChartSubscription = "Strategy Equity";
+            ChartSubscription = Messages.AlgorithmControl.ChartSubscription;
         }
 
         /// <summary>
@@ -695,7 +691,11 @@ namespace QuantConnect
         /// Eliminates price jumps between two consecutive contracts, multiplying the prices by their ratio. The last contract has the true price. Factor 1. (6)
         /// </summary>
         /// <remarks>Last contract is the true one, factor 1</remarks>
-        BackwardsRatio
+        BackwardsRatio,
+        /// <summary>
+        /// Splits and dividends are adjusted into the prices in a given date. Only for history requests. (7)
+        /// </summary>
+        ScaledRaw,
     }
 
     /// <summary>
@@ -722,6 +722,25 @@ namespace QuantConnect
         /// The contract maps when any of the back month contracts of the next year have a higher volume that the current front month (3)
         /// </summary>
         OpenInterestAnnual,
+    }
+
+    /// <summary>
+    /// The different types of <see cref="CashBook.Updated"/> events
+    /// </summary>
+    public enum CashBookUpdateType
+    {
+        /// <summary>
+        /// A new <see cref="Cash.Symbol"/> was added (0)
+        /// </summary>
+        Added,
+        /// <summary>
+        /// One or more <see cref="Cash"/> instances were removed (1)
+        /// </summary>
+        Removed,
+        /// <summary>
+        /// An existing <see cref="Cash.Symbol"/> was updated (2)
+        /// </summary>
+        Updated
     }
 
     /// <summary>
@@ -822,10 +841,27 @@ namespace QuantConnect
                     case "BATS Y":
                     case "BATS_Y":
                         return Exchange.BATS_Y;
+                    case "BB":
                     case "BOSTON":
                         return Exchange.BOSTON;
                     case "BSE":
                         return Exchange.BSE;
+                    case "IEX":
+                        return Exchange.IEX;
+                    case "SMART":
+                        return Exchange.SMART;
+                    case "OTCX":
+                        return Exchange.OTCX;
+                    case "MP":
+                    case "MIAX PEARL":
+                    case "MIAX_PEARL":
+                        return Exchange.MIAX_PEARL;
+                    case "L":
+                    case "LTSE":
+                        return Exchange.LTSE;
+                    case "MM":
+                    case "MEMX":
+                        return Exchange.MEMX;
                 }
             }
             else if (securityType == SecurityType.Option)
@@ -835,8 +871,17 @@ namespace QuantConnect
                     case "A":
                     case "AMEX":
                         return Exchange.AMEX_Options;
+                    case "M":
                     case "MIAX":
                         return Exchange.MIAX;
+                    case "ME":
+                    case "MIAX EMERALD":
+                    case "MIAX_EMERALD":
+                        return Exchange.MIAX_EMERALD;
+                    case "MP":
+                    case "MIAX PEARL":
+                    case "MIAX_PEARL":
+                        return Exchange.MIAX_PEARL;
                     case "I":
                     case "ISE":
                         return Exchange.ISE;

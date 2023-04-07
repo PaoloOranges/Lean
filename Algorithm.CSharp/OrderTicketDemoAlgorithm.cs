@@ -165,7 +165,7 @@ namespace QuantConnect.Algorithm.CSharp
                     return;
                 }
 
-                // if niether order has filled, bring in the limits by a penny
+                // if neither order has filled, bring in the limits by a penny
 
                 var newLongLimit = longOrder.Get(OrderField.LimitPrice) + 0.01m;
                 var newShortLimit = shortOrder.Get(OrderField.LimitPrice) - 0.01m;
@@ -234,7 +234,7 @@ namespace QuantConnect.Algorithm.CSharp
                     return;
                 }
 
-                // if niether order has filled, bring in the stops by a penny
+                // if neither order has filled, bring in the stops by a penny
 
                 var newLongStop = longOrder.Get(OrderField.StopPrice) - 0.01m;
                 var newShortStop = shortOrder.Get(OrderField.StopPrice) + 0.01m;
@@ -258,7 +258,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// StopLimitOrders work as a combined stop and limit order. First, the
         /// price must pass the stop price in the same way a StopMarketOrder works,
-        /// but then we're also gauranteed a fill price at least as good as the
+        /// but then we're also guaranteed a fill price at least as good as the
         /// limit price. This order type can be beneficial in gap down scenarios
         /// where a StopMarketOrder would have triggered and given the not as beneficial
         /// gapped down price, whereas the StopLimitOrder could protect you from
@@ -279,7 +279,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                 // a long stop is triggered when the price rises above the value
                 // so we'll set a long stop .25% above the current bar's close
-                // now we'll also be setting a limit, this means we are gauranteed
+                // now we'll also be setting a limit, this means we are guaranteed
                 // to get at least the limit price for our fills, so make the limit
                 // price a little softer than the stop price
 
@@ -291,7 +291,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                 // a short stop is triggered when the price falls below the value
                 // so we'll set a short stop .25% below the current bar's close
-                // now we'll also be setting a limit, this means we are gauranteed
+                // now we'll also be setting a limit, this means we are guaranteed
                 // to get at least the limit price for our fills, so make the limit
                 // price a little softer than the stop price
 
@@ -314,7 +314,7 @@ namespace QuantConnect.Algorithm.CSharp
                     return;
                 }
 
-                // if niether order has filled, bring in the stops/limits in by a penny
+                // if neither order has filled, bring in the stops/limits in by a penny
 
                 var newLongStop = longOrder.Get(OrderField.StopPrice) - 0.01m;
                 var newLongLimit = longOrder.Get(OrderField.LimitPrice) + 0.01m;
@@ -494,7 +494,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
             if (remainingOpenOrders != 0m)
             {
-                throw new Exception($"No remaining quantiy to be filled from open orders was expected");
+                throw new Exception($"No remaining quantity to be filled from open orders was expected");
             }
 
             var symbolOpenOrders = Transactions.GetOpenOrders(symbol).Count;
@@ -507,7 +507,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
             if (symbolOpenOrdersRemainingQuantity != 0)
             {
-                throw new Exception($"No remaining quantiy to be filled from open orders was expected");
+                throw new Exception($"No remaining quantity to be filled from open orders was expected");
             }
 
             var defaultOrders = Transactions.GetOrders();
@@ -526,7 +526,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
             if (defaultOpenOrdersRemaining != 0m)
             {
-                throw new Exception($"No remaining quantiy to be filled from open orders was expected");
+                throw new Exception($"No remaining quantity to be filled from open orders was expected");
             }
         }
 
@@ -558,12 +558,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "8"},
             {"Average Win", "0%"},
             {"Average Loss", "-0.01%"},
-            {"Compounding Annual Return", "92.027%"},
+            {"Compounding Annual Return", "92.087%"},
             {"Drawdown", "0.100%"},
             {"Expectancy", "-1"},
             {"Net Profit", "0.838%"},
-            {"Sharpe Ratio", "12.96"},
-            {"Probabilistic Sharpe Ratio", "99.089%"},
+            {"Sharpe Ratio", "12.969"},
+            {"Probabilistic Sharpe Ratio", "99.104%"},
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
@@ -571,32 +571,14 @@ namespace QuantConnect.Algorithm.CSharp
             {"Beta", "0.229"},
             {"Annual Standard Deviation", "0.054"},
             {"Annual Variance", "0.003"},
-            {"Information Ratio", "-7.418"},
+            {"Information Ratio", "-7.415"},
             {"Tracking Error", "0.172"},
-            {"Treynor Ratio", "3.066"},
+            {"Treynor Ratio", "3.069"},
             {"Total Fees", "$8.00"},
             {"Estimated Strategy Capacity", "$48000000.00"},
             {"Lowest Capacity Asset", "SPY R735QTJ8XC9X"},
-            {"Fitness Score", "0.093"},
-            {"Kelly Criterion Estimate", "0"},
-            {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "150.877"},
-            {"Return Over Maximum Drawdown", "1183.499"},
-            {"Portfolio Turnover", "0.093"},
-            {"Total Insights Generated", "0"},
-            {"Total Insights Closed", "0"},
-            {"Total Insights Analysis Completed", "0"},
-            {"Long Insight Count", "0"},
-            {"Short Insight Count", "0"},
-            {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$0"},
-            {"Total Accumulated Estimated Alpha Value", "$0"},
-            {"Mean Population Estimated Insight Value", "$0"},
-            {"Mean Population Direction", "0%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "3f7c620ad37d096af1af0ca341fbbe48"}
+            {"Portfolio Turnover", "7.47%"},
+            {"OrderListHash", "8719eaae0ff158d5050de45e4a607685"}
         };
     }
 }

@@ -47,7 +47,12 @@ namespace QuantConnect.Securities.Option
         /// <returns>The maintenance margin required for the </returns>
         public override MaintenanceMargin GetMaintenanceMargin(PositionGroupMaintenanceMarginParameters parameters)
         {
-            if (_optionStrategy.Name == OptionStrategyDefinitions.CoveredCall.Name)
+            if (_optionStrategy == null)
+            {
+                // we could be liquidating a position
+                return new MaintenanceMargin(0);
+            }
+            else if(_optionStrategy.Name == OptionStrategyDefinitions.CoveredCall.Name)
             {
                 // MAX[In-the-money amount + Margin(long stock evaluated at min(mark price, strike(short call))), min(stock value, max(call value, long stock margin))]
                 var optionPosition = parameters.PositionGroup.Positions.FirstOrDefault(position => position.Symbol.SecurityType.IsOption());
@@ -58,12 +63,12 @@ namespace QuantConnect.Securities.Option
                 var intrinsicValue = optionSecurity.GetIntrinsicValue(underlyingSecurity.Price);
                 var inTheMoneyAmount = intrinsicValue * optionSecurity.ContractUnitOfTrade * Math.Abs(optionPosition.Quantity);
 
-                var underlyingValue = underlyingSecurity.Holdings.GetQuantityValue(underlyingPosition.Quantity);
-                var optionValue = optionSecurity.Holdings.GetQuantityValue(optionPosition.Quantity);
+                var underlyingValue = underlyingSecurity.Holdings.GetQuantityValue(underlyingPosition.Quantity).InAccountCurrency;
+                var optionValue = optionSecurity.Holdings.GetQuantityValue(optionPosition.Quantity).InAccountCurrency;
 
                 // mark price, strike price
                 var underlyingPriceToEvaluate = Math.Min(optionSecurity.Price, optionSecurity.StrikePrice);
-                var underlyingHypotheticalValue = underlyingSecurity.Holdings.GetQuantityValue(underlyingPosition.Quantity, underlyingPriceToEvaluate);
+                var underlyingHypotheticalValue = underlyingSecurity.Holdings.GetQuantityValue(underlyingPosition.Quantity, underlyingPriceToEvaluate).InAccountCurrency;
 
                 var hypotheticalMarginRequired = underlyingSecurity.BuyingPowerModel.GetMaintenanceMargin(
                         new MaintenanceMarginParameters(underlyingSecurity, underlyingPosition.Quantity, 0, underlyingHypotheticalValue));
@@ -156,7 +161,7 @@ namespace QuantConnect.Securities.Option
                 var optionSecurity = (Option)parameters.Portfolio.Securities[optionPosition.Symbol];
                 var underlyingSecurity = parameters.Portfolio.Securities[underlyingPosition.Symbol];
 
-                var optionValue = optionSecurity.Holdings.GetQuantityValue(optionPosition.Quantity);
+                var optionValue = optionSecurity.Holdings.GetQuantityValue(optionPosition.Quantity).InAccountCurrency;
 
                 var marginRequired = underlyingSecurity.BuyingPowerModel.GetInitialMarginRequirement(underlyingSecurity, underlyingPosition.Quantity);
 

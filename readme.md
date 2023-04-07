@@ -7,12 +7,12 @@
 [Lean Home][1] | [Documentation][2] | [Download Zip][3] | [Docker Hub][8] | [Nuget][9]
 
 ----------
-
-## Introduction ##
  
+## Introduction ##
+
 Lean Engine is an open-source algorithmic trading engine built for easy strategy research, backtesting and live trading. We integrate with common data providers and brokerages so you can quickly deploy algorithmic trading strategies.
 
-The core of the LEAN Engine is written in C#; but it operates seamlessly on Linux, Mac and Windows operating systems. It supports algorithms written in Python 3.6 or C#. Lean drives the web-based algorithmic trading platform [QuantConnect][4].
+The core of the LEAN Engine is written in C#; but it operates seamlessly on Linux, Mac and Windows operating systems. It supports algorithms written in Python 3.8 or C#. Lean drives the web-based algorithmic trading platform [QuantConnect][4].
 
  
 ## Proudly Sponsored By ##
@@ -52,11 +52,17 @@ The most important plugins are:
 
 These are all configurable from the config.json file in the Launcher Project.
 
+## Developing with Visual Studio Code Dev Containers
+
+The [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension lets you use a Docker container as a full-featured development environment. The extension starts (or attaches to) a development container running the _quantconnect/research:latest_ image. 
+
+A full explanation of developing Lean with Visual Studio Code Dev Containers can be found in the [VS Code Integration](https://github.com/QuantConnect/Lean/tree/master/.vscode#readme) project.
+
 ## Developing with Lean CLI ##
 
 QuantConnect recommends using [Lean CLI](https://github.com/QuantConnect/lean-cli) for local algorithm development. This is because it is a great tool for working with your algorithms locally while still being able to deploy to the cloud and have access to Lean data. It is also able to run algorithms on your local machine with your data through our official docker images.
 
-Reference QuantConnects documentation on Lean CLI [here](https://www.quantconnect.com/docs/v2/lean-cli/getting-started/lean-cli)
+Reference QuantConnects documentation on Lean CLI [here](https://www.quantconnect.com/docs/v2/lean-cli/key-concepts/getting-started)
 
 ## Installation Instructions ##
 
@@ -91,7 +97,7 @@ dotnet QuantConnect.Lean.Launcher.dll
 
 ### Linux (Debian, Ubuntu)
 
-- Install [dotnet 5](https://docs.microsoft.com/en-us/dotnet/core/install/linux):
+- Install [dotnet 6](https://docs.microsoft.com/en-us/dotnet/core/install/linux):
 - Compile Lean Solution:
 ```
 dotnet build QuantConnect.Lean.sln

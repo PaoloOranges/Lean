@@ -25,39 +25,43 @@ namespace QuantConnect.Algorithm.CSharp
     /// </summary>
     public class FutureMarketOpenAndCloseRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
-        private static List<DateTime> _afterMarketOpen = new List<DateTime>() {
-            new DateTime(2022, 02, 01, 16, 30, 0),
-            new DateTime(2022, 02, 02, 16, 30, 0),
-            new DateTime(2022, 02, 03, 16, 30, 0),
-            new DateTime(2022, 02, 04, 16, 30, 0),
-            new DateTime(2022, 02, 06, 18, 0, 0),
-            new DateTime(2022, 02, 07, 16, 30, 0),
-            new DateTime(2022, 02, 08, 16, 30, 0)
+        protected virtual bool ExtendedMarketHours => false;
+
+        protected virtual List<DateTime> AfterMarketOpen => new List<DateTime>() {
+            new DateTime(2022, 02, 01, 9, 30, 0),
+            new DateTime(2022, 02, 02, 9, 30, 0),
+            new DateTime(2022, 02, 03, 9, 30, 0),
+            new DateTime(2022, 02, 04, 9, 30, 0),
+            new DateTime(2022, 02, 07, 9, 30, 0),
+            new DateTime(2022, 02, 08, 9, 30, 0)
         };
-        private static List<DateTime> _beforeMarketClose = new List<DateTime>()
+        protected virtual List<DateTime> BeforeMarketClose => new List<DateTime>()
         {
-            new DateTime(2022, 02, 01, 16, 15, 0),
-            new DateTime(2022, 02, 02, 16, 15, 0),
-            new DateTime(2022, 02, 03, 16, 15, 0),
-            new DateTime(2022, 02, 04, 16, 15, 0),
-            new DateTime(2022, 02, 07, 16, 15, 0),
-            new DateTime(2022, 02, 08, 16, 15, 0)
+            new DateTime(2022, 02, 01, 17, 0, 0),
+            new DateTime(2022, 02, 02, 17, 0, 0),
+            new DateTime(2022, 02, 03, 17, 0, 0),
+            new DateTime(2022, 02, 04, 17, 0, 0),
+            new DateTime(2022, 02, 07, 17, 0, 0),
+            new DateTime(2022, 02, 08, 17, 0, 0)
         };
-        private Queue<DateTime> _afterMarketOpenQueue = new Queue<DateTime>(_afterMarketOpen);
-        private Queue<DateTime> _beforeMarketCloseQueue = new Queue<DateTime>(_beforeMarketClose);
+        private Queue<DateTime> _afterMarketOpenQueue;
+        private Queue<DateTime> _beforeMarketCloseQueue;
 
         public override void Initialize()
         {
             SetStartDate(2022, 02, 01);
             SetEndDate(2022, 02, 08);
-            var esFuture = AddFuture("ES").Symbol;
+            var esFuture = AddFuture("ES", extendedMarketHours: ExtendedMarketHours).Symbol;
+
+            _afterMarketOpenQueue = new Queue<DateTime>(AfterMarketOpen);
+            _beforeMarketCloseQueue = new Queue<DateTime>(BeforeMarketClose);
 
             Schedule.On(DateRules.EveryDay(esFuture),
-                TimeRules.AfterMarketOpen(esFuture),
+                TimeRules.AfterMarketOpen(esFuture, extendedMarketOpen: ExtendedMarketHours),
                 EveryDayAfterMarketOpen);
 
             Schedule.On(DateRules.EveryDay(esFuture),
-                TimeRules.BeforeMarketClose(esFuture),
+                TimeRules.BeforeMarketClose(esFuture, extendedMarketClose: ExtendedMarketHours),
                 EveryDayBeforeMarketClose);
         }
 
@@ -81,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void OnEndOfAlgorithm()
         {
-            if (!_afterMarketOpenQueue.Any() || !_beforeMarketCloseQueue.Any())
+            if (_afterMarketOpenQueue.Any() || _beforeMarketCloseQueue.Any())
             {
                 throw new Exception($"_afterMarketOpenQueue and _beforeMarketCloseQueue should be empty");
             }
@@ -91,12 +95,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp};
+        public virtual Language[] Languages { get; } = { Language.CSharp};
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 7;
+        public virtual long DataPoints => 27067;
 
         /// </summary>
         /// Data Points count of the algorithm history
@@ -106,7 +110,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
-        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Trades", "0"},
             {"Average Win", "0%"},
@@ -130,25 +134,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Fees", "$0.00"},
             {"Estimated Strategy Capacity", "$0"},
             {"Lowest Capacity Asset", ""},
-            {"Fitness Score", "0"},
-            {"Kelly Criterion Estimate", "0"},
-            {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "79228162514264337593543950335"},
-            {"Return Over Maximum Drawdown", "79228162514264337593543950335"},
-            {"Portfolio Turnover", "0"},
-            {"Total Insights Generated", "0"},
-            {"Total Insights Closed", "0"},
-            {"Total Insights Analysis Completed", "0"},
-            {"Long Insight Count", "0"},
-            {"Short Insight Count", "0"},
-            {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$0"},
-            {"Total Accumulated Estimated Alpha Value", "$0"},
-            {"Mean Population Estimated Insight Value", "$0"},
-            {"Mean Population Direction", "0%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
+            {"Portfolio Turnover", "0%"},
             {"OrderListHash", "d41d8cd98f00b204e9800998ecf8427e"}
         };
     }

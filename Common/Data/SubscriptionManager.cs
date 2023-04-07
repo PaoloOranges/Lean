@@ -180,7 +180,11 @@ namespace QuantConnect.Data
         /// <param name="pyConsolidator">The custom python consolidator</param>
         public void AddConsolidator(Symbol symbol, PyObject pyConsolidator)
         {
-            IDataConsolidator consolidator = new DataConsolidatorPythonWrapper(pyConsolidator);
+            if (!pyConsolidator.TryConvert(out IDataConsolidator consolidator))
+            {
+                consolidator = new DataConsolidatorPythonWrapper(pyConsolidator);
+            }
+
             AddConsolidator(symbol, consolidator);
         }
 
@@ -218,7 +222,8 @@ namespace QuantConnect.Data
                 {SecurityType.Cfd, new List<TickType> {TickType.Quote}},
                 {SecurityType.Future, new List<TickType> {TickType.Quote, TickType.Trade, TickType.OpenInterest}},
                 {SecurityType.Commodity, new List<TickType> {TickType.Trade}},
-                {SecurityType.Crypto, new List<TickType> {TickType.Trade, TickType.Quote}}
+                {SecurityType.Crypto, new List<TickType> {TickType.Trade, TickType.Quote}},
+                {SecurityType.CryptoFuture, new List<TickType> {TickType.Trade, TickType.Quote}}
             };
         }
 

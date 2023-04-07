@@ -83,7 +83,8 @@ namespace QuantConnect.Algorithm.CSharp
                 Liquidate();
             }
 
-            if (_currentContract != null && _currentContract.Symbol != _continuousContract.Mapped)
+            // We check exchange hours because the contract mapping can call OnData outside of regular hours.
+            if (_currentContract != null && _currentContract.Symbol != _continuousContract.Mapped && _continuousContract.Exchange.ExchangeOpen)
             {
                 Log($"{Time} - rolling position from {_currentContract.Symbol} to {_continuousContract.Mapped}");
 
@@ -117,7 +118,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 875590;
+        public long DataPoints => 709638;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -132,45 +133,27 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "-0.02%"},
-            {"Compounding Annual Return", "-0.032%"},
+            {"Compounding Annual Return", "-0.033%"},
             {"Drawdown", "0.000%"},
             {"Expectancy", "-1"},
-            {"Net Profit", "-0.016%"},
+            {"Net Profit", "-0.017%"},
             {"Sharpe Ratio", "-1.173"},
             {"Probabilistic Sharpe Ratio", "0.011%"},
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
             {"Alpha", "-0"},
-            {"Beta", "0"},
+            {"Beta", "-0"},
             {"Annual Standard Deviation", "0"},
             {"Annual Variance", "0"},
-            {"Information Ratio", "-2.753"},
+            {"Information Ratio", "-2.752"},
             {"Tracking Error", "0.082"},
-            {"Treynor Ratio", "-8.269"},
-            {"Total Fees", "$3.70"},
+            {"Treynor Ratio", "1.883"},
+            {"Total Fees", "$4.30"},
             {"Estimated Strategy Capacity", "$0"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
-            {"Fitness Score", "0.006"},
-            {"Kelly Criterion Estimate", "0"},
-            {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "79228162514264337593543950335"},
-            {"Return Over Maximum Drawdown", "-1.985"},
-            {"Portfolio Turnover", "0.01"},
-            {"Total Insights Generated", "0"},
-            {"Total Insights Closed", "0"},
-            {"Total Insights Analysis Completed", "0"},
-            {"Long Insight Count", "0"},
-            {"Short Insight Count", "0"},
-            {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$0"},
-            {"Total Accumulated Estimated Alpha Value", "$0"},
-            {"Mean Population Estimated Insight Value", "$0"},
-            {"Mean Population Direction", "0%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "d5bb3821a9a78b9fbef422c0f6bb6b4c"}
+            {"Portfolio Turnover", "0.92%"},
+            {"OrderListHash", "1fd4b49e9450800981c6dead2bbca995"}
         };
     }
 }

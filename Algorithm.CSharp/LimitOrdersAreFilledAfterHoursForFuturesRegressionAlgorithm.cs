@@ -27,7 +27,7 @@ namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
     /// Regression algorithm for testing limit orders are filled after hours for futures.
-    /// It also asserts that market and market-on-open orders are not allowed for futures outside of regular market hours
+    /// It also asserts that market-on-open orders are not allowed for futures outside of regular market hours
     /// </summary>
     public class LimitOrdersAreFilledAfterHoursForFuturesRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
@@ -45,9 +45,10 @@ namespace QuantConnect.Algorithm.CSharp
             _continuousContract = AddFuture(Futures.Indices.SP500EMini,
                 dataNormalizationMode: DataNormalizationMode.BackwardsRatio,
                 dataMappingMode: DataMappingMode.LastTradingDay,
-                contractDepthOffset: 0
+                contractDepthOffset: 0,
+                extendedMarketHours: true
             );
-            _futureContract = AddFutureContract(FutureChainProvider.GetFutureContractList(_continuousContract.Symbol, Time).First());
+            _futureContract = AddFutureContract(FutureChainProvider.GetFutureContractList(_continuousContract.Symbol, Time).First(), extendedMarketHours: true);
         }
 
         public override void OnWarmupFinished()
@@ -56,13 +57,6 @@ namespace QuantConnect.Algorithm.CSharp
             if (_futureContract.Exchange.ExchangeOpen)
             {
                 throw new Exception("We should be outside regular market hours");
-            }
-
-            // Market order should not be allowed for futures outside of regular market hours
-            var futureContractMarketOrder = MarketOrder(_futureContract.Symbol, 1);
-            if (futureContractMarketOrder.Status != OrderStatus.Invalid)
-            {
-                throw new Exception($"Market order should not be allowed for futures outside of regular market hours");
             }
 
             // Market on open order should not be allowed for futures outside of regular market hours
@@ -119,7 +113,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 81526;
+        public long DataPoints => 82366;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -134,10 +128,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "121.062%"},
+            {"Compounding Annual Return", "120.870%"},
             {"Drawdown", "3.700%"},
             {"Expectancy", "0"},
-            {"Net Profit", "1.093%"},
+            {"Net Profit", "1.091%"},
             {"Sharpe Ratio", "4.285"},
             {"Probabilistic Sharpe Ratio", "58.720%"},
             {"Loss Rate", "0%"},
@@ -147,31 +141,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Beta", "1.285"},
             {"Annual Standard Deviation", "0.314"},
             {"Annual Variance", "0.098"},
-            {"Information Ratio", "15.223"},
+            {"Information Ratio", "15.222"},
             {"Tracking Error", "0.077"},
             {"Treynor Ratio", "1.046"},
-            {"Total Fees", "$3.70"},
+            {"Total Fees", "$4.30"},
             {"Estimated Strategy Capacity", "$39000000.00"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
-            {"Fitness Score", "0.327"},
-            {"Kelly Criterion Estimate", "0"},
-            {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "7.193"},
-            {"Return Over Maximum Drawdown", "23.933"},
-            {"Portfolio Turnover", "0.334"},
-            {"Total Insights Generated", "0"},
-            {"Total Insights Closed", "0"},
-            {"Total Insights Analysis Completed", "0"},
-            {"Long Insight Count", "0"},
-            {"Short Insight Count", "0"},
-            {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$0"},
-            {"Total Accumulated Estimated Alpha Value", "$0"},
-            {"Mean Population Estimated Insight Value", "$0"},
-            {"Mean Population Direction", "0%"},
-            {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"},
+            {"Portfolio Turnover", "33.59%"},
             {"OrderListHash", "22ca22bec4626a32dc8db29382acf948"}
         };
     }

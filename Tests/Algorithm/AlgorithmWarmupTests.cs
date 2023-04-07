@@ -80,7 +80,6 @@ namespace QuantConnect.Tests.Algorithm
 
             AlgorithmRunner.RunLocalBacktest(nameof(TestWarmupAlgorithm),
                 new Dictionary<string, string> { { "Total Trades", "1" } },
-                null,
                 Language.CSharp,
                 AlgorithmStatus.Completed,
                 setupHandler: "TestSetupHandler");
@@ -292,6 +291,29 @@ namespace QuantConnect.Tests.Algorithm
             algo.PostInitialize();
 
             Assert.AreEqual(expected, algo.Time);
+        }
+
+        [TestCase("UTC")]
+        [TestCase("Asia/Hong_Kong")]
+        [TestCase("America/New_York")]
+        public void WarmupEndTime(string timeZone)
+        {
+            var algo = new AlgorithmStub(new NullDataFeed { ShouldThrow = false });
+            algo.SetLiveMode(true);
+
+            algo.SetWarmup(TimeSpan.FromDays(1));
+            algo.SetTimeZone(timeZone);
+            algo.PostInitialize();
+            algo.SetLocked();
+
+            Assert.IsTrue(algo.IsWarmingUp);
+
+            var start = DateTime.UtcNow;
+
+            algo.SetDateTime(start.AddMinutes(-1));
+            Assert.IsTrue(algo.IsWarmingUp);
+            algo.SetDateTime(start);
+            Assert.IsFalse(algo.IsWarmingUp);
         }
 
         [Test]
