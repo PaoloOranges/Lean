@@ -2,7 +2,7 @@
     # Release Version
     #
 
-    FROM mcr.microsoft.com/dotnet/sdk:5.0 as build
+    FROM mcr.microsoft.com/dotnet/sdk:6.0 as build
     
     WORKDIR /Lean
     
@@ -11,7 +11,7 @@
     RUN dotnet publish Launcher/QuantConnect.Lean.Launcher.csproj -c Release -o /output
 
 
-    FROM mcr.microsoft.com/dotnet/runtime:5.0-bullseye-slim-arm32v7
+    FROM mcr.microsoft.com/dotnet/runtime:6.0-alpine-arm32v7
     WORKDIR /Lean
 
     COPY Data/market-hours /Data/market-hours
