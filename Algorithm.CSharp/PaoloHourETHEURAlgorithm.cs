@@ -184,7 +184,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (IsWarmingUp)
             {
-                if(_purchase_status < 0 && !HasSoldPriceFromPreviousSession)
+                if(_purchase_status == PurchaseStatus.Sold && !HasSoldPriceFromPreviousSession)
                 {
                     _sold_price = _maximum_price;
                 }
@@ -245,7 +245,7 @@ namespace QuantConnect.Algorithm.CSharp
 #endif
             decimal current_price = Securities[SymbolName].Price;
 
-            if (_purchase_status < 0)
+            if (_purchase_status == PurchaseStatus.Sold)
             {                
                 if (IsOkToBuy(data))
                 {
@@ -264,7 +264,7 @@ namespace QuantConnect.Algorithm.CSharp
 #endif
                 }
             }
-            else if (_purchase_status > 0)
+            else if (_purchase_status == PurchaseStatus.Bought)
             {
                 _maximum_price_after_buy = Math.Max(current_price, _maximum_price_after_buy);
                 if (IsOkToSell(data))
