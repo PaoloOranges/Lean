@@ -66,6 +66,14 @@ namespace QuantConnect.Algorithm.CSharp
         private const string CurrencyName = "EUR";
         private const string SymbolName = CryptoName + CurrencyName;
 
+#if DEBUG && PLOT_CHART
+        private const string ChartSymbolPrefix = "BARS_";
+
+        private const string OpenSeriesName = "O";
+        private const string HighSeriesName = "H";
+        private const string LowSeriesName = "L";
+        private const string CloseSeriesName = "C";
+#endif
         // Objsect store to save last buy and sell price for different deploy
         private const string LastBoughtObjectStoreKey = SymbolName + "-last-buy";
         private const string LastSoldObjectStoreKey = SymbolName + "-last-sell";
@@ -123,6 +131,22 @@ namespace QuantConnect.Algorithm.CSharp
             _maximum_price_after_buy = _maximum_price;
 
             SetWarmUp(TimeSpan.FromDays(7));
+
+#if DEBUG && PLOT_CHART
+            var candleChart = new Chart(ChartSymbolPrefix + SymbolName);
+            AddChart(candleChart);
+            candleChart.AddSeries(new Series(OpenSeriesName, SeriesType.Line, "€"));
+            candleChart.AddSeries(new Series(HighSeriesName, SeriesType.Line, "€"));
+            candleChart.AddSeries(new Series(LowSeriesName, SeriesType.Line, "€"));
+            candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
+            //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
+            PlotIndicator("Indicators", _macd);
+            PlotIndicator("Indicators", _slow_hullma);
+            PlotIndicator("Indicators", _fast_lsma);
+            PlotIndicator("Indicators", _very_fast_wma);
+            PlotIndicator("Indicators", _psar);
+            PlotIndicator("Indicators", _maximum_price);
+#endif
 
         }
 
@@ -213,27 +237,33 @@ namespace QuantConnect.Algorithm.CSharp
             UtcTimeLast = UtcTimeNow;
 
 #if DEBUG && PLOT_CHART
-            Plot(SymbolName, "Price", data[SymbolName].Value);
-            if (_macd.Histogram.Current.Value > 0m)
-            {
-                Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
-            }
-            if (_slow_hullma > 0)
-            {
-                Plot("Indicators", "HullMA", _slow_hullma);
-            }
-            if (_fast_lsma > 0)
-            {
-                Plot("Indicators", "LSMA", _fast_lsma);
-            }
-            if(_very_fast_wma > 0)
-            {
-                Plot("Indicators", "WMA", _very_fast_wma);
-            }
-            if (_psar > 0)
-            {
-                Plot("Indicators", "PSAR", _psar);
-            }
+            //Plot(SymbolName, "Price", data[SymbolName].Value);
+            Plot(ChartSymbolPrefix + SymbolName, OpenSeriesName, data[SymbolName].Open);
+            Plot(ChartSymbolPrefix + SymbolName, HighSeriesName, data[SymbolName].High);
+            Plot(ChartSymbolPrefix + SymbolName, LowSeriesName, data[SymbolName].Low);
+            Plot(ChartSymbolPrefix + SymbolName, CloseSeriesName, data[SymbolName].Close);
+            //Plot(SymbolName, "Time", (decimal)data[SymbolName].Time.ToBinary());
+            
+            //if (_macd.Histogram.Current.Value > 0m)
+            //{
+            //    Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
+            //}
+            //if (_slow_hullma > 0)
+            //{
+            //    Plot("Indicators", "HullMA", _slow_hullma);
+            //}
+            //if (_fast_lsma > 0)
+            //{
+            //    Plot("Indicators", "LSMA", _fast_lsma);
+            //}
+            //if(_very_fast_wma > 0)
+            //{
+            //    Plot("Indicators", "WMA", _very_fast_wma);
+            //}
+            //if (_psar > 0)
+            //{
+            //    Plot("Indicators", "PSAR", _psar);
+            //}
 #endif
         }
 
