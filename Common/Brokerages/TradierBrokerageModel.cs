@@ -18,6 +18,7 @@ using QuantConnect.Data.Market;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.Slippage;
+using QuantConnect.Orders.TimeInForces;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Equity;
 
@@ -77,6 +78,37 @@ namespace QuantConnect.Brokerages
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
                     Messages.TradierBrokerageModel.UnsupportedSecurityType);
+
+                return false;
+            }
+
+            if (order.TimeInForce is not GoodTilCanceledTimeInForce && order.TimeInForce is not DayTimeInForce)
+            {
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                    Messages.TradierBrokerageModel.UnsupportedTimeInForceType);
+
+                return false;
+            }
+
+            if (security.Holdings.Quantity + order.Quantity < 0)
+            {
+                if (order.TimeInForce is GoodTilCanceledTimeInForce)
+                {
+                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "ShortOrderIsGtc", Messages.TradierBrokerageModel.ShortOrderIsGtc);
+
+                    return false;
+                }
+                else if (security.Price < 5)
+                {
+                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "SellShortOrderLastPriceBelow5", Messages.TradierBrokerageModel.SellShortOrderLastPriceBelow5);
+
+                    return false;
+                }
+            }
+
+            if (order.AbsoluteQuantity < 1 || order.AbsoluteQuantity > 10000000)
+            {
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "IncorrectOrderQuantity", Messages.TradierBrokerageModel.IncorrectOrderQuantity);
 
                 return false;
             }

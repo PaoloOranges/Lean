@@ -163,7 +163,8 @@ namespace QuantConnect.Lean.Engine.Setup
                     algorithm.SetAvailableDataTypes(BaseSetupHandler.GetConfiguredDataFeeds());
 
                     //Algorithm is backtesting, not live:
-                    algorithm.SetLiveMode(false);
+                    algorithm.SetAlgorithmMode(job.AlgorithmMode);
+                    algorithm.SetDeploymentTarget(job.DeploymentTarget);
 
                     //Set the source impl for the event scheduling
                     algorithm.Schedule.SetEventSchedule(parameters.RealTimeHandler);
@@ -220,10 +221,6 @@ namespace QuantConnect.Lean.Engine.Setup
 
             BaseSetupHandler.SetupCurrencyConversions(algorithm, parameters.UniverseSelection);
             StartingPortfolioValue = algorithm.Portfolio.Cash;
-
-            // we set the free portfolio value based on the initial total value and the free percentage value
-            algorithm.Settings.FreePortfolioValue =
-                algorithm.Portfolio.TotalPortfolioValue * algorithm.Settings.FreePortfolioValuePercentage;
 
             // Get and set maximum orders for this job
             MaxOrders = job.Controls.BacktestingMaxOrders;

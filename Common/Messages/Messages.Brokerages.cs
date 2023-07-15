@@ -22,6 +22,7 @@ using QuantConnect.Orders;
 
 using static QuantConnect.StringExtensions;
 using System.Collections.Generic;
+using QuantConnect.Orders.TimeInForces;
 
 namespace QuantConnect
 {
@@ -60,6 +61,12 @@ namespace QuantConnect
             {
                 return Invariant($@"The minimum order size (in quote currency) for {security.Symbol.Value} is {
                     security.SymbolProperties.MinimumOrderSize}. Order quantity was {quantity}.");
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static string InvalidOrderSize(Securities.Security security, decimal quantity, decimal price)
+            {
+                return Invariant($@"The minimum order size (in quote currency) for {security.Symbol.Value} is {security.SymbolProperties.MinimumOrderSize}. Order size was {quantity * price}.");
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -272,12 +279,20 @@ namespace QuantConnect
         {
             public static string UnsupportedSecurityType = "This model only supports equities and options.";
 
+            public static string UnsupportedTimeInForceType = $"This model only supports orders with the following time in force types: {typeof(DayTimeInForce)} and {typeof(GoodTilCanceledTimeInForce)}";
+
             public static string ExtendedMarketHoursTradingNotSupported =
                 "Tradier does not support extended market hours trading. Your order will be processed at market open.";
 
             public static string OrderQuantityUpdateNotSupported = "Tradier does not support updating order quantities.";
 
             public static string OpenOrdersCancelOnReverseSplitSymbols = "Tradier Brokerage cancels open orders on reverse split symbols";
+
+            public static string ShortOrderIsGtc = "You cannot place short stock orders with GTC, only day orders are allowed";
+
+            public static string SellShortOrderLastPriceBelow5 = "Sell Short order cannot be placed for stock priced below $5";
+
+            public static string IncorrectOrderQuantity = "Quantity should be between 1 and 10,000,000";
         }
 
         /// <summary>
@@ -304,6 +319,18 @@ namespace QuantConnect
             public static string UnsupportedOrderType(Orders.Order order)
             {
                 return Invariant($"{order.Type} order is not supported by Wolverine. Currently, only Market Order is supported.");
+            }
+        }
+
+        /// <summary>
+        /// Provides user-facing messages for the <see cref="Brokerages.RBIBrokerageModel"/> class and its consumers or related classes
+        /// </summary>
+        public static class RBIBrokerageModel
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static string UnsupportedOrderType(Orders.Order order)
+            {
+                return Invariant($"{order.Type} order is not supported by RBI. Currently, only Market Order, Limit Order, StopMarket Order and StopLimit Order are supported.");
             }
         }
     }

@@ -50,8 +50,8 @@ namespace QuantConnect.Algorithm.CSharp
 
             SetBrokerageModel(new InteractiveBrokersBrokerageModel());
 
-            var index = AddIndex("SPX", Resolution.Hour, fillDataForward: true);
-            var indexOption = AddIndexOption(index.Symbol, Resolution.Hour, fillDataForward: true);
+            var index = AddIndex("SPX", Resolution.Hour, fillForward: true);
+            var indexOption = AddIndexOption(index.Symbol, Resolution.Hour, fillForward: true);
             indexOption.SetFilter(filterFunc => filterFunc.CallsOnly());
 
             _option = indexOption;
@@ -162,12 +162,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Average Loss", "-4.10%"},
             {"Compounding Annual Return", "10.590%"},
             {"Drawdown", "1.900%"},
-            {"Expectancy", "-1"},
+            {"Expectancy", "0"},
             {"Net Profit", "0.712%"},
             {"Sharpe Ratio", "3.343"},
             {"Probabilistic Sharpe Ratio", "87.312%"},
-            {"Loss Rate", "100%"},
-            {"Win Rate", "0%"},
+            {"Loss Rate", "0%"},
+            {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
             {"Alpha", "0"},
             {"Beta", "0"},

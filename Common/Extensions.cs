@@ -49,7 +49,6 @@ using QuantConnect.Scheduling;
 using QuantConnect.Securities;
 using QuantConnect.Util;
 using Timer = System.Timers.Timer;
-using static QuantConnect.StringExtensions;
 using Microsoft.IO;
 using NodaTime.TimeZones;
 using QuantConnect.Configuration;
@@ -58,6 +57,7 @@ using QuantConnect.Exceptions;
 using QuantConnect.Securities.Future;
 using QuantConnect.Securities.FutureOption;
 using QuantConnect.Securities.Option;
+using QuantConnect.Statistics;
 
 namespace QuantConnect
 {
@@ -66,6 +66,8 @@ namespace QuantConnect
     /// </summary>
     public static class Extensions
     {
+        private static readonly Regex LeanPathRegex = new Regex("(?:\\S*?\\\\Lean\\\\)|(?:\\S*?/Lean/)", RegexOptions.Compiled);
+        private static readonly Dictionary<string, bool> _emptyDirectories = new ();
         private static readonly HashSet<string> InvalidSecurityTypes = new HashSet<string>();
         private static readonly Regex DateCheck = new Regex(@"\d{8}", RegexOptions.Compiled);
         private static RecyclableMemoryStreamManager MemoryManager = new RecyclableMemoryStreamManager();
@@ -107,22 +109,54 @@ namespace QuantConnect
         }
 
         /// <summary>
-        /// Tries to fetch the custom data type associated with a symbol
+        /// Helper method to clear undesired paths from stack traces
         /// </summary>
-        /// <remarks>Custom data type <see cref="SecurityIdentifier"/> symbol value holds their data type</remarks>
-        public static bool TryGetCustomDataType(this string symbol, out string type)
+        /// <param name="error">The error to cleanup</param>
+        /// <returns>The sanitized error</returns>
+        public static string ClearLeanPaths(string error)
         {
-            type = null;
-            if (symbol != null)
+            if (string.IsNullOrEmpty(error))
             {
-                var index = symbol.LastIndexOf('.');
-                if (index != -1 && symbol.Length > index + 1)
-                {
-                    type = symbol.Substring(index + 1);
-                    return true;
-                }
+                return error;
             }
-            return false;
+            return LeanPathRegex.Replace(error, string.Empty);
+        }
+
+        /// <summary>
+        /// Helper method to check if a directory exists and is not empty
+        /// </summary>
+        /// <param name="directoryPath">The path to check</param>
+        /// <returns>True if the directory does not exist or is empty</returns>
+        /// <remarks>Will cache results</remarks>
+        public static bool IsDirectoryEmpty(this string directoryPath)
+        {
+            lock (_emptyDirectories)
+            {
+                if(!_emptyDirectories.TryGetValue(directoryPath, out var result))
+                {
+                    // is empty unless it exists and it has at least 1 file or directory in it
+                    result = true;
+                    if (Directory.Exists(directoryPath))
+                    {
+                        try
+                        {
+                            result = !Directory.EnumerateFileSystemEntries(directoryPath).Any();
+                        }
+                        catch (Exception exception)
+                        {
+                            Log.Error(exception);
+                        }
+                    }
+
+                    _emptyDirectories[directoryPath] = result;
+                    if (result)
+                    {
+                        Log.Trace($"Extensions.IsDirectoryEmpty(): directory '{directoryPath}' not found or empty");
+                    }
+                }
+
+                return result;
+            }
         }
 
         /// <summary>
@@ -140,7 +174,7 @@ namespace QuantConnect
                     var type = dataTypes.Single();
                     var baseInstance = type.GetBaseDataInstance();
                     baseInstance.Symbol = symbol;
-                    symbol.ID.Symbol.TryGetCustomDataType(out var customType);
+                    SecurityIdentifier.TryGetCustomDataType(symbol.ID.Symbol, out var customType);
                     // for custom types we will add an entry for that type
                     entry = marketHoursDatabase.SetEntryAlwaysOpen(symbol.ID.Market, customType != null ? $"TYPE.{customType}" : null, SecurityType.Base, baseInstance.DataTimeZone());
                 }
@@ -172,35 +206,44 @@ namespace QuantConnect
         /// <summary>
         /// Helper method to download a provided url as a string
         /// </summary>
+        /// <param name="client">The http client to use</param>
+        /// <param name="url">The url to download data from</param>
+        /// <param name="headers">Add custom headers for the request</param>
+        public static string DownloadData(this HttpClient client, string url, Dictionary<string, string> headers = null)
+        {
+            if (headers != null)
+            {
+                foreach (var kvp in headers)
+                {
+                    client.DefaultRequestHeaders.Add(kvp.Key, kvp.Value);
+                }
+            }
+            try
+            {
+                using (var response = client.GetAsync(url).Result)
+                {
+                    using (var content = response.Content)
+                    {
+                        return content.ReadAsStringAsync().Result;
+                    }
+                }
+            }
+            catch (WebException ex)
+            {
+                Log.Error(ex, $"DownloadData(): {Messages.Extensions.DownloadDataFailed(url)}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Helper method to download a provided url as a string
+        /// </summary>
         /// <param name="url">The url to download data from</param>
         /// <param name="headers">Add custom headers for the request</param>
         public static string DownloadData(this string url, Dictionary<string, string> headers = null)
         {
-            using (var client = new HttpClient())
-            {
-                if (headers != null)
-                {
-                    foreach (var kvp in headers)
-                    {
-                        client.DefaultRequestHeaders.Add(kvp.Key, kvp.Value);
-                    }
-                }
-                try
-                {
-                    using (var response = client.GetAsync(url).Result)
-                    {
-                        using (var content = response.Content)
-                        {
-                            return content.ReadAsStringAsync().Result;
-                        }
-                    }
-                }
-                catch (WebException ex)
-                {
-                    Log.Error(ex, $"DownloadData(): {Messages.Extensions.DownloadDataFailed(url)}");
-                    return null;
-                }
-            }
+            using var client = new HttpClient();
+            return client.DownloadData(url, headers);
         }
 
         /// <summary>
@@ -1505,16 +1548,16 @@ namespace QuantConnect
         /// <param name="dateTime">Time to be rounded down</param>
         /// <param name="interval">Timespan interval to round to.</param>
         /// <param name="exchangeHours">The exchange hours to determine open times</param>
-        /// <param name="extendedMarket">True for extended market hours, otherwise false</param>
+        /// <param name="extendedMarketHours">True for extended market hours, otherwise false</param>
         /// <returns>Rounded datetime</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static DateTime ExchangeRoundDown(this DateTime dateTime, TimeSpan interval, SecurityExchangeHours exchangeHours, bool extendedMarket)
+        public static DateTime ExchangeRoundDown(this DateTime dateTime, TimeSpan interval, SecurityExchangeHours exchangeHours, bool extendedMarketHours)
         {
             // can't round against a zero interval
             if (interval == TimeSpan.Zero) return dateTime;
 
             var rounded = dateTime.RoundDown(interval);
-            while (!exchangeHours.IsOpen(rounded, rounded + interval, extendedMarket))
+            while (!exchangeHours.IsOpen(rounded, rounded + interval, extendedMarketHours))
             {
                 rounded -= interval;
             }
@@ -1530,10 +1573,10 @@ namespace QuantConnect
         /// <param name="interval">Timespan interval to round to.</param>
         /// <param name="exchangeHours">The exchange hours to determine open times</param>
         /// <param name="roundingTimeZone">The time zone to perform the rounding in</param>
-        /// <param name="extendedMarket">True for extended market hours, otherwise false</param>
+        /// <param name="extendedMarketHours">True for extended market hours, otherwise false</param>
         /// <returns>Rounded datetime</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static DateTime ExchangeRoundDownInTimeZone(this DateTime dateTime, TimeSpan interval, SecurityExchangeHours exchangeHours, DateTimeZone roundingTimeZone, bool extendedMarket)
+        public static DateTime ExchangeRoundDownInTimeZone(this DateTime dateTime, TimeSpan interval, SecurityExchangeHours exchangeHours, DateTimeZone roundingTimeZone, bool extendedMarketHours)
         {
             // can't round against a zero interval
             if (interval == TimeSpan.Zero) return dateTime;
@@ -1542,7 +1585,7 @@ namespace QuantConnect
             var roundedDateTimeInRoundingTimeZone = dateTimeInRoundingTimeZone.RoundDown(interval);
             var rounded = roundedDateTimeInRoundingTimeZone.ConvertTo(roundingTimeZone, exchangeHours.TimeZone);
 
-            while (!exchangeHours.IsOpen(rounded, rounded + interval, extendedMarket))
+            while (!exchangeHours.IsOpen(rounded, rounded + interval, extendedMarketHours))
             {
                 // Will subtract interval to 'dateTime' in the roundingTimeZone (using the same value type instance) to avoid issues with daylight saving time changes.
                 // GH issue 2368: subtracting interval to 'dateTime' in exchangeHours.TimeZone and converting back to roundingTimeZone
@@ -1564,18 +1607,7 @@ namespace QuantConnect
         /// <returns>True if the market is open</returns>
         public static bool IsMarketOpen(this Security security, bool extendedMarketHours)
         {
-            if (!security.Exchange.Hours.IsOpen(security.LocalTime, extendedMarketHours))
-            {
-                // if we're not open at the current time exactly, check the bar size, this handle large sized bars (hours/days)
-                var currentBar = security.GetLastData();
-                if (currentBar == null
-                    || security.LocalTime.Date != currentBar.EndTime.Date
-                    || !security.Exchange.IsOpenDuringBar(currentBar.Time, currentBar.EndTime, extendedMarketHours))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return security.Exchange.Hours.IsOpen(security.LocalTime, extendedMarketHours);
         }
 
         /// <summary>
@@ -2774,17 +2806,28 @@ namespace QuantConnect
         {
             using (Py.GIL())
             {
-                var pyList = new PyList();
-                foreach (var item in enumerable)
-                {
-                    using (var pyObject = item.ToPython())
-                    {
-                        pyList.Append(pyObject);
-                    }
-                }
-
-                return pyList;
+                return enumerable.ToPyListUnSafe();
             }
+        }
+
+        /// <summary>
+        /// Converts an IEnumerable to a PyList
+        /// </summary>
+        /// <param name="enumerable">IEnumerable object to convert</param>
+        /// <remarks>Requires the caller to own the GIL</remarks>
+        /// <returns>PyList</returns>
+        public static PyList ToPyListUnSafe(this IEnumerable enumerable)
+        {
+            var pyList = new PyList();
+            foreach (var item in enumerable)
+            {
+                using (var pyObject = item.ToPython())
+                {
+                    pyList.Append(pyObject);
+                }
+            }
+
+            return pyList;
         }
 
         /// <summary>
@@ -3015,7 +3058,7 @@ namespace QuantConnect
         public static bool IsCustomDataType<T>(this Symbol symbol)
         {
             return symbol.SecurityType == SecurityType.Base
-                && symbol.ID.Symbol.TryGetCustomDataType(out var type)
+                && SecurityIdentifier.TryGetCustomDataType(symbol.ID.Symbol, out var type)
                 && type.Equals(typeof(T).Name, StringComparison.InvariantCultureIgnoreCase);
         }
 
@@ -3070,6 +3113,7 @@ namespace QuantConnect
         public static IEnumerator<BaseData> SubscribeWithMapping(this IDataQueueHandler dataQueueHandler,
             SubscriptionDataConfig dataConfig,
             EventHandler newDataAvailableHandler,
+            Func<SubscriptionDataConfig, bool> isExpired,
             out SubscriptionDataConfig subscribedConfig)
         {
             subscribedConfig = dataConfig;
@@ -3077,8 +3121,18 @@ namespace QuantConnect
             {
                 subscribedConfig = new SubscriptionDataConfig(dataConfig, symbol: mappedSymbol, mappedConfig: true);
             }
-            var enumerator = dataQueueHandler.Subscribe(subscribedConfig, newDataAvailableHandler);
-            return enumerator ?? Enumerable.Empty<BaseData>().GetEnumerator();
+
+            // during warmup we might get requested to add some asset which has already expired in which case the live enumerator will be empty
+            IEnumerator<BaseData> result = null;
+            if (!isExpired(subscribedConfig))
+            {
+                result = dataQueueHandler.Subscribe(subscribedConfig, newDataAvailableHandler);
+            }
+            else
+            {
+                Log.Trace($"SubscribeWithMapping(): skip live subscription for expired asset {subscribedConfig}");
+            }
+            return result ?? Enumerable.Empty<BaseData>().GetEnumerator();
         }
 
         /// <summary>
@@ -3441,63 +3495,98 @@ namespace QuantConnect
         /// <param name="filter">The option filter to use</param>
         /// <param name="universeSettings">The universe settings, will use algorithm settings if null</param>
         /// <returns><see cref="OptionChainUniverse"/> for the given symbol</returns>
+        public static OptionChainUniverse CreateOptionChain(this IAlgorithm algorithm, Symbol symbol, PyObject filter, UniverseSettings universeSettings = null)
+        {
+            var result = CreateOptionChain(algorithm, symbol, out var option, universeSettings);
+            option.SetFilter(filter);
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a <see cref="OptionChainUniverse"/> for a given symbol
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance to create universes for</param>
+        /// <param name="symbol">Symbol of the option</param>
+        /// <param name="filter">The option filter to use</param>
+        /// <param name="universeSettings">The universe settings, will use algorithm settings if null</param>
+        /// <returns><see cref="OptionChainUniverse"/> for the given symbol</returns>
         public static OptionChainUniverse CreateOptionChain(this IAlgorithm algorithm, Symbol symbol, Func<OptionFilterUniverse, OptionFilterUniverse> filter, UniverseSettings universeSettings = null)
+        {
+            var result = CreateOptionChain(algorithm, symbol, out var option, universeSettings);
+            option.SetFilter(filter);
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a <see cref="OptionChainUniverse"/> for a given symbol
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance to create universes for</param>
+        /// <param name="symbol">Symbol of the option</param>
+        /// <param name="universeSettings">The universe settings, will use algorithm settings if null</param>
+        /// <returns><see cref="OptionChainUniverse"/> for the given symbol</returns>
+        private static OptionChainUniverse CreateOptionChain(this IAlgorithm algorithm, Symbol symbol, out Option option, UniverseSettings universeSettings = null)
         {
             if (!symbol.SecurityType.IsOption())
             {
                 throw new ArgumentException(Messages.Extensions.CreateOptionChainRequiresOptionSymbol);
             }
 
-            // rewrite non-canonical symbols to be canonical
-            var market = symbol.ID.Market;
-            var underlying = symbol.Underlying;
-            if (!symbol.IsCanonical())
-            {
-                // The underlying can be a non-equity Symbol, so we must explicitly
-                // initialize the Symbol using the CreateOption(Symbol, ...) overload
-                // to ensure that the underlying SecurityType is preserved and not
-                // written as SecurityType.Equity.
-                var alias = $"?{underlying.Value}";
+            // resolve defaults if not specified
+            var settings = universeSettings ?? algorithm.UniverseSettings;
 
-                symbol = Symbol.CreateOption(
-                    underlying,
-                    market,
-                    underlying.SecurityType.DefaultOptionStyle(),
-                    default(OptionRight),
-                    0m,
-                    SecurityIdentifier.DefaultDate,
-                    alias);
+            option = (Option)algorithm.AddSecurity(symbol.Canonical, settings.Resolution, settings.FillForward, settings.Leverage, settings.ExtendedMarketHours);
+
+            return (OptionChainUniverse)algorithm.UniverseManager.Values.Single(universe => universe.Configuration.Symbol == symbol.Canonical);
+        }
+
+        /// <summary>
+        /// Creates a <see cref="FuturesChainUniverse"/> for a given symbol
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance to create universes for</param>
+        /// <param name="symbol">Symbol of the future</param>
+        /// <param name="filter">The future filter to use</param>
+        /// <param name="universeSettings">The universe settings, will use algorithm settings if null</param>
+        public static IEnumerable<Universe> CreateFutureChain(this IAlgorithm algorithm, Symbol symbol, PyObject filter, UniverseSettings universeSettings = null)
+        {
+            var result = CreateFutureChain(algorithm, symbol, out var future, universeSettings);
+            future.SetFilter(filter);
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a <see cref="FuturesChainUniverse"/> for a given symbol
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance to create universes for</param>
+        /// <param name="symbol">Symbol of the future</param>
+        /// <param name="filter">The future filter to use</param>
+        /// <param name="universeSettings">The universe settings, will use algorithm settings if null</param>
+        public static IEnumerable<Universe> CreateFutureChain(this IAlgorithm algorithm, Symbol symbol, Func<FutureFilterUniverse, FutureFilterUniverse> filter, UniverseSettings universeSettings = null)
+        {
+            var result = CreateFutureChain(algorithm, symbol, out var future, universeSettings);
+            future.SetFilter(filter);
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a <see cref="FuturesChainUniverse"/> for a given symbol
+        /// </summary>
+        private static IEnumerable<Universe> CreateFutureChain(this IAlgorithm algorithm, Symbol symbol, out Future future, UniverseSettings universeSettings = null)
+        {
+            if (symbol.SecurityType != SecurityType.Future)
+            {
+                throw new ArgumentException(Messages.Extensions.CreateFutureChainRequiresFutureSymbol);
             }
 
             // resolve defaults if not specified
             var settings = universeSettings ?? algorithm.UniverseSettings;
 
-            // create canonical security object, but don't duplicate if it already exists
-            Security security;
-            Option optionChain;
-            if (!algorithm.Securities.TryGetValue(symbol, out security))
-            {
-                var config = algorithm.SubscriptionManager.SubscriptionDataConfigService.Add(
-                    typeof(ZipEntryName),
-                    symbol,
-                    settings.Resolution,
-                    settings.FillForward,
-                    settings.ExtendedMarketHours,
-                    false);
-                optionChain = (Option)algorithm.Securities.CreateSecurity(symbol, config, settings.Leverage, false);
-            }
-            else
-            {
-                optionChain = (Option)security;
-            }
+            var dataNormalizationMode = settings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType);
 
-            // set the option chain contract filter function
-            optionChain.SetFilter(filter);
+            future = (Future)algorithm.AddSecurity(symbol.Canonical, settings.Resolution, settings.FillForward, settings.Leverage, settings.ExtendedMarketHours,
+                settings.DataMappingMode, dataNormalizationMode, settings.ContractDepthOffset);
 
-            // force option chain security to not be directly tradable AFTER it's configured to ensure it's not overwritten
-            optionChain.IsTradable = false;
-
-            return new OptionChainUniverse(optionChain, settings);
+            // let's yield back both the future chain and the continuous future universe
+            return algorithm.UniverseManager.Values.Where(universe => universe.Configuration.Symbol == symbol.Canonical || ContinuousContractUniverse.CreateSymbol(symbol.Canonical) == universe.Configuration.Symbol);
         }
 
         /// <summary>
@@ -3734,6 +3823,50 @@ namespace QuantConnect
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// Checks whether the fill event for closing a trade is a winning trade
+        /// </summary>
+        /// <param name="fill">The fill event</param>
+        /// <param name="security">The security being traded</param>
+        /// <param name="profitLoss">The profit-loss for the closed trade</param>
+        /// <returns>
+        /// Whether the trade is a win.
+        /// For options assignments this depends on whether the option is ITM or OTM and the position side.
+        /// See <see cref="Trade.IsWin"/> for more information.
+        /// </returns>
+        public static bool IsWin(this OrderEvent fill, Security security, decimal profitLoss)
+        {
+            // For non-options or non-exercise orders, the trade is a win if the profit-loss is positive
+            if (!fill.Symbol.SecurityType.IsOption() || fill.Ticket.OrderType != OrderType.OptionExercise)
+            {
+                return profitLoss > 0;
+            }
+
+            var option = (Option)security;
+
+            // If the fill is a sell, the original transaction was a buy
+            if (fill.Direction == OrderDirection.Sell)
+            {
+                // If the option is ITM, the trade is a win only if the profit is greater than the ITM amount
+                return fill.IsInTheMoney && Math.Abs(profitLoss) < option.InTheMoneyAmount(fill.FillQuantity);
+            }
+
+            // It is a win if the buyer paid more than what they saved (the ITM amount)
+            return !fill.IsInTheMoney || Math.Abs(profitLoss) > option.InTheMoneyAmount(fill.FillQuantity);
+        }
+
+        /// <summary>
+        /// Gets the option's ITM amount for the given quantity.
+        /// </summary>
+        /// <param name="option">The option security</param>
+        /// <param name="quantity">The quantity</param>
+        /// <returns>The ITM amount for the absolute quantity</returns>
+        /// <remarks>The returned value can be negative, which would mean the option is actually OTM.</remarks>
+        public static ConvertibleCashAmount InTheMoneyAmount(this Option option, decimal quantity)
+        {
+            return option.Holdings.GetQuantityValue(Math.Abs(quantity), option.GetPayOff(option.Underlying.Price));
         }
 
         /// <summary>

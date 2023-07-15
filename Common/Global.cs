@@ -20,7 +20,6 @@ using System.Collections.Generic;
 using Newtonsoft.Json.Converters;
 using System.Runtime.Serialization;
 using System.Runtime.CompilerServices;
-using static QuantConnect.StringExtensions;
 
 namespace QuantConnect
 {
@@ -99,6 +98,10 @@ namespace QuantConnect
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public decimal UnrealizedPnL;
 
+        /// Current unrealized P/L % of the holding
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public decimal UnrealizedPnLPercent;
+
         /// Create a new default holding:
         public Holding()
         {
@@ -125,6 +128,7 @@ namespace QuantConnect
             AveragePrice = Math.Round(holding.AveragePrice, rounding);
             MarketPrice = Math.Round(holding.Price, rounding);
             UnrealizedPnL = Math.Round(holding.UnrealizedProfit, 2);
+            UnrealizedPnLPercent = Math.Round(holding.UnrealizedProfitPercent * 100, 2);
         }
 
         /// <summary>
@@ -141,6 +145,7 @@ namespace QuantConnect
                 MarketPrice = MarketPrice,
                 MarketValue = MarketValue,
                 UnrealizedPnL = UnrealizedPnL,
+                UnrealizedPnLPercent = UnrealizedPnLPercent,
                 ConversionRate = ConversionRate,
                 CurrencySymbol = CurrencySymbol
             };
@@ -1220,5 +1225,49 @@ namespace QuantConnect
             new DateTime(2022, 12, 26),
             new DateTime(2023, 12, 25)
         };
+    }
+
+    /// <summary>
+    /// Represents the types deployment targets for algorithms
+    /// </summary>
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum DeploymentTarget
+    {
+        /// <summary>
+        /// Cloud Platform (0)
+        /// </summary>
+        CloudPlatform,
+
+        /// <summary>
+        /// Local Platform (1)
+        /// </summary>
+        LocalPlatform
+    }
+
+    /// <summary>
+    /// Represents the deployment modes of an algorithm
+    /// </summary>
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum AlgorithmMode
+    {
+        /// <summary>
+        /// Live (0)
+        /// </summary>
+        Live,
+
+        /// <summary>
+        /// Optimization (1)
+        /// </summary>
+        Optimization,
+
+        /// <summary>
+        /// Backtesting (2)
+        /// </summary>
+        Backtesting,
+
+        /// <summary>
+        /// Research (1)
+        /// </summary>
+        Research
     }
 }

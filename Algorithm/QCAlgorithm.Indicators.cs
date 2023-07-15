@@ -318,7 +318,7 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(Indicators)]
         public Beta B(Symbol target, Symbol reference, int period, Resolution? resolution = null, Func<IBaseData, TradeBar> selector = null)
         {
-            var name = CreateIndicatorName(QuantConnect.Symbol.None, "B", resolution);
+            var name = CreateIndicatorName(QuantConnect.Symbol.None, $"B({period})", resolution);
             var beta = new Beta(name, period, target, reference);
             InitializeIndicator(target, beta, resolution, selector);
             InitializeIndicator(reference, beta, resolution, selector);
@@ -675,6 +675,30 @@ namespace QuantConnect.Algorithm
             InitializeIndicator(symbol, heikinAshi, resolution, selector);
 
             return heikinAshi;
+        }
+
+        /// <summary>
+        /// Creates a new Hilbert Transform indicator
+        /// </summary>
+        /// <param name="symbol">The symbol whose Hilbert transform we want</param>
+        /// <param name="length">The length of the FIR filter used in the calculation of the Hilbert Transform.
+        /// This parameter determines the number of filter coefficients in the FIR filter.</param>
+        /// <param name="inPhaseMultiplicationFactor">The multiplication factor used in the calculation of the in-phase component
+        /// of the Hilbert Transform. This parameter adjusts the sensitivity and responsiveness of
+        /// the transform to changes in the input signal.</param>
+        /// <param name="quadratureMultiplicationFactor">The multiplication factor used in the calculation of the quadrature component of
+        /// the Hilbert Transform. This parameter also adjusts the sensitivity and responsiveness of the
+        /// transform to changes in the input signal.</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        [DocumentationAttribute(Indicators)]
+        public HilbertTransform HT(Symbol symbol, int length, decimal inPhaseMultiplicationFactor, decimal quadratureMultiplicationFactor, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"HT({length}, {inPhaseMultiplicationFactor}, {quadratureMultiplicationFactor})", resolution);
+            var hilbertTransform = new HilbertTransform(length, inPhaseMultiplicationFactor, quadratureMultiplicationFactor);
+            InitializeIndicator(symbol, hilbertTransform, resolution, selector);
+
+            return hilbertTransform;
         }
 
         /// <summary>
@@ -1428,7 +1452,7 @@ namespace QuantConnect.Algorithm
         {
             var name = CreateIndicatorName(symbol, $"RDV({period})", resolution);
             var relativeDailyVolume = new RelativeDailyVolume(name, period);
-            InitializeIndicator(symbol, relativeDailyVolume, resolution, selector);
+            RegisterIndicator(symbol, relativeDailyVolume, resolution, selector);
 
             return relativeDailyVolume;
         }
@@ -2107,7 +2131,9 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(Indicators)]
         public string CreateIndicatorName(Symbol symbol, string type, Resolution? resolution)
         {
-            if (!resolution.HasValue)
+            var symbolIsNotEmpty = symbol != QuantConnect.Symbol.None && symbol != QuantConnect.Symbol.Empty;
+
+            if (!resolution.HasValue && symbolIsNotEmpty)
             {
                 resolution = GetSubscription(symbol).Resolution;
             }
@@ -2144,7 +2170,7 @@ namespace QuantConnect.Algorithm
 
             var parts = new List<string>();
 
-            if (symbol != QuantConnect.Symbol.None && symbol != QuantConnect.Symbol.Empty)
+            if (symbolIsNotEmpty)
             {
                 parts.Add(symbol.ToString());
             }
@@ -2234,8 +2260,7 @@ namespace QuantConnect.Algorithm
             // default our selector to the Value property on BaseData
             selector = selector ?? (x => x.Value);
 
-            // register the consolidator for automatic updates via SubscriptionManager
-            SubscriptionManager.AddConsolidator(symbol, consolidator);
+            RegisterConsolidator(indicator, symbol, consolidator);
 
             // attach to the DataConsolidated event so it updates our indicator
             consolidator.DataConsolidated += (sender, consolidated) =>
@@ -2308,8 +2333,7 @@ namespace QuantConnect.Algorithm
             // assign default using cast
             var selectorToUse = selector ?? (x => (T)x);
 
-            // register the consolidator for automatic updates via SubscriptionManager
-            SubscriptionManager.AddConsolidator(symbol, consolidator);
+            RegisterConsolidator(indicator, symbol, consolidator);
 
             // check the output type of the consolidator and verify we can assign it to T
             var type = typeof(T);
@@ -2335,6 +2359,31 @@ namespace QuantConnect.Algorithm
                 var value = selectorToUse(consolidated);
                 indicator.Update(value);
             };
+        }
+
+        /// <summary>
+        /// Will unregister an indicator and it's associated consolidator instance so they stop receiving data updates
+        /// </summary>
+        /// <param name="indicator">The indicator instance to unregister</param>
+        [DocumentationAttribute(ConsolidatingData)]
+        [DocumentationAttribute(Indicators)]
+        public void UnregisterIndicator(IndicatorBase indicator)
+        {
+            DeregisterIndicator(indicator);
+        }
+
+        /// <summary>
+        /// Will deregister an indicator and it's associated consolidator instance so they stop receiving data updates
+        /// </summary>
+        /// <param name="indicator">The indicator instance to deregister</param>
+        public void DeregisterIndicator(IndicatorBase indicator)
+        {
+            foreach (var consolidator in indicator.Consolidators)
+            {
+                SubscriptionManager.RemoveConsolidator(null, consolidator);
+            }
+
+            indicator.Consolidators.Clear();
         }
 
         /// <summary>
@@ -2918,6 +2967,15 @@ namespace QuantConnect.Algorithm
             {
                 WarmUpIndicator(symbol, indicator, resolution, selector);
             }
+        }
+
+        private void RegisterConsolidator(IndicatorBase indicatorBase, Symbol symbol, IDataConsolidator consolidator)
+        {
+            // keep a reference of the consolidator so we can unregister it later using only a reference to the indicator
+            indicatorBase.Consolidators.Add(consolidator);
+
+            // register the consolidator for automatic updates via SubscriptionManager
+            SubscriptionManager.AddConsolidator(symbol, consolidator);
         }
     }
 }

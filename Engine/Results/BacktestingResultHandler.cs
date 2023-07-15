@@ -90,9 +90,10 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="transactionHandler">The transaction handler used to get the algorithms <see cref="Order"/> information</param>
         public override void Initialize(AlgorithmNodePacket job, IMessagingHandler messagingHandler, IApi api, ITransactionHandler transactionHandler)
         {
+            _job = (BacktestNodePacket)job;
+            State["Name"] = _job.Name;
             _algorithmId = job.AlgorithmId;
             _projectId = job.ProjectId;
-            _job = (BacktestNodePacket)job;
             if (_job == null) throw new Exception("BacktestingResultHandler.Constructor(): Submitted Job type invalid.");
             base.Initialize(job, messagingHandler, api, transactionHandler);
         }
@@ -391,6 +392,7 @@ namespace QuantConnect.Lean.Engine.Results
         public virtual void SetAlgorithm(IAlgorithm algorithm, decimal startingPortfolioValue)
         {
             Algorithm = algorithm;
+            Algorithm.SetStatisticsService(this);
             StartingPortfolioValue = startingPortfolioValue;
             DailyPortfolioValue = StartingPortfolioValue;
             CumulativeMaxPortfolioValue = StartingPortfolioValue;
@@ -742,6 +744,25 @@ namespace QuantConnect.Lean.Engine.Results
                 Console.SetOut(new FuncTextWriter(msg => Log.Trace(msg)));
                 Console.SetError(new FuncTextWriter(msg => Log.Error(msg)));
             }
+        }
+
+        /// <summary>
+        /// Calculates and gets the current statistics for the algorithm
+        /// </summary>
+        /// <returns>The current statistics</returns>
+        public StatisticsResults StatisticsResults()
+        {
+            return GenerateStatisticsResults(_capacityEstimate);
+        }
+
+        /// <summary>
+        /// Sets or updates a custom summary statistic
+        /// </summary>
+        /// <param name="name">The statistic name</param>
+        /// <param name="value">The statistic value</param>
+        public void SetSummaryStatistic(string name, string value)
+        {
+            SummaryStatistic(name, value);
         }
     }
 }

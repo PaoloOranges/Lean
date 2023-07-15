@@ -1577,19 +1577,35 @@ namespace QuantConnect.Tests.Algorithm
             }
         }
 
-        private class TestShortableProvider : IShortableProvider
+        [Test]
+        public void MarketOnCloseOrdersSubmissionTimeCheck([Values] bool beforeLatestSubmissionTime)
         {
-            public Dictionary<Symbol, long> AllShortableSymbols(DateTime localTime)
-            {
-                return new Dictionary<Symbol, long>
-                {
-                    { Symbols.MSFT, 1000 }
-                };
-            }
+            var algo = GetAlgorithm(out _, 1, 0);
+            algo.SetTimeZone(TimeZones.London);
+            algo.SetDateTime(new DateTime(2023, 02, 16));
 
-            public long? ShortableQuantity(Symbol symbol, DateTime localTime)
+            var es20h20 = algo.AddFutureContract(
+                Symbol.CreateFuture(Futures.Indices.SP500EMini, Market.CME, new DateTime(2020, 3, 20)),
+                Resolution.Minute);
+            es20h20.SetMarketPrice(new Tick(algo.Time, es20h20.Symbol, 1, 1));
+
+            var dateTimeInExchangeTimeZone = algo.Time.Date + new TimeSpan(17, 0, 0) - MarketOnCloseOrder.SubmissionTimeBuffer;
+            if (!beforeLatestSubmissionTime)
             {
-                return 1000;
+                dateTimeInExchangeTimeZone += TimeSpan.FromSeconds(1);
+            }
+            algo.SetDateTime(dateTimeInExchangeTimeZone.ConvertTo(es20h20.Exchange.TimeZone, algo.TimeZone));
+
+            var ticket = algo.MarketOnCloseOrder(es20h20.Symbol, 1);
+
+            if (!beforeLatestSubmissionTime)
+            {
+                Assert.AreEqual(OrderStatus.Invalid, ticket.Status);
+                Assert.AreEqual(OrderResponseErrorCode.MarketOnCloseOrderTooLate, ticket.SubmitRequest.Response.ErrorCode);
+            }
+            else
+            {
+                Assert.AreNotEqual(OrderStatus.Invalid, ticket.Status, ticket.SubmitRequest.Response.ErrorMessage);
             }
         }
 
@@ -1597,11 +1613,13 @@ namespace QuantConnect.Tests.Algorithm
         {
             //Initialize algorithm
             var algo = new QCAlgorithm();
+            algo.Settings.MinimumOrderMarginPortfolioPercentage = 0;
             algo.SubscriptionManager.SetDataManager(new DataManagerStub(algo));
             algo.AddSecurity(SecurityType.Equity, "MSFT");
             algo.SetCash(100000);
             algo.SetFinishedWarmingUp();
             algo.Securities[Symbols.MSFT].FeeModel = new ConstantFeeModel(fee);
+            algo.SetLiveMode(false);
             _fakeOrderProcessor = new FakeOrderProcessor();
             algo.Transactions.SetOrderProcessor(_fakeOrderProcessor);
             msft = algo.Securities[Symbols.MSFT];

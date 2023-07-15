@@ -47,6 +47,8 @@ namespace QuantConnect.Algorithm.CSharp
             SetEndDate(2021, 1, 31);
             SetCash(1000000);
 
+            Portfolio.SetMarginCallModel(MarginCallModel.Null);
+
             SetSecurityInitializer(new CompositeSecurityInitializer(SecurityInitializer,
                 new FuncSecurityInitializer((security) =>
                 {
@@ -198,12 +200,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "-12.811%"},
             {"Drawdown", "1.200%"},
-            {"Expectancy", "0"},
+            {"Expectancy", "-1"},
             {"Net Profit", "-0.959%"},
             {"Sharpe Ratio", "-3.005"},
             {"Probabilistic Sharpe Ratio", "0.483%"},
-            {"Loss Rate", "0%"},
-            {"Win Rate", "100%"},
+            {"Loss Rate", "100%"},
+            {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
             {"Alpha", "-0.093"},
             {"Beta", "0.019"},

@@ -51,7 +51,7 @@ namespace QuantConnect.Algorithm.CSharp
                 contractDepthOffset: 0
             );
 
-            _fast = SMA(_continuousContract.Symbol, 3, Resolution.Daily);
+            _fast = SMA(_continuousContract.Symbol, 4, Resolution.Daily);
             _slow = SMA(_continuousContract.Symbol, 10, Resolution.Daily);
         }
 
@@ -118,7 +118,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 709638;
+        public long DataPoints => 703956;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -130,30 +130,30 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "2"},
-            {"Average Win", "0%"},
-            {"Average Loss", "-0.02%"},
-            {"Compounding Annual Return", "-0.033%"},
-            {"Drawdown", "0.000%"},
-            {"Expectancy", "-1"},
-            {"Net Profit", "-0.017%"},
-            {"Sharpe Ratio", "-1.173"},
-            {"Probabilistic Sharpe Ratio", "0.011%"},
-            {"Loss Rate", "100%"},
-            {"Win Rate", "0%"},
+            {"Total Trades", "3"},
+            {"Average Win", "5.51%"},
+            {"Average Loss", "0%"},
+            {"Compounding Annual Return", "12.437%"},
+            {"Drawdown", "1.500%"},
+            {"Expectancy", "0"},
+            {"Net Profit", "6.079%"},
+            {"Sharpe Ratio", "1.604"},
+            {"Probabilistic Sharpe Ratio", "88.038%"},
+            {"Loss Rate", "0%"},
+            {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-0"},
-            {"Beta", "-0"},
-            {"Annual Standard Deviation", "0"},
-            {"Annual Variance", "0"},
-            {"Information Ratio", "-2.752"},
-            {"Tracking Error", "0.082"},
-            {"Treynor Ratio", "1.883"},
-            {"Total Fees", "$4.30"},
+            {"Alpha", "0.091"},
+            {"Beta", "-0.02"},
+            {"Annual Standard Deviation", "0.054"},
+            {"Annual Variance", "0.003"},
+            {"Information Ratio", "-1.399"},
+            {"Tracking Error", "0.099"},
+            {"Treynor Ratio", "-4.276"},
+            {"Total Fees", "$6.45"},
             {"Estimated Strategy Capacity", "$0"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
-            {"Portfolio Turnover", "0.92%"},
-            {"OrderListHash", "1fd4b49e9450800981c6dead2bbca995"}
+            {"Portfolio Turnover", "1.39%"},
+            {"OrderListHash", "624c51bc6451dfb74335b99c04e3ed16"}
         };
     }
 }

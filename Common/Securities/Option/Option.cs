@@ -324,6 +324,7 @@ namespace QuantConnect.Securities.Option
         {
             return Math.Max(0.0m, GetPayOff(underlyingPrice));
         }
+
         /// <summary>
         /// Option payoff function at expiration time
         /// </summary>
@@ -332,6 +333,16 @@ namespace QuantConnect.Securities.Option
         public decimal GetPayOff(decimal underlyingPrice)
         {
             return Right == OptionRight.Call ? underlyingPrice - StrikePrice : StrikePrice - underlyingPrice;
+        }
+
+        /// <summary>
+        /// Option out of the money function
+        /// </summary>
+        /// <param name="underlyingPrice">The price of the underlying</param>
+        /// <returns></returns>
+        public decimal OutOfTheMoneyAmount(decimal underlyingPrice)
+        {
+            return Math.Max(0, Right == OptionRight.Call ? StrikePrice - underlyingPrice : underlyingPrice - StrikePrice);
         }
 
         /// <summary>
@@ -444,7 +455,10 @@ namespace QuantConnect.Securities.Option
             }
             else
             {
-                throw new ArgumentException($"SetOptionAssignmentModel: {pyObject.Repr()} is not a valid argument.");
+                using(Py.GIL())
+                {
+                    throw new ArgumentException($"SetOptionAssignmentModel: {pyObject.Repr()} is not a valid argument.");
+                }
             }
         }
 
@@ -455,6 +469,39 @@ namespace QuantConnect.Securities.Option
         public void SetOptionAssignmentModel(IOptionAssignmentModel optionAssignmentModel)
         {
             OptionAssignmentModel = optionAssignmentModel;
+        }
+
+        /// <summary>
+        /// Sets the option exercise model
+        /// </summary>
+        /// <param name="pyObject">The option exercise model to use</param>
+        public void SetOptionExerciseModel(PyObject pyObject)
+        {
+            if (pyObject.TryConvert<IOptionExerciseModel>(out var optionExerciseModel))
+            {
+                // pure C# implementation
+                SetOptionExerciseModel(optionExerciseModel);
+            }
+            else if (Extensions.TryConvert<IOptionExerciseModel>(pyObject, out _, allowPythonDerivative: true))
+            {
+                SetOptionExerciseModel(new OptionExerciseModelPythonWrapper(pyObject));
+            }
+            else
+            {
+                using (Py.GIL())
+                {
+                    throw new ArgumentException($"SetOptionExerciseModel: {pyObject.Repr()} is not a valid argument.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sets the option exercise model
+        /// </summary>
+        /// <param name="optionExerciseModel">The option exercise model to use</param>
+        public void SetOptionExerciseModel(IOptionExerciseModel optionExerciseModel)
+        {
+            OptionExerciseModel = optionExerciseModel;
         }
 
         /// <summary>

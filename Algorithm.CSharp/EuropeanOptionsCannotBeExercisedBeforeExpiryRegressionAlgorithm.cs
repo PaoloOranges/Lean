@@ -46,8 +46,8 @@ namespace QuantConnect.Algorithm.CSharp
             SetEndDate(2021, 2, 1);
             SetCash(200000);
 
-            var index = AddIndex("SPX", Resolution.Hour, fillDataForward: true);
-            var indexOption = AddIndexOption(index.Symbol, Resolution.Hour, fillDataForward: true);
+            var index = AddIndex("SPX", Resolution.Hour, fillForward: true);
+            var indexOption = AddIndexOption(index.Symbol, Resolution.Hour, fillForward: true);
             indexOption.SetFilter(filterFunc => filterFunc);
 
             _option = indexOption;
@@ -149,12 +149,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Average Loss", "-4.10%"},
             {"Compounding Annual Return", "25.461%"},
             {"Drawdown", "1.900%"},
-            {"Expectancy", "-1"},
+            {"Expectancy", "0"},
             {"Net Profit", "0.712%"},
             {"Sharpe Ratio", "5.904"},
             {"Probabilistic Sharpe Ratio", "90.591%"},
-            {"Loss Rate", "100%"},
-            {"Win Rate", "0%"},
+            {"Loss Rate", "0%"},
+            {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
             {"Alpha", "0.967"},
             {"Beta", "-0.359"},
