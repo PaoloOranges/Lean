@@ -104,8 +104,8 @@ namespace QuantConnect.Algorithm.CSharp
 
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2021, 10, 20); // Set Start Date
-            SetEndDate(2022, 08, 01); // Set End Date
+            SetStartDate(2023, 1, 1); // Set Start Date
+            SetEndDate(2023, 08, 01); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
