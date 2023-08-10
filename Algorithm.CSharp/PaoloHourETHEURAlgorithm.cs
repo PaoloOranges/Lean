@@ -140,12 +140,12 @@ namespace QuantConnect.Algorithm.CSharp
             candleChart.AddSeries(new Series(LowSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
-            PlotIndicator("Indicators", _macd);
+            //PlotIndicator("Indicators", _macd);
             PlotIndicator("Indicators", _slow_hullma);
             PlotIndicator("Indicators", _fast_lsma);
             PlotIndicator("Indicators", _very_fast_wma);
             PlotIndicator("Indicators", _psar);
-            PlotIndicator("Indicators", _maximum_price);
+            //PlotIndicator("Indicators", _maximum_price);
 #endif
 
         }
@@ -348,18 +348,21 @@ namespace QuantConnect.Algorithm.CSharp
             bool is_psar_ok = current_price < _psar;
             //bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
 
-            bool is_price_ok = current_price > (1.0m + _percentage_price_gain) * _bought_price;
+            bool is_target_price_achieved = current_price > (1.0m + _percentage_price_gain) * _bought_price;
 
-            if (is_price_ok)
+            if (is_target_price_achieved)
             {
                 string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _bought_price;
                 //Notify.Email(EmailAddress, "Price Ok for SELL", body);
                 //Log(body);
             }
+            
+            bool is_stop_limit = current_price < current_price + (_maximum_price - current_price) * 0.95m;            
 
-            bool is_gain_ok = is_moving_averages_ok && is_price_ok;
+            bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
+            is_gain_ok = is_target_price_achieved && is_stop_limit;
 
-            return is_gain_ok || IsStopLoss(data);
+            return is_gain_ok /*|| IsStopLoss(data)*/;
 
         }
 

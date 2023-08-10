@@ -23,8 +23,8 @@
 
   // engine
   "data-folder": "../../../../Data/",
-  // "object-store-root": "../LeanStorage",
-  //"results-destination-folder": "../LeanStorage/Results",
+  "object-store-root": "../../../../LeanStorage",
+  "results-destination-folder": "../../../../LeanStorage/Results",
 
   // debugging configuration - options for debugging-method LocalCmdLine, VisualStudio, Debugpy, PyCharm
   "debugging": false,
@@ -628,7 +628,7 @@
 
     "live-rbi": {
       "live-mode": true,
-      
+
       // real brokerage implementations require the BrokerageTransactionHandler
       "live-mode-brokerage": "RBIBrokerage",
       "data-queue-handler": [ "QuantConnect.Lean.Engine.DataFeeds.Queues.LiveDataQueue" ],
