@@ -140,7 +140,7 @@ namespace QuantConnect.Algorithm.CSharp
             candleChart.AddSeries(new Series(LowSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
-            //PlotIndicator("Indicators", _macd);
+            PlotIndicator("Indicators", _macd);
             PlotIndicator("Indicators", _slow_hullma);
             PlotIndicator("Indicators", _fast_lsma);
             PlotIndicator("Indicators", _very_fast_wma);
@@ -243,27 +243,6 @@ namespace QuantConnect.Algorithm.CSharp
             Plot(ChartSymbolPrefix + SymbolName, LowSeriesName, data[SymbolName].Low);
             Plot(ChartSymbolPrefix + SymbolName, CloseSeriesName, data[SymbolName].Close);
             //Plot(SymbolName, "Time", (decimal)data[SymbolName].Time.ToBinary());
-            
-            //if (_macd.Histogram.Current.Value > 0m)
-            //{
-            //    Plot("Indicators", "MACD", _macd.Histogram.Current.Value);
-            //}
-            //if (_slow_hullma > 0)
-            //{
-            //    Plot("Indicators", "HullMA", _slow_hullma);
-            //}
-            //if (_fast_lsma > 0)
-            //{
-            //    Plot("Indicators", "LSMA", _fast_lsma);
-            //}
-            //if(_very_fast_wma > 0)
-            //{
-            //    Plot("Indicators", "WMA", _very_fast_wma);
-            //}
-            //if (_psar > 0)
-            //{
-            //    Plot("Indicators", "PSAR", _psar);
-            //}
 #endif
         }
 
