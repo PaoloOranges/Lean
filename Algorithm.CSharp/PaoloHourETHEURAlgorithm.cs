@@ -73,6 +73,7 @@ namespace QuantConnect.Algorithm.CSharp
         private const string HighSeriesName = "H";
         private const string LowSeriesName = "L";
         private const string CloseSeriesName = "C";
+        private const string VolumeSeriesName = "VOL";
 #endif
         // Objsect store to save last buy and sell price for different deploy
         private const string LastBoughtObjectStoreKey = SymbolName + "-last-buy";
@@ -124,7 +125,7 @@ namespace QuantConnect.Algorithm.CSharp
             _fast_lsma = LSMA(_symbol, fastValue, resolution);
             _very_fast_wma = LWMA(_symbol, veryFastValue, resolution);
 
-            _macd = MACD(_symbol, fastValue, slowValue*2, signal, MovingAverageType.Exponential, resolution);
+            _macd = MACD(_symbol, fastValue, slowValue, veryFastValue, MovingAverageType.Exponential, resolution);
             _psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
 
             _maximum_price = MAX(_symbol, WarmUpTime, resolution);
@@ -139,6 +140,7 @@ namespace QuantConnect.Algorithm.CSharp
             candleChart.AddSeries(new Series(HighSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(LowSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
+            candleChart.AddSeries(new Series(VolumeSeriesName, SeriesType.Bar, ""));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
             PlotIndicator("Indicators", _macd);
             PlotIndicator("Indicators", _slow_hullma);
@@ -242,6 +244,7 @@ namespace QuantConnect.Algorithm.CSharp
             Plot(ChartSymbolPrefix + SymbolName, HighSeriesName, data[SymbolName].High);
             Plot(ChartSymbolPrefix + SymbolName, LowSeriesName, data[SymbolName].Low);
             Plot(ChartSymbolPrefix + SymbolName, CloseSeriesName, data[SymbolName].Close);
+            Plot(ChartSymbolPrefix + SymbolName, VolumeSeriesName, data[SymbolName].Volume);
             //Plot(SymbolName, "Time", (decimal)data[SymbolName].Time.ToBinary());
 #endif
         }
