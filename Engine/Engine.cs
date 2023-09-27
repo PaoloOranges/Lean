@@ -129,6 +129,8 @@ namespace QuantConnect.Lean.Engine
                     // notify the user of any errors w/ object store persistence
                     AlgorithmHandlers.ObjectStore.ErrorRaised += (sender, args) => algorithm.Debug($"ObjectStore Persistence Error: {args.Error.Message}");
 
+                    // set the order processor on the transaction manager,needs to be done before initializing the brokerage which might start using it
+                    algorithm.Transactions.SetOrderProcessor(AlgorithmHandlers.Transactions);
 
                     // Initialize the brokerage
                     IBrokerageFactory factory;
@@ -146,7 +148,8 @@ namespace QuantConnect.Lean.Engine
                         algorithm,
                         registeredTypesProvider,
                         new SecurityCacheProvider(algorithm.Portfolio),
-                        mapFilePrimaryExchangeProvider);
+                        mapFilePrimaryExchangeProvider,
+                        algorithm);
 
                     algorithm.Securities.SetSecurityService(securityService);
 
@@ -178,9 +181,6 @@ namespace QuantConnect.Lean.Engine
                         dataManager,
                         (IDataFeedTimeProvider) synchronizer,
                         AlgorithmHandlers.DataPermissionsManager.DataChannelProvider);
-
-                    // set the order processor on the transaction manager (needs to be done before initializing BrokerageHistoryProvider)
-                    algorithm.Transactions.SetOrderProcessor(AlgorithmHandlers.Transactions);
 
                     // set the history provider before setting up the algorithm
                     var historyProvider = GetHistoryProvider();
