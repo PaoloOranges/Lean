@@ -61,6 +61,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private PurchaseStatus _purchase_status = PurchaseStatus.Init;
         private decimal _bought_price = 0;
+        private decimal _max_price_after_buy = Decimal.MinValue;
 
         private const string CryptoName = "ETH";
         private const string CurrencyName = "EUR";
@@ -130,7 +131,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             _adx = ADX(_symbol, fastValue, resolution);
 
-            _maximum_price = MAX(_symbol, WarmUpTime, resolution);
+            _maximum_price = MAX(_symbol, fastValue, resolution);
 
             SetWarmUp(TimeSpan.FromDays(7));
 
@@ -210,6 +211,8 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
+            UpdateInternalVariables(data);
+
             if (IsWarmingUp)
             {
                 if(_purchase_status == PurchaseStatus.Sold && !HasSoldPriceFromPreviousSession)
@@ -223,7 +226,8 @@ namespace QuantConnect.Algorithm.CSharp
                  return;
             }
 
-            if(_is_ready_to_trade)
+
+            if (_is_ready_to_trade)
             {
                 OnProcessData(data);
             }
@@ -251,6 +255,14 @@ namespace QuantConnect.Algorithm.CSharp
 #endif
         }
 
+        private void UpdateInternalVariables(Slice data)
+        {
+            if(_purchase_status == PurchaseStatus.Bought)
+            {
+                decimal current_price = data[SymbolName].Value;
+                _max_price_after_buy = Math.Max(_max_price_after_buy, current_price);
+            }
+        }
 
         private void OnProcessData(Slice data)
         {
@@ -307,6 +319,7 @@ namespace QuantConnect.Algorithm.CSharp
                 //Notify.Email(EmailAddress, "Algorithm Ready to Trade", "Ready to trade");
                 Log("Algorithm Ready to Trade");
             }
+
         }
         
         private bool IsOkToBuy(Slice data)
@@ -367,6 +380,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 _purchase_status = PurchaseStatus.Bought;
                 _bought_price = orderEvent.FillPrice;
+                _max_price_after_buy = _bought_price;
                 ObjectStore.Save(LastBoughtObjectStoreKey, _bought_price.ToString(_culture_info));
             }
 
@@ -374,6 +388,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 _purchase_status = PurchaseStatus.Sold;
                 _sold_price = orderEvent.FillPrice;
+                _max_price_after_buy = Decimal.MinValue;
                 ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_culture_info));
             }
 
