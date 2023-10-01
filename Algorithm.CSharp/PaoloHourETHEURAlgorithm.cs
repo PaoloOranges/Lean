@@ -144,13 +144,12 @@ namespace QuantConnect.Algorithm.CSharp
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(VolumeSeriesName, SeriesType.Bar, ""));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
-            PlotIndicator("Indicators", _slow_hullma);
-            PlotIndicator("Indicators", _fast_lsma);
-            PlotIndicator("Indicators", _very_fast_wma);
+            IndicatorBase[] indicatorsToPlot = { _slow_hullma, _fast_lsma, _very_fast_wma };
+            PlotIndicator("Indicators", indicatorsToPlot);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
-            PlotIndicator("Oscillators", _macd);
-            PlotIndicator("Oscillators", _adx);
+            IndicatorBase[] oscillatorsToPlot = { _macd, _adx };
+            PlotIndicator("Oscillators", oscillatorsToPlot);
 #endif
 
         }
