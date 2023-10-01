@@ -148,7 +148,7 @@ namespace QuantConnect.Algorithm.CSharp
             PlotIndicator("Indicators", indicatorsToPlot);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
-            IndicatorBase[] oscillatorsToPlot = { _macd, _adx };
+            IndicatorBase[] oscillatorsToPlot = { _adx, _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex };
             PlotIndicator("Oscillators", oscillatorsToPlot);
 #endif
 
