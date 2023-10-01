@@ -54,6 +54,7 @@ namespace QuantConnect.Algorithm.CSharp
         
         private MovingAverageConvergenceDivergence _macd;
         //private ParabolicStopAndReverse _psar;
+        private AverageDirectionalIndex _adx;
 
         private Maximum _maximum_price;
         private const decimal _stop_loss_percentage = 0.015m;
@@ -127,6 +128,8 @@ namespace QuantConnect.Algorithm.CSharp
             _macd = MACD(_symbol, fastValue, slowValue, veryFastValue, MovingAverageType.Exponential, resolution);
             //_psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
 
+            _adx = ADX(_symbol, fastValue, resolution);
+
             _maximum_price = MAX(_symbol, WarmUpTime, resolution);
 
             SetWarmUp(TimeSpan.FromDays(7));
@@ -140,12 +143,13 @@ namespace QuantConnect.Algorithm.CSharp
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(VolumeSeriesName, SeriesType.Bar, ""));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
-            PlotIndicator("Indicators", _macd);
             PlotIndicator("Indicators", _slow_hullma);
             PlotIndicator("Indicators", _fast_lsma);
             PlotIndicator("Indicators", _very_fast_wma);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
+            PlotIndicator("Oscillators", _macd);
+            PlotIndicator("Oscillators", _adx);
 #endif
 
         }
