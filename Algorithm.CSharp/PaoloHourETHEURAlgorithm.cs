@@ -309,7 +309,7 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = data[SymbolName].Value;
 
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _very_fast_wma < _fast_lsma && _very_fast_wma < _slow_hullma;
+            bool is_moving_averages_ok = _very_fast_wma < _fast_lsma ;//&& _very_fast_wma < _slow_hullma;
             //bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
 
             bool is_target_price_achieved = current_price > (1.0m + _percentage_price_gain) * _bought_price;
