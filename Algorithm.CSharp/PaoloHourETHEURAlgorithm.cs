@@ -51,7 +51,7 @@ namespace QuantConnect.Algorithm.CSharp
         private HullMovingAverage _slow_hullma;
         private LeastSquaresMovingAverage _fast_lsma;
         private LinearWeightedMovingAverage _very_fast_wma;
-        
+
         private MovingAverageConvergenceDivergence _macd;
         //private ParabolicStopAndReverse _psar;
         private AverageDirectionalIndex _adx;
@@ -83,8 +83,6 @@ namespace QuantConnect.Algorithm.CSharp
         private Symbol _symbol = null;
 
         private decimal _sold_price = 0m;
-
-        private bool _is_ready_to_trade = false;
 
         private const decimal _amount_to_buy = 0.8m;
         private const decimal _percentage_price_gain = 0.04m;
@@ -156,31 +154,27 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void PostInitialize()
         {
-
-            if (Portfolio.CashBook[CryptoName].Amount > 0)
+            var cryptoCashBook = Portfolio.CashBook[CryptoName];
+            if (cryptoCashBook.Amount > 0)
             {
-                Log(CryptoName + " amount in Portfolio: " + Portfolio.CashBook[CryptoName].Amount + " - Initialized to Bought");
+                Log(CryptoName + " amount in Portfolio: " + cryptoCashBook.Amount + " - Initialized to Bought");
                 _purchase_status = PurchaseStatus.Bought;
                 if (HasBoughtPriceFromPreviousSession)
                 {
                     string bought_price = ObjectStore.Read(LastBoughtObjectStoreKey);
-                    Log("Previous Purchase found: " + bought_price );
+                    Log("Previous Purchase found: " + bought_price);
                     _bought_price = Convert.ToDecimal(bought_price, _culture_info);
                 }
-                _is_ready_to_trade = true;
             }
             else
             {
                 Log(CurrencyName + " amount in Portfolio: " + Portfolio.CashBook[CurrencyName].Amount + " - Initialized to Sold");
                 _purchase_status = PurchaseStatus.Sold;
-                if(HasSoldPriceFromPreviousSession)
+                if (HasSoldPriceFromPreviousSession)
                 {
                     string sold_price = ObjectStore.Read(LastSoldObjectStoreKey);
                     Log("Previous Sell found: " + sold_price);
-                    _sold_price = Convert.ToDecimal(sold_price, _culture_info);
-                }
-
-                _is_ready_to_trade = false;
+                }                
             }
 
 
@@ -214,31 +208,19 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (IsWarmingUp)
             {
-                if(_purchase_status == PurchaseStatus.Sold && !HasSoldPriceFromPreviousSession)
+                if(_purchase_status == PurchaseStatus.Bought && !HasBoughtPriceFromPreviousSession)
                 {
-                    _sold_price = _maximum_price;
+                    _bought_price = _maximum_price;
                 }
-                if (!_is_ready_to_trade)
-                {
-                    OnPrepareToTrade(data);
-                }
-                 return;
+                return;
             }
-
-
-            if (_is_ready_to_trade)
-            {
-                OnProcessData(data);
-            }
-            else
-            {
-                OnPrepareToTrade(data);
-            }
-
-            DateTime UtcTimeNow = UtcTime;
             
+            OnProcessData(data);
+            
+            DateTime UtcTimeNow = UtcTime;
+
             if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > resolutionInSeconds)
-            {                
+            {
                 Log("WrongTime! Last: " + UtcTimeLast.ToString(_culture_info) + " Now: " + UtcTimeNow.ToString(_culture_info));
             }
             UtcTimeLast = UtcTimeNow;
@@ -256,7 +238,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private void UpdateInternalVariables(Slice data)
         {
-            if(_purchase_status == PurchaseStatus.Bought)
+            if (_purchase_status == PurchaseStatus.Bought)
             {
                 decimal current_price = data[SymbolName].Value;
                 _max_price_after_buy = Math.Max(_max_price_after_buy, current_price);
@@ -271,7 +253,7 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = Securities[SymbolName].Price;
 
             if (_purchase_status == PurchaseStatus.Sold)
-            {                
+            {
                 if (IsOkToBuy(data))
                 {
                     const decimal round_multiplier = 1000m;
@@ -305,40 +287,28 @@ namespace QuantConnect.Algorithm.CSharp
 #endif
                 }
             }
-
-
-
         }
 
-        private void OnPrepareToTrade(Slice data)
-        {
-            if (IsOkToSell(data))
-            {
-                _is_ready_to_trade = true;
-                //Notify.Email(EmailAddress, "Algorithm Ready to Trade", "Ready to trade");
-                Log("Algorithm Ready to Trade");
-            }
-
-        }
-        
         private bool IsOkToBuy(Slice data)
         {
             decimal current_price = data[SymbolName].Value;
 
             bool is_macd_ok = _macd.Histogram.Current.Value > 0;
-            bool is_moving_averages_ok = _very_fast_wma > _fast_lsma;            
-            bool is_ao_ok = true; // _ao.AroonUp > 80;
+            bool is_adx_ok = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex; // try making combination with distance of positive and negative compared to other indicators
 
-            return is_moving_averages_ok /*&& is_macd_ok && is_ao_ok*/;
+            bool is_moving_averages_ok = _very_fast_wma > _fast_lsma;
+            //bool is_ao_ok = true; // _ao.AroonUp > 80;
+
+            return is_moving_averages_ok && is_adx_ok; /*&& is_macd_ok && is_ao_ok*/;
         }
 
         private bool IsOkToSell(Slice data)
         {
 
             decimal current_price = data[SymbolName].Value;
-            
+
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _very_fast_wma < _fast_lsma && _very_fast_wma < _slow_hullma; 
+            bool is_moving_averages_ok = _very_fast_wma < _fast_lsma && _very_fast_wma < _slow_hullma;
             //bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
 
             bool is_target_price_achieved = current_price > (1.0m + _percentage_price_gain) * _bought_price;
@@ -349,8 +319,8 @@ namespace QuantConnect.Algorithm.CSharp
                 //Notify.Email(EmailAddress, "Price Ok for SELL", body);
                 //Log(body);
             }
-            
-            bool is_stop_limit = current_price < current_price + (_maximum_price - current_price) * 0.90m;            
+
+            bool is_stop_limit = current_price < current_price + (_maximum_price - current_price) * 0.90m;
 
             bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
@@ -368,7 +338,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void OnOrderEvent(OrderEvent orderEvent)
         {
-            if(orderEvent == null)
+            if (orderEvent == null)
             {
                 return;
             }
