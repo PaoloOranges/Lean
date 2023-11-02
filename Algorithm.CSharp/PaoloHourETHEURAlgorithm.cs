@@ -297,7 +297,7 @@ namespace QuantConnect.Algorithm.CSharp
             bool is_macd_ok = _macd.Histogram.Current.Value > 0;
             bool is_adx_ok = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex; // try making combination with distance of positive and negative compared to other indicators
 
-            bool is_moving_averages_ok = _very_fast_wma > _fast_lsma;
+            bool is_moving_averages_ok = _very_fast_wma > _slow_hullma;
             //bool is_ao_ok = true; // _ao.AroonUp > 80;
 
             return is_moving_averages_ok && is_adx_ok; /*&& is_macd_ok && is_ao_ok*/;
