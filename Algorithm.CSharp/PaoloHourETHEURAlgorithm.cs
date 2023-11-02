@@ -27,6 +27,7 @@ using QuantConnect.Data;
 using QuantConnect.Brokerages;
 using QuantConnect.Indicators;
 using QuantConnect.Orders;
+using QuantConnect.Data.Market;
 
 
 namespace QuantConnect.Algorithm.CSharp
@@ -105,7 +106,7 @@ namespace QuantConnect.Algorithm.CSharp
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2023, 1, 1); // Set Start Date
-            SetEndDate(2023, 08, 01); // Set End Date
+            SetEndDate(2023, 03, 30); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -129,7 +130,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             _adx = ADX(_symbol, fastValue, resolution);
 
-            _maximum_price = MAX(_symbol, fastValue, resolution);
+            _maximum_price = MAX(_symbol, fastValue, resolution, x => ((TradeBar)x).Close);
 
             SetWarmUp(TimeSpan.FromDays(7));
 
@@ -320,7 +321,7 @@ namespace QuantConnect.Algorithm.CSharp
                 //Log(body);
             }
 
-            bool is_stop_limit = current_price < current_price + (_maximum_price - current_price) * 0.90m;
+            bool is_stop_limit = current_price < 0.98m * _maximum_price;//current_price < current_price + (_maximum_price - current_price) * 0.90m;
 
             bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
