@@ -58,7 +58,7 @@ namespace QuantConnect.Algorithm.CSharp
         private AverageDirectionalIndex _adx;
 
         private Maximum _maximum_price;
-        private const decimal _stop_loss_percentage = 0.015m;
+        private const decimal _stop_loss_percentage = 0.98m;
 
         private PurchaseStatus _purchase_status = PurchaseStatus.Init;
         private decimal _bought_price = 0;
@@ -147,7 +147,7 @@ namespace QuantConnect.Algorithm.CSharp
             PlotIndicator("Indicators", indicatorsToPlot);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
-            IndicatorBase[] oscillatorsToPlot = { _adx, _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex };
+            IndicatorBase[] oscillatorsToPlot = { /*_adx,*/ _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex, _macd.Histogram };
             PlotIndicator("Oscillators", oscillatorsToPlot);
 #endif
 
@@ -300,7 +300,7 @@ namespace QuantConnect.Algorithm.CSharp
             bool is_moving_averages_ok = _very_fast_wma > _slow_hullma && _very_fast_wma > _fast_lsma;
             //bool is_ao_ok = true; // _ao.AroonUp > 80;
 
-            return is_moving_averages_ok && is_adx_ok; /*&& is_macd_ok && is_ao_ok*/;
+            return is_moving_averages_ok && is_adx_ok && is_macd_ok /*&& is_ao_ok*/;
         }
 
         private bool IsOkToSell(Slice data)
@@ -326,7 +326,7 @@ namespace QuantConnect.Algorithm.CSharp
             bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
 
-            return is_target_price_achieved && (is_moving_averages_ok || is_stop_limit); /*|| IsStopLoss(data)*/;
+            return is_target_price_achieved && (is_moving_averages_ok || is_stop_limit) /*|| IsStopLoss(data)*/;
 
         }
 
@@ -334,7 +334,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             decimal current_price = data[SymbolName].Value;
 
-            return current_price < (1.0m - _stop_loss_percentage) * _bought_price;
+            return current_price < _stop_loss_percentage * _bought_price;
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
