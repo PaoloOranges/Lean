@@ -37,13 +37,14 @@ namespace QuantConnect.ToolBox.CoinApiDataConverter
         /// </summary>
         private static readonly HashSet<string> SupportedMarkets = new[]
         {
-            Market.GDAX,
+            Market.Coinbase,
             Market.Bitfinex,
             Market.Binance,
             Market.FTX,
             Market.FTXUS,
             Market.Kraken,
-            Market.BinanceUS
+            Market.BinanceUS,
+            Market.Bybit
         }.ToHashSet();
 
         private readonly DirectoryInfo _rawDataFolder;

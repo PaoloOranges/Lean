@@ -30,6 +30,7 @@ using QuantConnect.Lean.Engine.Results;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Lean.Engine.DataFeeds.Enumerators;
 using QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories;
+using QuantConnect.Data.Fundamental;
 
 namespace QuantConnect.Lean.Engine.DataFeeds
 {
@@ -202,7 +203,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         Tiingo.SetAuthCode(Config.Get("tiingo-auth-token"));
                     }
 
-                    var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider);
+                    var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider, _algorithm.ObjectStore);
                     var enumeratorStack = factory.CreateEnumerator(request, _dataProvider);
 
                     var enqueable = new EnqueueableEnumerator<BaseData>();
@@ -323,13 +324,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 _customExchange.AddEnumerator(new EnumeratorHandler(config.Symbol, enumerator, enqueueable));
                 enumerator = enqueueable;
             }
-            else if (config.Type == typeof(CoarseFundamental) || config.Type == typeof(ETFConstituentData))
+            else if (config.Type == typeof(ETFConstituentData) || config.Type == typeof(Fundamentals))
             {
                 Log.Trace($"LiveTradingDataFeed.CreateUniverseSubscription(): Creating {config.Type.Name} universe: {config.Symbol.ID}");
 
                 // Will try to pull data from the data folder every 10min, file with yesterdays date.
                 // If lean is started today it will trigger initial coarse universe selection
                 var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider,
+                    _algorithm.ObjectStore,
                     // we adjust time to the previous tradable date
                     time => Time.GetStartTimeForTradeBars(request.Security.Exchange.Hours, time, Time.OneDay, 1, false, config.DataTimeZone),
                     TimeSpan.FromMinutes(10)
@@ -380,7 +382,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             {
                 Log.Trace("LiveTradingDataFeed.CreateUniverseSubscription(): Creating custom universe: " + config.Symbol.ID);
 
-                var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider);
+                var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider, _algorithm.ObjectStore);
                 var enumeratorStack = factory.CreateEnumerator(request, _dataProvider);
                 enumerator = new BaseDataCollectionAggregatorEnumerator(enumeratorStack, config.Symbol, liveMode: true);
 

@@ -37,6 +37,7 @@ using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
+using QuantConnect.Tests.Common.Data.Fundamental;
 using QuantConnect.Tests.Common.Securities;
 using QuantConnect.Util;
 
@@ -72,6 +73,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Interlocked.Exchange(ref TestCustomData.ReaderCallsCount, 0);
             TestCustomData.ReturnNull = false;
             TestCustomData.ThrowException = false;
+
+            FundamentalService.Initialize(TestGlobals.DataProvider, new TestFundamentalDataProviderTrue(), false);
         }
 
         [TearDown]
@@ -245,16 +248,16 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 // let's wait till it's remapped
                 if (securityChanges == 3)
                 {
-                    Assert.IsNotNull(_algorithm.Securities.Values.SingleOrDefault(sec => sec.IsTradable));
-                    Assert.AreEqual(3, _algorithm.Securities.Values.Count);
+                    Assert.IsNotNull(_algorithm.Securities.Total.SingleOrDefault(sec => sec.IsTradable));
+                    Assert.AreEqual(3, _algorithm.Securities.Total.Count);
 
-                    var result = LiveTradingResultHandler.GetHoldings(_algorithm.Securities.Values, _algorithm.SubscriptionManager.SubscriptionDataConfigService);
+                    var result = LiveTradingResultHandler.GetHoldings(_algorithm.Securities.Total, _algorithm.SubscriptionManager.SubscriptionDataConfigService);
                     // old future mapped contract is removed
                     Assert.AreEqual(2, result.Count);
                     Assert.IsTrue(result.TryGetValue(es.Symbol.ID.ToString(), out var holding));
                     Assert.IsTrue(result.TryGetValue(es.Mapped.ID.ToString(), out holding));
 
-                    Assert.AreEqual(0, LiveTradingResultHandler.GetHoldings(_algorithm.Securities.Values, _algorithm.SubscriptionManager.SubscriptionDataConfigService, onlyInvested: true).Count);
+                    Assert.AreEqual(0, LiveTradingResultHandler.GetHoldings(_algorithm.Securities.Total, _algorithm.SubscriptionManager.SubscriptionDataConfigService, onlyInvested: true).Count);
 
                     _algorithm.RemoveSecurity(es.Symbol);
                     // allow time for the exchange to pick up the selection point
@@ -262,10 +265,10 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 }
                 else if (securityChanges == 4)
                 {
-                    Assert.IsTrue(_algorithm.Securities.Values.All(sec => !sec.IsTradable));
-                    Assert.AreEqual(3, _algorithm.Securities.Values.Count);
+                    Assert.IsTrue(_algorithm.Securities.Total.All(sec => !sec.IsTradable));
+                    Assert.AreEqual(3, _algorithm.Securities.Total.Count);
 
-                    var result = LiveTradingResultHandler.GetHoldings(_algorithm.Securities.Values, _algorithm.SubscriptionManager.SubscriptionDataConfigService);
+                    var result = LiveTradingResultHandler.GetHoldings(_algorithm.Securities.Total, _algorithm.SubscriptionManager.SubscriptionDataConfigService);
                     Assert.AreEqual(0, result.Count);
 
                     // we got what we wanted shortcut unit test
@@ -1345,7 +1348,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             ConsumeBridge(feed, TimeSpan.FromSeconds(5), ts =>
             {
                 if (ts.UniverseData.Count > 0 &&
-                    ts.UniverseData.First().Value.Data.First().GetType() == universeData)
+                    ts.UniverseData.First().Value.Data.First().GetType().IsAssignableTo(universeData))
                 {
                     var now = _manualTimeProvider.GetUtcNow();
                     Log.Trace($"Received BaseDataCollection {now}");
@@ -1403,7 +1406,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             ConsumeBridge(feed, TimeSpan.FromSeconds(10), ts =>
             {
                 if (ts.UniverseData.Count > 0 &&
-                    ts.UniverseData.First().Value.Data.First() is Fundamentals)
+                    ts.UniverseData.First().Value.Data.First() is Fundamental)
                 {
                     securityChanges = ts.SecurityChanges;
                     receivedFundamentalsData = true;
@@ -1467,7 +1470,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             ConsumeBridge(feed, TimeSpan.FromSeconds(5), ts =>
             {
                 if (ts.UniverseData.Count > 0 &&
-                    ts.UniverseData.First().Value.Data.First() is Fundamentals)
+                    ts.UniverseData.First().Value.Data.First() is Fundamental)
                 {
                     if (_algorithm.IsWarmingUp)
                     {
@@ -1548,7 +1551,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             ConsumeBridge(feed, TimeSpan.FromSeconds(5), ts =>
             {
                 if (ts.UniverseData.Count > 0 &&
-                    ts.UniverseData.First().Value.Data.First() is Fundamentals)
+                    ts.UniverseData.First().Value.Data.First() is Fundamental)
                 {
                     receivedFundamentalsData = true;
                     // we got what we wanted shortcut unit test
@@ -1720,7 +1723,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         [Test]
         public void HandlesAllTickTypesAtTickResolution()
         {
-            var symbol = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX);
+            var symbol = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.Coinbase);
             // setting func benchmark so we don't add SPY
             _algorithm.SetBenchmark(time => 1);
             var feed = RunDataFeed(
@@ -3163,6 +3166,32 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             timeAdvanced.DisposeSafely();
             started.DisposeSafely();
             timer.DisposeSafely();
+        }
+
+        private class TestFundamentalDataProviderTrue : IFundamentalDataProvider
+        {
+            public T Get<T>(DateTime time, SecurityIdentifier securityIdentifier, FundamentalProperty name)
+            {
+                if (securityIdentifier == SecurityIdentifier.Empty)
+                {
+                    return default;
+                }
+                return Get(time, securityIdentifier, name);
+            }
+
+            private dynamic Get(DateTime time, SecurityIdentifier securityIdentifier, FundamentalProperty enumName)
+            {
+                var name = Enum.GetName(enumName);
+                switch (name)
+                {
+                    case "HasFundamentalData":
+                        return true;
+                }
+                return null;
+            }
+            public void Initialize(IDataProvider dataProvider, bool liveMode)
+            {
+            }
         }
     }
 

@@ -44,6 +44,8 @@ namespace QuantConnect.Lean.Engine.Results
         private string _errorMessage;
         private int _daysProcessedFrontier;
         private readonly HashSet<string> _chartSeriesExceededDataPoints;
+        private readonly HashSet<string> _chartSeriesCount;
+        private bool _chartSeriesCountExceededError;
 
         private BacktestProgressMonitor _progressMonitor;
 
@@ -70,10 +72,11 @@ namespace QuantConnect.Lean.Engine.Results
             ResamplePeriod = TimeSpan.FromMinutes(4);
             NotificationPeriod = TimeSpan.FromSeconds(2);
 
-            _chartSeriesExceededDataPoints = new HashSet<string>();
+            _chartSeriesExceededDataPoints = new();
+            _chartSeriesCount = new();
 
             // Delay uploading first packet
-            _nextS3Update = StartTime.AddSeconds(30);
+            _nextS3Update = StartTime.AddSeconds(5);
 
             //Default charts:
             Charts.AddOrUpdate(StrategyEquityKey, new Chart(StrategyEquityKey));
@@ -353,7 +356,7 @@ namespace QuantConnect.Lean.Engine.Results
                     result = new BacktestResultPacket(_job,
                         new BacktestResult(new BacktestResultParameters(charts, orders, profitLoss, statisticsResults.Summary, runtime,
                             statisticsResults.RollingPerformances, orderEvents, statisticsResults.TotalPerformance,
-                            AlgorithmConfiguration.Create(Algorithm), GetAlgorithmState(endTime))),
+                            AlgorithmConfiguration.Create(Algorithm, _job), GetAlgorithmState(endTime))),
                         Algorithm.EndDate, Algorithm.StartDate);
                 }
                 else
@@ -570,7 +573,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// Add a range of samples from the users algorithms to the end of our current list.
         /// </summary>
         /// <param name="updates">Chart updates since the last request.</param>
-        protected void SampleRange(List<Chart> updates)
+        protected void SampleRange(IEnumerable<Chart> updates)
         {
             lock (ChartLock)
             {
@@ -587,6 +590,22 @@ namespace QuantConnect.Lean.Engine.Results
                     //Add these samples to this chart.
                     foreach (var series in update.Series.Values)
                     {
+                        // let's assert we are within series count limit
+                        if (_chartSeriesCount.Count < _job.Controls.MaximumChartSeries)
+                        {
+                            _chartSeriesCount.Add(series.Name);
+                        }
+                        else if (!_chartSeriesCount.Contains(series.Name))
+                        {
+                            // above the limit and this is a new series
+                            if(!_chartSeriesCountExceededError)
+                            {
+                                _chartSeriesCountExceededError = true;
+                                DebugMessage($"Exceeded maximum chart series count for organization tier, new series will be ignored. Limit is currently set at {_job.Controls.MaximumChartSeries}. https://qnt.co/docs-charting-quotas");
+                            }
+                            continue;
+                        }
+
                         if (series.Values.Count > 0)
                         {
                             var thisSeries = chart.TryAddAndGetSeries(series.Name, series, forceAddNew: false);
@@ -609,7 +628,7 @@ namespace QuantConnect.Lean.Engine.Results
                                 else if (!_chartSeriesExceededDataPoints.Contains(chart.Name + series.Name))
                                 {
                                     _chartSeriesExceededDataPoints.Add(chart.Name + series.Name);
-                                    DebugMessage($"Exceeded maximum data points per series, chart update skipped. Chart Name {update.Name}. Series name {series.Name}. " +
+                                    DebugMessage($"Exceeded maximum data points per series for organization tier, chart update skipped. Chart Name {update.Name}. Series name {series.Name}. https://qnt.co/docs-charting-quotas" +
                                                  $"Limit is currently set at {_job.Controls.MaximumDataPointsPerChartSeries}");
                                 }
                             }

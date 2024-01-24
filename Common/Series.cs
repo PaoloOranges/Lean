@@ -161,14 +161,17 @@ namespace QuantConnect
         /// Will sum up all chart points into a new single value, using the time of latest point
         /// </summary>
         /// <returns>The new chart point</returns>
-        public override ChartPoint ConsolidateChartPoints()
+        public override ISeriesPoint ConsolidateChartPoints()
         {
             if (Values.Count <= 0) return null;
 
             var sum = 0m;
             foreach (ChartPoint point in Values)
             {
-                sum += point.y;
+                if(point.y.HasValue)
+                {
+                    sum += point.y.Value;
+                }
             }
 
             var lastPoint = (ChartPoint)Values.Last();
@@ -179,12 +182,13 @@ namespace QuantConnect
         /// Return a new instance clone of this object
         /// </summary>
         /// <returns></returns>
-        public override Series Clone(bool empty = false)
+        public override BaseSeries Clone(bool empty = false)
         {
             var series = new Series(Name, SeriesType, Index, Unit)
             {
                 Color = Color,
-                ScatterMarkerSymbol = ScatterMarkerSymbol
+                ZIndex = ZIndex,
+                ScatterMarkerSymbol = ScatterMarkerSymbol,
             };
 
             if (!empty)

@@ -297,6 +297,17 @@ namespace QuantConnect.Tests.Common.Util
             Assert.Greater(nextNextExpiration.ID.Date, nextExpiration.ID.Date);
         }
 
+        [TestCase("MDTUSD XJ")]
+        [TestCase("BTCEUR XJ")]
+        [TestCase("BTCUSDC XJ")]
+        [TestCase("BTCUSDT XJ")]
+        public void GDAXMarketNameCompatibilityWithCoinbase(string gdaxTicker)
+        {
+            var sid = SecurityIdentifier.Parse(gdaxTicker);
+
+            Assert.AreEqual(Market.Coinbase, sid.Market);
+        }
+
         [TestCase("A", "a")]
         [TestCase("", "")]
         [TestCase(null, null)]
@@ -310,7 +321,7 @@ namespace QuantConnect.Tests.Common.Util
         [Test]
         public void BatchAlphaResultPacket()
         {
-            var btcusd = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX);
+            var btcusd = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.Coinbase);
             var insights = new List<Insight>
             {
                 new Insight(DateTime.UtcNow, btcusd, Time.OneMillisecond, InsightType.Price, InsightDirection.Up, 1, 2, "sourceModel1"),
@@ -344,7 +355,7 @@ namespace QuantConnect.Tests.Common.Util
         [Test]
         public void BatchAlphaResultPacketDuplicateOrder()
         {
-            var btcusd = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX);
+            var btcusd = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.Coinbase);
             var orders = new List<Order>
             {
                 new MarketOrder(btcusd, 1000, DateTime.UtcNow, "ExpensiveOrder") { Id = 1 },
@@ -532,7 +543,7 @@ namespace QuantConnect.Tests.Common.Util
         {
             var time = new DateTime(2014, 3, 9, 2, 0, 1);
             var expected = new DateTime(2014, 3, 9, 2, 0, 0);
-            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Coinbase, null, SecurityType.Crypto);
             var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.Utc, true);
             Assert.AreEqual(expected, exchangeRounded);
         }
@@ -542,7 +553,7 @@ namespace QuantConnect.Tests.Common.Util
         {
             var time = new DateTime(2014, 11, 2, 2, 0, 1);
             var expected = new DateTime(2014, 11, 2, 2, 0, 0);
-            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Coinbase, null, SecurityType.Crypto);
             var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.Utc, true);
             Assert.AreEqual(expected, exchangeRounded);
         }
@@ -661,7 +672,7 @@ namespace QuantConnect.Tests.Common.Util
         {
             var time = new DateTime(2014, 3, 9, 2, 0, 1);
             var expected = new DateTime(2014, 3, 9, 2, 0, 0);
-            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Coinbase, null, SecurityType.Crypto);
             var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.NewYork, true);
             Assert.AreEqual(expected, exchangeRounded);
         }
@@ -671,7 +682,7 @@ namespace QuantConnect.Tests.Common.Util
         {
             var time = new DateTime(2014, 11, 2, 2, 0, 1);
             var expected = new DateTime(2014, 11, 2, 2, 0, 0);
-            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Coinbase, null, SecurityType.Crypto);
             var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.NewYork, true);
             Assert.AreEqual(expected, exchangeRounded);
         }
@@ -1565,43 +1576,41 @@ actualDictionary.update({'IBM': 5})
                 new DataPermissionManager()
             ));
 
-            using (var zipDataCacheProvider = new ZipDataCacheProvider(TestGlobals.DataProvider))
+            algo.HistoryProvider = new SubscriptionDataReaderHistoryProvider();
+            algo.HistoryProvider.Initialize(
+                new HistoryProviderInitializeParameters(
+                    null,
+                    null,
+                    null,
+                    TestGlobals.DataCacheProvider,
+                    TestGlobals.MapFileProvider,
+                    TestGlobals.FactorFileProvider,
+                    (_) => {},
+                    false,
+                    new DataPermissionManager(),
+                    algo.ObjectStore));
+
+            algo.SetStartDate(DateTime.UtcNow.AddDays(-1));
+
+            var history = algo.History(new[] { Symbols.IBM }, new DateTime(2013, 10, 7), new DateTime(2013, 10, 8), Resolution.Tick).ToList();
+            Assert.AreEqual(57460, history.Count);
+
+            foreach (var slice in history)
             {
-                algo.HistoryProvider = new SubscriptionDataReaderHistoryProvider();
-                algo.HistoryProvider.Initialize(
-                    new HistoryProviderInitializeParameters(
-                        null,
-                        null,
-                        null,
-                        zipDataCacheProvider,
-                        TestGlobals.MapFileProvider,
-                        TestGlobals.FactorFileProvider,
-                        (_) => {},
-                        false,
-                        new DataPermissionManager()));
-
-                algo.SetStartDate(DateTime.UtcNow.AddDays(-1));
-
-                var history = algo.History(new[] { Symbols.IBM }, new DateTime(2013, 10, 7), new DateTime(2013, 10, 8), Resolution.Tick).ToList();
-                Assert.AreEqual(57460, history.Count);
-
-                foreach (var slice in history)
+                if (!slice.Ticks.ContainsKey(Symbols.IBM))
                 {
-                    if (!slice.Ticks.ContainsKey(Symbols.IBM))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    foreach (var tick in slice.Ticks[Symbols.IBM])
+                foreach (var tick in slice.Ticks[Symbols.IBM])
+                {
+                    if (tick.BidPrice != 0)
                     {
-                        if (tick.BidPrice != 0)
-                        {
-                            Assert.LessOrEqual(Math.Abs(tick.Value - tick.BidPrice), 0.05);
-                        }
-                        if (tick.AskPrice != 0)
-                        {
-                            Assert.LessOrEqual(Math.Abs(tick.Value - tick.AskPrice), 0.05);
-                        }
+                        Assert.LessOrEqual(Math.Abs(tick.Value - tick.BidPrice), 0.05);
+                    }
+                    if (tick.AskPrice != 0)
+                    {
+                        Assert.LessOrEqual(Math.Abs(tick.Value - tick.AskPrice), 0.05);
                     }
                 }
             }

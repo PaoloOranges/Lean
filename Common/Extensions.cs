@@ -66,7 +66,7 @@ namespace QuantConnect
     /// </summary>
     public static class Extensions
     {
-        private static readonly Regex LeanPathRegex = new Regex("(?:\\S*?\\\\Lean\\\\)|(?:\\S*?/Lean/)", RegexOptions.Compiled);
+        private static readonly Regex LeanPathRegex = new Regex("(?:\\S*?\\\\pythonnet\\\\)|(?:\\S*?\\\\Lean\\\\)|(?:\\S*?/Lean/)|(?:\\S*?/pythonnet/)", RegexOptions.Compiled);
         private static readonly Dictionary<string, bool> _emptyDirectories = new ();
         private static readonly HashSet<string> InvalidSecurityTypes = new HashSet<string>();
         private static readonly Regex DateCheck = new Regex(@"\d{8}", RegexOptions.Compiled);
@@ -1067,35 +1067,35 @@ namespace QuantConnect
             // Subtract by multiples of 5 to round down to nearest round number
             if (number < 10000)
             {
-                return $"{number - 5m:#,.##}K";
+                return (number - 5m).ToString("#,.##", CultureInfo.InvariantCulture) + "K";
             }
 
             if (number < 100000)
             {
-                return $"{number - 50m:#,.#}K";
+                return (number - 50m).ToString("#,.#", CultureInfo.InvariantCulture) + "K";
             }
 
             if (number < 1000000)
             {
-                return $"{number - 500m:#,.}K";
+                return (number - 500m).ToString("#,.", CultureInfo.InvariantCulture) + "K";
             }
 
             if (number < 10000000)
             {
-                return $"{number - 5000m:#,,.##}M";
+                return (number - 5000m).ToString("#,,.##", CultureInfo.InvariantCulture) + "M";
             }
 
             if (number < 100000000)
             {
-                return $"{number - 50000m:#,,.#}M";
+                return (number - 50000m).ToString("#,,.#", CultureInfo.InvariantCulture) + "M";
             }
 
             if (number < 1000000000)
             {
-                return $"{number - 500000m:#,,.}M";
+                return (number - 500000m).ToString("#,,.", CultureInfo.InvariantCulture) + "M";
             }
 
-            return $"{number - 5000000m:#,,,.##}B";
+            return (number - 5000000m).ToString("#,,,.##", CultureInfo.InvariantCulture) + "B";
         }
 
         /// <summary>
@@ -1137,6 +1137,19 @@ namespace QuantConnect
             }
 
             return Math.Truncate(1000 * value) / 1000;
+        }
+
+        /// <summary>
+        /// Provides global smart rounding, numbers larger than 1000 will round to 4 decimal places,
+        /// while numbers smaller will round to 7 significant digits
+        /// </summary>
+        public static decimal? SmartRounding(this decimal? input)
+        {
+            if (!input.HasValue)
+            {
+                return null;
+            }
+            return input.Value.SmartRounding();
         }
 
         /// <summary>
@@ -2396,7 +2409,6 @@ namespace QuantConnect
             switch (order.Type)
             {
                 case OrderType.Limit:
-                case OrderType.ComboLegLimit:
                     var limitOrder = order as LimitOrder;
                     limitPrice = limitOrder.LimitPrice;
                     break;
@@ -2430,6 +2442,10 @@ namespace QuantConnect
                     break;
                 case OrderType.ComboLimit:
                     limitPrice = order.GroupOrderManager.LimitPrice;
+                    break;
+                case OrderType.ComboLegLimit:
+                    var legLimitOrder = order as ComboLegLimitOrder;
+                    limitPrice = legLimitOrder.LimitPrice;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -3612,6 +3628,82 @@ namespace QuantConnect
 
             // let's yield back both the future chain and the continuous future universe
             return algorithm.UniverseManager.Values.Where(universe => universe.Configuration.Symbol == symbol.Canonical || ContinuousContractUniverse.CreateSymbol(symbol.Canonical) == universe.Configuration.Symbol);
+        }
+
+        private static bool _notifiedUniverseSettingsUsed;
+        private static readonly HashSet<SecurityType> _supportedSecurityTypes = new()
+        {
+            SecurityType.Equity,
+            SecurityType.Forex,
+            SecurityType.Cfd,
+            SecurityType.Option,
+            SecurityType.Future,
+            SecurityType.FutureOption,
+            SecurityType.IndexOption,
+            SecurityType.Crypto,
+            SecurityType.CryptoFuture
+        };
+
+        /// <summary>
+        /// Gets the security for the specified symbol from the algorithm's securities collection.
+        /// In case the security is not found, it will be created using the <see cref="IAlgorithm.UniverseSettings"/>
+        /// and a best effort configuration setup.
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance</param>
+        /// <param name="symbol">The symbol which security is being looked up</param>
+        /// <param name="security">The found or added security instance</param>
+        /// <param name="onError">Callback to invoke in case of unsupported security type</param>
+        /// <returns>True if the security was found or added</returns>
+        public static bool GetOrAddUnrequestedSecurity(this IAlgorithm algorithm, Symbol symbol, out Security security,
+            Action<IReadOnlyCollection<SecurityType>> onError = null)
+        {
+            if (!algorithm.Securities.TryGetValue(symbol, out security))
+            {
+                if (!_supportedSecurityTypes.Contains(symbol.SecurityType))
+                {
+                    Log.Error("GetOrAddUnrequestedSecurity(): Unsupported security type: " + symbol.SecurityType + "-" + symbol.Value);
+                    onError?.Invoke(_supportedSecurityTypes);
+                    return false;
+                }
+
+                var resolution = algorithm.UniverseSettings.Resolution;
+                var fillForward = algorithm.UniverseSettings.FillForward;
+                var leverage = algorithm.UniverseSettings.Leverage;
+                var extendedHours = algorithm.UniverseSettings.ExtendedMarketHours;
+
+                if (!_notifiedUniverseSettingsUsed)
+                {
+                    // let's just send the message once
+                    _notifiedUniverseSettingsUsed = true;
+
+                    var leverageMsg = $" Leverage = {leverage};";
+                    if (leverage == Security.NullLeverage)
+                    {
+                        leverageMsg = $" Leverage = default;";
+                    }
+                    algorithm.Debug($"Will use UniverseSettings for automatically added securities for open orders and holdings. UniverseSettings:" +
+                        $" Resolution = {resolution};{leverageMsg} FillForward = {fillForward}; ExtendedHours = {extendedHours}");
+                }
+
+                Log.Trace("GetOrAddUnrequestedSecurity(): Adding unrequested security: " + symbol.Value);
+
+                if (symbol.SecurityType.IsOption())
+                {
+                    // add current option contract to the system
+                    security = algorithm.AddOptionContract(symbol, resolution, fillForward, leverage, extendedHours);
+                }
+                else if (symbol.SecurityType == SecurityType.Future)
+                {
+                    // add current future contract to the system
+                    security = algorithm.AddFutureContract(symbol, resolution, fillForward, leverage, extendedHours);
+                }
+                else
+                {
+                    // for items not directly requested set leverage to 1 and at the min resolution
+                    security = algorithm.AddSecurity(symbol.SecurityType, symbol.Value, resolution, symbol.ID.Market, fillForward, leverage, extendedHours);
+                }
+            }
+            return true;
         }
 
         /// <summary>

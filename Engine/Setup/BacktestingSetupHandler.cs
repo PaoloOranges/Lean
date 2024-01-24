@@ -112,7 +112,7 @@ namespace QuantConnect.Lean.Engine.Setup
         /// <param name="uninitializedAlgorithm">The algorithm instance before Initialize has been called</param>
         /// <param name="factory">The brokerage factory</param>
         /// <returns>The brokerage instance, or throws if error creating instance</returns>
-        public IBrokerage CreateBrokerage(AlgorithmNodePacket algorithmNodePacket, IAlgorithm uninitializedAlgorithm, out IBrokerageFactory factory)
+        public virtual IBrokerage CreateBrokerage(AlgorithmNodePacket algorithmNodePacket, IAlgorithm uninitializedAlgorithm, out IBrokerageFactory factory)
         {
             factory = new BacktestingBrokerageFactory();
             return new BacktestingBrokerage(uninitializedAlgorithm);
@@ -175,9 +175,6 @@ namespace QuantConnect.Lean.Engine.Setup
                     // set the future chain provider
                     algorithm.SetFutureChainProvider(new CachingFutureChainProvider(new BacktestingFutureChainProvider(parameters.DataCacheProvider)));
 
-                    // set the object store
-                    algorithm.SetObjectStore(parameters.ObjectStore);
-
                     // before we call initialize
                     BaseSetupHandler.LoadBacktestJobAccountCurrency(algorithm, job);
 
@@ -194,8 +191,25 @@ namespace QuantConnect.Lean.Engine.Setup
                         algorithm.SetEndDate(job.PeriodFinish.Value);
                     }
 
+                    if(job.OutOfSampleMaxEndDate.HasValue)
+                    {
+                        if(algorithm.EndDate > job.OutOfSampleMaxEndDate.Value)
+                        {
+                            Log.Trace($"BacktestingSetupHandler.Setup(): setting end date to {job.OutOfSampleMaxEndDate.Value:yyyyMMdd}");
+                            algorithm.SetEndDate(job.OutOfSampleMaxEndDate.Value);
+
+                            if (algorithm.StartDate > algorithm.EndDate)
+                            {
+                                algorithm.SetStartDate(algorithm.EndDate);
+                            }
+                        }
+                    }
+
                     // after we call initialize
                     BaseSetupHandler.LoadBacktestJobCashAmount(algorithm, job);
+
+                    // after algorithm was initialized, should set trading days per year for our great portfolio statistics
+                    BaseSetupHandler.SetBrokerageTradingDayPerYear(algorithm);
 
                     // finalize initialization
                     algorithm.PostInitialize();

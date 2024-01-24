@@ -40,13 +40,14 @@ namespace QuantConnect.ToolBox.CoinApi
         // LEAN market <-> CoinAPI exchange id maps
         public static readonly Dictionary<string, string> MapMarketsToExchangeIds = new Dictionary<string, string>
         {
-            { Market.GDAX, "COINBASE" },
+            { Market.Coinbase, "COINBASE" },
             { Market.Bitfinex, "BITFINEX" },
             { Market.Binance, "BINANCE" },
             { Market.FTX, "FTX" },
             { Market.FTXUS, "FTXUS" },
             { Market.Kraken, "KRAKEN" },
             { Market.BinanceUS, "BINANCEUS" },
+            { Market.Bybit, "BYBIT" },
         };
         private static readonly Dictionary<string, string> MapExchangeIdsToMarkets =
             MapMarketsToExchangeIds.ToDictionary(x => x.Value, x => x.Key);
@@ -115,6 +116,8 @@ namespace QuantConnect.ToolBox.CoinApi
         {
             MapExchangeIdsToMarkets["BINANCEFTS"] = Market.Binance;
             MapExchangeIdsToMarkets["BINANCEFTSC"] = Market.Binance;
+
+            MapExchangeIdsToMarkets["BYBITSPOT"] = Market.Bybit;
 
             LoadSymbolMap(MapExchangeIdsToMarkets.Keys.ToArray());
         }

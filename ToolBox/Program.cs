@@ -22,13 +22,10 @@ using QuantConnect.ToolBox.CoinApiDataConverter;
 using QuantConnect.ToolBox.CryptoiqDownloader;
 using QuantConnect.ToolBox.DukascopyDownloader;
 using QuantConnect.ToolBox.IEX;
-using QuantConnect.ToolBox.IQFeedDownloader;
 using QuantConnect.ToolBox.IVolatilityEquityConverter;
 using QuantConnect.ToolBox.KaikoDataConverter;
 using QuantConnect.ToolBox.KrakenDownloader;
 using QuantConnect.ToolBox.NseMarketDataConverter;
-using QuantConnect.ToolBox.Polygon;
-using QuantConnect.ToolBox.QuantQuoteConverter;
 using QuantConnect.ToolBox.RandomDataGenerator;
 using QuantConnect.ToolBox.YahooDownloader;
 using QuantConnect.Util;
@@ -93,10 +90,6 @@ namespace QuantConnect.ToolBox
                     case "iexdownloader":
                         IEXDownloaderProgram.IEXDownloader(tickers, resolution, fromDate, toDate);
                         break;
-                    case "iqfdl":
-                    case "iqfeeddownloader":
-                        IQFeedDownloaderProgram.IQFeedDownloader(tickers, resolution, fromDate, toDate);
-                        break;
                     case "kdl":
                     case "krakendownloader":
                         KrakenDownloaderProgram.KrakenDownloader(tickers, resolution, fromDate, toDate);
@@ -105,17 +98,6 @@ namespace QuantConnect.ToolBox
                     case "ydl":
                     case "yahoodownloader":
                         YahooDownloaderProgram.YahooDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "pdl":
-                    case "polygondownloader":
-                        PolygonDownloaderProgram.PolygonDownloader(
-                            tickers,
-                            GetParameterOrExit(optionsObject, "security-type"),
-                            GetParameterOrExit(optionsObject, "market"),
-                            resolution,
-                            fromDate,
-                            toDate,
-                            apiKey);
                         break;
 
                     case "avdl":
@@ -168,12 +150,6 @@ namespace QuantConnect.ToolBox
                     case "nsemarketdataconverter":
                         NseMarketDataConverterProgram.NseMarketDataConverter(GetParameterOrExit(optionsObject, "source-dir"),
                                                                              GetParameterOrExit(optionsObject, "destination-dir"));
-                        break;
-                    case "qqc":
-                    case "quantquoteconverter":
-                        QuantQuoteConverterProgram.QuantQuoteConverter(GetParameterOrExit(optionsObject, "destination-dir"),
-                                                                       GetParameterOrExit(optionsObject, "source-dir"),
-                                                                       GetParameterOrExit(optionsObject, "resolution"));
                         break;
                     case "cug":
                     case "coarseuniversegenerator":

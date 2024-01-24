@@ -387,7 +387,7 @@ namespace QuantConnect.Lean.Engine.Results
             var filename = $"{AlgorithmId}-{utcTime:yyyy-MM-dd}-order-events.json";
             var path = GetResultsPath(filename);
 
-            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None);
+            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None, OrderEventJsonConverter);
 
             File.WriteAllText(path, data);
         }
@@ -424,7 +424,7 @@ namespace QuantConnect.Lean.Engine.Results
 
                 // sample the entire charts with a 12 hours resolution
                 var dailySampler = new SeriesSampler(TimeSpan.FromHours(12));
-                chartComplete = dailySampler.SampleCharts(chartComplete, Time.BeginningOfTime, Time.EndOfTime);
+                chartComplete = dailySampler.SampleCharts(chartComplete, Time.Start, Time.EndOfTime);
 
                 var result = new LiveResult(new LiveResultParameters(chartComplete,
                     new Dictionary<int, Order>(TransactionHandler.Orders),
@@ -653,7 +653,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// </summary>
         /// <param name="updates">Chart updates since the last request.</param>
         /// <seealso cref="Sample(string,string,int,SeriesType,ISeriesPoint,string)"/>
-        protected void SampleRange(List<Chart> updates)
+        protected void SampleRange(IEnumerable<Chart> updates)
         {
             Log.Debug("LiveTradingResultHandler.SampleRange(): Begin sampling");
             lock (ChartLock)
@@ -795,7 +795,7 @@ namespace QuantConnect.Lean.Engine.Results
                     result = new LiveResultPacket(_job,
                         new LiveResult(new LiveResultParameters(charts, orders, profitLoss, new Dictionary<string, Holding>(),
                             Algorithm.Portfolio.CashBook, statisticsResults.Summary, runtime, GetOrderEventsToStore(),
-                            algorithmConfiguration: AlgorithmConfiguration.Create(Algorithm), state: endState)));
+                            algorithmConfiguration: AlgorithmConfiguration.Create(Algorithm, null), state: endState)));
                 }
                 else
                 {
@@ -1117,6 +1117,11 @@ namespace QuantConnect.Lean.Engine.Results
                                      || symbol.SecurityType == QuantConnect.SecurityType.Forex
                                      || Algorithm.SubscriptionManager.SubscriptionDataConfigService.GetSubscriptionDataConfigs(symbol)
                                          .Any(config => config.ExtendedMarketHours || config.Resolution == Resolution.Daily);
+                if (_sampleChartAlways)
+                {
+                    // we set it once to true
+                    return;
+                }
 
                 if (!_exchangeHours.ContainsKey(securityChange.Symbol.ID.Market))
                 {

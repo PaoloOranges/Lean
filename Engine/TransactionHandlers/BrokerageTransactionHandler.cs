@@ -89,6 +89,11 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         private readonly ConcurrentDictionary<int, OrderTicket> _completeOrderTickets = new ConcurrentDictionary<int, OrderTicket>();
 
         /// <summary>
+        /// Cache collection of price adjustment modes for each symbol
+        /// </summary>
+        private readonly Dictionary<Symbol, DataNormalizationMode> _priceAdjustmentModes = new Dictionary<Symbol, DataNormalizationMode>();
+
+        /// <summary>
         /// The _cancelPendingOrders instance will help to keep track of CancelPending orders and their Status
         /// </summary>
         protected readonly CancelPendingOrders _cancelPendingOrders = new CancelPendingOrders();
@@ -175,7 +180,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
             _brokerage.NewBrokerageOrderNotification += (sender, e) =>
             {
-                AddOpenOrder(e.Order, _algorithm);
+                HandleNewBrokerageSideOrder(e);
             };
 
             _brokerage.DelistingNotification += (sender, e) =>
@@ -265,8 +270,16 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
             if (!shortable)
             {
-                response = OrderResponse.Error(request, OrderResponseErrorCode.ExceedsShortableQuantity,
-                    $"Order exceeds maximum shortable quantity for Symbol {request.Symbol} (requested short: {Math.Abs(request.Quantity)})");
+                var message = GetShortableErrorMessage(request.Symbol, request.Quantity);
+                if (_algorithm.LiveMode)
+                {
+                    // in live mode we send a warning but we wont block the order being sent to the brokerage
+                    _algorithm.Debug($"Warning: {message}");
+                }
+                else
+                {
+                    response = OrderResponse.Error(request, OrderResponseErrorCode.ExceedsShortableQuantity, message);
+                }
             }
 
             request.SetResponse(response);
@@ -349,7 +362,15 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 var shortable = true;
                 if (order?.Direction == OrderDirection.Sell || orderQuantity < 0)
                 {
-                    shortable = _algorithm.Shortable(ticket.Symbol, orderQuantity);
+                    shortable = _algorithm.Shortable(ticket.Symbol, orderQuantity, order.Id);
+
+                    if(_algorithm.LiveMode && !shortable)
+                    {
+                        // let's override and just send warning
+                        shortable = true;
+
+                        _algorithm.Debug($"Warning: {GetShortableErrorMessage(ticket.Symbol, ticket.Quantity)}");
+                    }
                 }
 
                 if (order == null)
@@ -381,7 +402,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 else if (!shortable)
                 {
                     var shortableResponse = OrderResponse.Error(request, OrderResponseErrorCode.ExceedsShortableQuantity,
-                        $"Order exceeds maximum shortable quantity for Symbol {ticket.Symbol} (requested short: {Math.Abs(orderQuantity)})");
+                        GetShortableErrorMessage(ticket.Symbol, ticket.Quantity));
 
                     request.SetResponse(shortableResponse);
                 }
@@ -684,6 +705,8 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
             var orderTicket = order.ToOrderTicket(algorithm.Transactions);
 
+            SetPriceAdjustmentMode(order, algorithm);
+
             _openOrders.AddOrUpdate(order.Id, order, (i, o) => order);
             _completeOrders.AddOrUpdate(order.Id, order, (i, o) => order);
             _openOrderTickets.AddOrUpdate(order.Id, orderTicket);
@@ -771,6 +794,9 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
             // save current security prices
             order.OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Close);
+
+            // Set order price adjustment mode
+            SetPriceAdjustmentMode(order, _algorithm);
 
             // update the ticket's internal storage with this new order reference
             ticket.SetOrder(order);
@@ -1110,9 +1136,12 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                     switch (order.Type)
                     {
                         case OrderType.Limit:
-                        case OrderType.ComboLegLimit:
                             var limit = order as LimitOrder;
                             orderEvent.LimitPrice = limit.LimitPrice;
+                            break;
+                        case OrderType.ComboLegLimit:
+                            var legLimitOrder = order as ComboLegLimitOrder;
+                            orderEvent.LimitPrice = legLimitOrder.LimitPrice;
                             break;
                         case OrderType.StopMarket:
                             var marketOrder = order as StopMarketOrder;
@@ -1262,6 +1291,34 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                     ((StopLimitOrder)order).StopTriggered = e.StopTriggered;
                     break;
             }
+        }
+
+        /// <summary>
+        /// Gets the price adjustment mode for the specified symbol from its subscription configurations
+        /// </summary>
+        private void SetPriceAdjustmentMode(Order order, IAlgorithm algorithm)
+        {
+            if (algorithm.LiveMode)
+            {
+                // live trading always uses raw prices
+                order.PriceAdjustmentMode = DataNormalizationMode.Raw;
+                return;
+            }
+
+            if (!_priceAdjustmentModes.TryGetValue(order.Symbol, out var mode))
+            {
+                var configs = algorithm.SubscriptionManager.SubscriptionDataConfigService
+                    .GetSubscriptionDataConfigs(order.Symbol, includeInternalConfigs: true);
+                if (configs.Count == 0)
+                {
+                    throw new InvalidOperationException($"Unable to locate subscription data config for {order.Symbol}");
+                }
+
+                mode = configs[0].DataNormalizationMode;
+                _priceAdjustmentModes[order.Symbol] = mode;
+            }
+
+            order.PriceAdjustmentMode = mode;
         }
 
         /// <summary>
@@ -1464,6 +1521,22 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             }
         }
 
+        /// <summary>
+        /// New brokerage-side order event handler
+        /// </summary>
+        private void HandleNewBrokerageSideOrder(NewBrokerageOrderNotificationEventArgs e)
+        {
+            void onError(IReadOnlyCollection<SecurityType> supportedSecurityTypes) =>
+                _algorithm.Debug($"Warning: New brokerage-side order could not be processed due to " +
+                    $"it's security not being supported. Supported security types are {string.Join(", ", supportedSecurityTypes)}");
+
+            if (_algorithm.BrokerageMessageHandler.HandleOrder(e) &&
+                _algorithm.GetOrAddUnrequestedSecurity(e.Order.Symbol, out _, onError))
+            {
+                AddOpenOrder(e.Order, _algorithm);
+            }
+        }
+
         private OptionExerciseOrder GenerateOptionExerciseOrder(Security security, decimal quantity)
         {
             // generate new exercise order and ticket for the option
@@ -1631,6 +1704,12 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                     $"Warning: To meet brokerage precision requirements, order {priceType.ToStringInvariant()} was rounded to {priceRound.ToStringInvariant()} from {priceOriginal.ToStringInvariant()}"
                 );
             }
+        }
+
+        private string GetShortableErrorMessage(Symbol symbol, decimal quantity)
+        {
+            var shortableQuantity = _algorithm.ShortableQuantity(symbol);
+            return $"Order exceeds shortable quantity {shortableQuantity} for Symbol {symbol} requested {quantity})";
         }
     }
 }

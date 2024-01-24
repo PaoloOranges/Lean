@@ -101,7 +101,7 @@ namespace QuantConnect.Orders
         /// <summary>
         /// Number of shares to execute.
         /// </summary>
-        public decimal Quantity
+        public virtual decimal Quantity
         {
             get { return _quantity; }
             internal set { _quantity = value.Normalize(); }
@@ -200,6 +200,11 @@ namespace QuantConnect.Orders
         /// </summary>
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public GroupOrderManager GroupOrderManager { get; set; }
+
+        /// <summary>
+        /// The adjustment mode used on the order fill price
+        /// </summary>
+        public DataNormalizationMode PriceAdjustmentMode { get; set; }
 
         /// <summary>
         /// Added a default constructor for JSON Deserialization:
@@ -341,6 +346,9 @@ namespace QuantConnect.Orders
         protected void CopyTo(Order order)
         {
             order.Id = Id;
+            // The group order manager has to be set before the quantity,
+            // since combo orders might need it to calculate the quantity in the Quantity setter.
+            order.GroupOrderManager = GroupOrderManager;
             order.Time = Time;
             order.LastFillTime = LastFillTime;
             order.LastUpdateTime = LastUpdateTime;
@@ -355,7 +363,7 @@ namespace QuantConnect.Orders
             order.Tag = Tag;
             order.Properties = Properties.Clone();
             order.OrderSubmissionData = OrderSubmissionData?.Clone();
-            order.GroupOrderManager = GroupOrderManager;
+            order.PriceAdjustmentMode = PriceAdjustmentMode;
         }
 
         /// <summary>
@@ -401,6 +409,7 @@ namespace QuantConnect.Orders
             order.Price = serializedOrder.Price;
             order.PriceCurrency = serializedOrder.PriceCurrency;
             order.Status = serializedOrder.Status;
+            order.PriceAdjustmentMode = serializedOrder.PriceAdjustmentMode;
 
             if (serializedOrder.LastFillTime.HasValue)
             {

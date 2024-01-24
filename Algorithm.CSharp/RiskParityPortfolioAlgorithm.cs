@@ -60,7 +60,7 @@ namespace QuantConnect.DataLibrary.Tests
         /// <summary>
         /// Data Points count of the algorithm history
         /// </summary>
-        public int AlgorithmHistoryDataPoints => 509;
+        public int AlgorithmHistoryDataPoints => 519;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
@@ -74,23 +74,24 @@ namespace QuantConnect.DataLibrary.Tests
             {"Drawdown", "4.900%"},
             {"Expectancy", "-0.273"},
             {"Net Profit", "0.510%"},
-            {"Sharpe Ratio", "0.278"},
+            {"Sharpe Ratio", "0.265"},
+            {"Sortino Ratio", "0.371"},
             {"Probabilistic Sharpe Ratio", "39.108%"},
             {"Loss Rate", "58%"},
             {"Win Rate", "42%"},
             {"Profit-Loss Ratio", "0.75"},
-            {"Alpha", "-0.093"},
+            {"Alpha", "-0.092"},
             {"Beta", "1.22"},
             {"Annual Standard Deviation", "0.2"},
             {"Annual Variance", "0.04"},
             {"Information Ratio", "-0.748"},
             {"Tracking Error", "0.088"},
-            {"Treynor Ratio", "0.045"},
+            {"Treynor Ratio", "0.043"},
             {"Total Fees", "$31.65"},
             {"Estimated Strategy Capacity", "$1300000000.00"},
             {"Lowest Capacity Asset", "AAPL R735QTJ8XC9X"},
             {"Portfolio Turnover", "3.08%"},
-            {"OrderListHash", "5b1ab4af56b31b9b1517f020b4cdeb34"}
+            {"OrderListHash", "c6a79aecd23149bd6ccad4008d56e397"}
         };
 
     }

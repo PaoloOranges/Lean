@@ -92,6 +92,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Expectancy", "0"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -105,9 +106,9 @@ namespace QuantConnect.Algorithm.CSharp
             {"Treynor Ratio", "0"},
             {"Total Fees", "$1.21"},
             {"Estimated Strategy Capacity", "$170000.00"},
-            {"Lowest Capacity Asset", "ETHUSD XJ"},
+            {"Lowest Capacity Asset", "ETHUSD 2XR"},
             {"Portfolio Turnover", "0.00%"},
-            {"OrderListHash", "a51b300baf8cd448f28d9523fd834c81"}
+            {"OrderListHash", "76b610bd1d6b6f15b371796b8430bc51"}
         };
     }
 }
