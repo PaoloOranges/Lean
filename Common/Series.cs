@@ -124,8 +124,16 @@ namespace QuantConnect
         /// <param name="value">Value of the chart point</param>
         public void AddPoint(DateTime time, decimal value)
         {
-            var chartPoint = new ChartPoint(time, value);
-            AddPoint(chartPoint);
+            ISeriesPoint point;
+            if (SeriesType == SeriesType.Scatter)
+            {
+                point = new ScatterChartPoint(time, value);
+            }
+            else
+            {
+                point = new ChartPoint(time, value);
+            }
+            AddPoint(point);
         }
 
         /// <summary>
@@ -188,6 +196,8 @@ namespace QuantConnect
             {
                 Color = Color,
                 ZIndex = ZIndex,
+                Tooltip = Tooltip,
+                IndexName = IndexName,
                 ScatterMarkerSymbol = ScatterMarkerSymbol,
             };
 

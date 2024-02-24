@@ -32,7 +32,6 @@ Example: --app=YahooDownloader --tickers=SPY,AAPL --resolution=Daily --from-date
 	- OandaDownloader or ODL
 	- QuandlBitfinexDownloader or QBDL
 	- YahooDownloader or YDL
-	- IEXDownloader or IEXDL
 	- BitfinexDownloader or BFXDL
 - **'--from-date=yyyyMMdd-HH:mm:ss'** required
 - **'--tickers=SPY,AAPL,etc'** required, except for QuandlBitfinexDownloader (QBDL)
@@ -46,8 +45,6 @@ Example: --app=YahooDownloader --tickers=SPY,AAPL --resolution=Daily --from-date
 		- **'--date=yyyyMMdd'** reference date.
 	- AlgoSeekOptionsConverter or ASOC
 		- **'--date=yyyyMMdd'** reference date.
-	- CoinApiDataConverter or CADC
-		- **'--source-dir='** path to the raw CoinAPI data.
 	- IVolatilityEquityConverter or IVEC
 		- **'--source-dir='** source archived IVolatility data.
 		- **'--source-meta-dir='** source archived IVolatility meta data.

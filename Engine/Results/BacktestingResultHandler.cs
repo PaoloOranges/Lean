@@ -21,10 +21,10 @@ using System.Linq;
 using QuantConnect.Brokerages;
 using QuantConnect.Configuration;
 using QuantConnect.Interfaces;
-using QuantConnect.Lean.Engine.TransactionHandlers;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Packets;
+using QuantConnect.Securities.Positions;
 using QuantConnect.Statistics;
 using QuantConnect.Util;
 
@@ -77,28 +77,19 @@ namespace QuantConnect.Lean.Engine.Results
 
             // Delay uploading first packet
             _nextS3Update = StartTime.AddSeconds(5);
-
-            //Default charts:
-            Charts.AddOrUpdate(StrategyEquityKey, new Chart(StrategyEquityKey));
-            Charts[StrategyEquityKey].Series.Add(EquityKey, new CandlestickSeries(EquityKey, 0, "$"));
-            Charts[StrategyEquityKey].Series.Add(DailyPerformanceKey, new Series(DailyPerformanceKey, SeriesType.Bar, 1, "%"));
         }
 
         /// <summary>
         /// Initialize the result handler with this result packet.
         /// </summary>
-        /// <param name="job">Algorithm job packet for this result handler</param>
-        /// <param name="messagingHandler">The handler responsible for communicating messages to listeners</param>
-        /// <param name="api">The api instance used for handling logs</param>
-        /// <param name="transactionHandler">The transaction handler used to get the algorithms <see cref="Order"/> information</param>
-        public override void Initialize(AlgorithmNodePacket job, IMessagingHandler messagingHandler, IApi api, ITransactionHandler transactionHandler)
+        public override void Initialize(ResultHandlerInitializeParameters parameters)
         {
-            _job = (BacktestNodePacket)job;
+            _job = (BacktestNodePacket)parameters.Job;
             State["Name"] = _job.Name;
-            _algorithmId = job.AlgorithmId;
-            _projectId = job.ProjectId;
+            _algorithmId = _job.AlgorithmId;
+            _projectId = _job.ProjectId;
             if (_job == null) throw new Exception("BacktestingResultHandler.Constructor(): Submitted Job type invalid.");
-            base.Initialize(job, messagingHandler, api, transactionHandler);
+            base.Initialize(parameters);
         }
 
         /// <summary>
@@ -192,6 +183,11 @@ namespace QuantConnect.Lean.Engine.Results
                         if (AlgorithmPerformanceCharts.Contains(kvp.Key))
                         {
                             performanceCharts[kvp.Key] = chart.Clone();
+                        }
+
+                        if (updates.Name == PortfolioMarginKey)
+                        {
+                            PortfolioMarginChart.RemoveSinglePointSeries(updates);
                         }
                     }
                 }
@@ -307,6 +303,11 @@ namespace QuantConnect.Lean.Engine.Results
                             result.Results.TotalPerformance,
                             result.Results.AlgorithmConfiguration,
                             result.Results.State));
+
+                        if (result.Results.Charts.TryGetValue(PortfolioMarginKey, out var marginChart))
+                        {
+                            PortfolioMarginChart.RemoveSinglePointSeries(marginChart);
+                        }
                     }
                     // Save results
                     SaveResults(key, results);
@@ -396,6 +397,7 @@ namespace QuantConnect.Lean.Engine.Results
         {
             Algorithm = algorithm;
             Algorithm.SetStatisticsService(this);
+            State["Name"] = Algorithm.Name;
             StartingPortfolioValue = startingPortfolioValue;
             DailyPortfolioValue = StartingPortfolioValue;
             CumulativeMaxPortfolioValue = StartingPortfolioValue;
@@ -420,6 +422,28 @@ namespace QuantConnect.Lean.Engine.Results
             SecurityType(types);
 
             ConfigureConsoleTextWriter(algorithm);
+
+            // Wire algorithm name and tags updates
+            algorithm.NameUpdated += (sender, name) => AlgorithmNameUpdated(name);
+            algorithm.TagsUpdated += (sender, tags) => AlgorithmTagsUpdated(tags);
+        }
+
+        /// <summary>
+        /// Handles updates to the algorithm's name
+        /// </summary>
+        /// <param name="name">The new name</param>
+        public virtual void AlgorithmNameUpdated(string name)
+        {
+            Messages.Enqueue(new AlgorithmNameUpdatePacket(AlgorithmId, name));
+        }
+
+        /// <summary>
+        /// Sends a packet communicating an update to the algorithm's tags
+        /// </summary>
+        /// <param name="tags">The new tags</param>
+        public virtual void AlgorithmTagsUpdated(HashSet<string> tags)
+        {
+            Messages.Enqueue(new AlgorithmTagsUpdatePacket(AlgorithmId, tags));
         }
 
         /// <summary>

@@ -33,19 +33,24 @@ namespace QuantConnect.Tests.Common
             Assert.AreEqual(2m, series.GetValues<ChartPoint>().Single().y);
         }
 
-        [Test]
-        public void Clone()
+        [TestCase(null, "toolTip")]
+        [TestCase("IndexName", "toolTip")]
+        [TestCase(null, null)]
+        [TestCase("IndexName", null)]
+        public void Clone(string indexName, string toolTip)
         {
-            var series = new Series("A", SeriesType.Line, "TT", Color.AliceBlue, ScatterMarkerSymbol.Circle) { ZIndex = 98, Index = 8 };
+            var series = new Series("A", SeriesType.Line, "TT", Color.AliceBlue, ScatterMarkerSymbol.Circle) { ZIndex = 98, Index = 8, IndexName = indexName, Tooltip = toolTip };
             var result = (Series)series.Clone();
 
             Assert.AreEqual(series.Name, result.Name);
             Assert.AreEqual(series.Unit, result.Unit);
+            Assert.AreEqual(series.Tooltip, result.Tooltip);
             Assert.AreEqual(series.SeriesType, result.SeriesType);
             Assert.AreEqual(series.Color.ToArgb(), result.Color.ToArgb());
             Assert.AreEqual(series.ScatterMarkerSymbol, result.ScatterMarkerSymbol);
             Assert.AreEqual(series.Index, result.Index);
             Assert.AreEqual(series.ZIndex, result.ZIndex);
+            Assert.AreEqual(series.IndexName, result.IndexName);
         }
     }
 }

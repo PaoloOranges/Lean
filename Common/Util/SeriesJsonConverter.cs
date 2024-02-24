@@ -58,22 +58,30 @@ namespace QuantConnect.Util
                 writer.WriteValue(baseSeries.ZIndex.Value);
             }
 
+            if (baseSeries.IndexName != null)
+            {
+                writer.WritePropertyName("IndexName");
+                writer.WriteValue(baseSeries.IndexName);
+            }
+
+            if (baseSeries.Tooltip != null)
+            {
+                writer.WritePropertyName("Tooltip");
+                writer.WriteValue(baseSeries.Tooltip);
+            }
+
             switch (value)
             {
                 case Series series:
-                    List<ChartPoint> values;
+                    var values = series.Values;
                     if (series.SeriesType == SeriesType.Pie)
                     {
-                        values = new List<ChartPoint>();
-                        var dataPoint = series.ConsolidateChartPoints() as ChartPoint;
+                        values = new List<ISeriesPoint>();
+                        var dataPoint = series.ConsolidateChartPoints();
                         if (dataPoint != null)
                         {
                             values.Add(dataPoint);
                         }
-                    }
-                    else
-                    {
-                        values = series.Values.Cast<ChartPoint>().ToList();
                     }
 
                     // have to add the converter we want to use, else will use default
@@ -109,12 +117,9 @@ namespace QuantConnect.Util
             var seriesType = (SeriesType)jObject["SeriesType"].Value<int>();
             var values = (JArray)jObject["Values"];
 
-            int? zindex = null;
-            var jZIndex = jObject["ZIndex"];
-            if (jZIndex != null && jZIndex.Type != JTokenType.Null)
-            {
-                zindex = jZIndex.Value<int>();
-            }
+            var zindex = jObject.TryGetPropertyValue<int?>("ZIndex");
+            var indexName = jObject.TryGetPropertyValue<string>("IndexName");
+            var tooltip = jObject.TryGetPropertyValue<string>("Tooltip");
 
             if (seriesType == SeriesType.Candle)
             {
@@ -124,22 +129,35 @@ namespace QuantConnect.Util
                     Unit = unit,
                     Index = index,
                     ZIndex = zindex,
+                    Tooltip = tooltip,
+                    IndexName = indexName,
                     SeriesType = seriesType,
                     Values = values.ToObject<List<Candlestick>>(serializer).Where(x => x != null).Cast<ISeriesPoint>().ToList()
                 };
             }
 
-            return new Series()
+            var result = new Series()
             {
                 Name = name,
                 Unit = unit,
                 Index = index,
                 ZIndex = zindex,
+                Tooltip = tooltip,
+                IndexName = indexName,
                 SeriesType = seriesType,
                 Color = jObject["Color"].ToObject<Color>(serializer),
-                ScatterMarkerSymbol = jObject["ScatterMarkerSymbol"].ToObject<ScatterMarkerSymbol>(serializer),
-                Values = values.ToObject<List<ChartPoint>>(serializer).Where(x => x != null).Cast<ISeriesPoint>().ToList()
+                ScatterMarkerSymbol = jObject["ScatterMarkerSymbol"].ToObject<ScatterMarkerSymbol>(serializer)
             };
+
+            if (seriesType == SeriesType.Scatter)
+            {
+                result.Values = values.ToObject<List<ScatterChartPoint>>(serializer).Where(x => x != null).Cast<ISeriesPoint>().ToList();
+            }
+            else
+            {
+                result.Values = values.ToObject<List<ChartPoint>>(serializer).Where(x => x != null).Cast<ISeriesPoint>().ToList();
+            }
+            return result;
         }
 
         /// <summary>
@@ -151,10 +169,5 @@ namespace QuantConnect.Util
         {
             return typeof(BaseSeries).IsAssignableFrom(objectType);
         }
-
-        /// <summary>
-        /// This converter wont be used to read JSON. Will throw exception if manually called.
-        /// </summary>
-        public override bool CanRead => true;
     }
 }

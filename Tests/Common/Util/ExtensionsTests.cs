@@ -27,7 +27,7 @@ using QuantConnect.Algorithm.CSharp;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
-using QuantConnect.Data.Custom.AlphaStreams;
+using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Indicators;
@@ -334,16 +334,15 @@ namespace QuantConnect.Tests.Common.Util
             };
             var orders = new List<Order> { new MarketOrder(btcusd, 1000, DateTime.UtcNow, "ExpensiveOrder") { Id = 1 } };
 
-            var packet1 = new AlphaResultPacket("1", 1, insights: insights, portfolio: new AlphaStreamsPortfolioState { TotalPortfolioValue = 11 });
+            var packet1 = new AlphaResultPacket("1", 1, insights: insights);
             var packet2 = new AlphaResultPacket("1", 1, orders: orders);
-            var packet3 = new AlphaResultPacket("1", 1, orderEvents: orderEvents, portfolio: new AlphaStreamsPortfolioState { TotalPortfolioValue = 12 });
+            var packet3 = new AlphaResultPacket("1", 1, orderEvents: orderEvents);
 
             var result = new List<AlphaResultPacket> { packet1, packet2, packet3 }.Batch();
 
             Assert.AreEqual(2, result.Insights.Count);
             Assert.AreEqual(2, result.OrderEvents.Count);
             Assert.AreEqual(1, result.Orders.Count);
-            Assert.AreEqual(12, result.Portfolio.TotalPortfolioValue);
 
             Assert.IsTrue(result.Insights.SequenceEqual(insights));
             Assert.IsTrue(result.OrderEvents.SequenceEqual(orderEvents));
@@ -1552,7 +1551,6 @@ actualDictionary.update({'IBM': 5})
             var algo = new QCAlgorithm();
             var dataFeed = new NullDataFeed();
 
-            algo.SubscriptionManager = new SubscriptionManager();
             algo.SubscriptionManager.SetDataManager(new DataManager(
                 dataFeed,
                 new UniverseSelection(
@@ -1712,6 +1710,46 @@ actualDictionary.update({'IBM': 5})
             Assert.AreEqual(expectedResult, values.GreatestCommonDivisor());
         }
 
+        [Test]
+        public void ConvertsPythonUniverseSelectionSymbolIDDelegateToSymbolDelegate()
+        {
+            using (Py.GIL())
+            {
+                var module = PyModule.FromString(
+                    "ConvertsPythonUniverseSelectionSymbolIDDelegateToSymbolDelegate",
+                    @"
+def select_symbol(fundamental):
+    return [str(x.Symbol.ID) for x in fundamental]
+"
+                );
+                var selectSymbolPythonMethod = module.GetAttr("select_symbol");
+                Assert.IsTrue(selectSymbolPythonMethod.TryConvertToDelegate(out Func<IEnumerable<Fundamental>, object> selectSymbols));
+                Assert.IsNotNull(selectSymbols);
+
+                var selectSymbolsUniverseDelegate = selectSymbols.ConvertToUniverseSelectionSymbolDelegate();
+
+                var reference = new DateTime(2024, 2, 1);
+                var fundamentals = new List<Fundamental>()
+                {
+                    new Fundamental(reference, Symbols.SPY),
+                    new Fundamental(reference, Symbols.AAPL),
+                    new Fundamental(reference, Symbols.IBM),
+                    new Fundamental(reference, Symbols.GOOG)
+                };
+
+                List<Symbol> symbols = null;
+                Assert.DoesNotThrow(() => symbols = selectSymbolsUniverseDelegate(fundamentals).ToList());
+                CollectionAssert.IsNotEmpty(symbols);
+                Assert.That(symbols, Is.All.Matches<Symbol>(x => fundamentals.Any(fund => fund.Symbol == x)));
+            }
+        }
+
+        [TestCaseSource(nameof(DivideCases))]
+        public void SafeDivisionWorksAsExpectedWithEdgeCases(decimal numerator, decimal denominator)
+        {
+            Assert.DoesNotThrow(() => numerator.SafeDivision(denominator));
+        }
+
         private PyObject ConvertToPyObject(object value)
         {
             using (Py.GIL())
@@ -1746,5 +1784,14 @@ actualDictionary.update({'IBM': 5})
                 new SecurityCache()
             );
         }
+
+        private static object[] DivideCases =
+        {
+            new decimal[] { 100000000000000000000m, 0.000000000001m },
+            new decimal[] { -100000000000000000000m, 0.000000000001m },
+            new decimal[] { 1, 0 },
+            new decimal[] { 0.0000000000000001m, 10000000000000000000000000000m },
+            new decimal[] { -0.000000000000001m, 10000000000000000000000000000m },
+        };
     }
 }

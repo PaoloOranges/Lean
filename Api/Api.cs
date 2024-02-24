@@ -39,7 +39,7 @@ namespace QuantConnect.Api
     /// </summary>
     public class Api : IApi, IDownloadProvider
     {
-        private readonly HttpClient _client = new HttpClient();
+        private readonly Lazy<HttpClient> _client = new ();
         private string _dataFolder;
 
         /// <summary>
@@ -634,6 +634,31 @@ namespace QuantConnect.Api
         }
 
         /// <summary>
+        /// Updates the tags collection for a backtest
+        /// </summary>
+        /// <param name="projectId">Project for the backtest we want to update</param>
+        /// <param name="backtestId">Backtest id we want to update</param>
+        /// <param name="tags">The new backtest tags</param>
+        /// <returns><see cref="RestResponse"/></returns>
+        public RestResponse UpdateBacktestTags(int projectId, string backtestId, IReadOnlyCollection<string> tags)
+        {
+            var request = new RestRequest("backtests/tags/update", Method.POST)
+            {
+                RequestFormat = DataFormat.Json
+            };
+
+            request.AddParameter("application/json", JsonConvert.SerializeObject(new
+            {
+                projectId,
+                backtestId,
+                tags
+            }), ParameterType.RequestBody);
+
+            ApiConnection.TryRequest(request, out RestResponse result);
+            return result;
+        }
+
+        /// <summary>
         /// Create a live algorithm.
         /// </summary>
         /// <param name="projectId">Id of the project on QuantConnect</param>
@@ -985,7 +1010,7 @@ namespace QuantConnect.Api
             {
                 // Download the file
                 var uri = new Uri(dataLink.Url);
-                using var dataStream = _client.GetStreamAsync(uri);
+                using var dataStream = _client.Value.GetStreamAsync(uri);
 
                 using var fileStream = new FileStream(filePath, FileMode.Create);
                 dataStream.Result.CopyTo(fileStream);
@@ -1103,7 +1128,10 @@ namespace QuantConnect.Api
         /// <filterpriority>2</filterpriority>
         public virtual void Dispose()
         {
-            _client.DisposeSafely();
+            if (_client.IsValueCreated)
+            {
+                _client.Value.DisposeSafely();
+            }
         }
 
         /// <summary>
