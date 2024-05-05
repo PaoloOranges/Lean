@@ -28,9 +28,10 @@ using QuantConnect.Brokerages;
 using QuantConnect.Indicators;
 using QuantConnect.Orders;
 using QuantConnect.Data.Market;
+using QuantConnect.Util;
 
 
-namespace QuantConnect.Algorithm.CSharp
+namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 {
     /// <summary>
     /// The demonstration algorithm shows some of the most common order methods when working with Crypto assets.
@@ -65,7 +66,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private PurchaseStatus _purchase_status = PurchaseStatus.Init;
         private decimal _bought_price = 0;
-        private decimal _max_price_after_buy = Decimal.MinValue;
+        private decimal _max_price_after_buy = decimal.MinValue;
 
         private const string CryptoName = "ETH";
         private const string CurrencyName = "EUR";
@@ -109,12 +110,10 @@ namespace QuantConnect.Algorithm.CSharp
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2023, 1, 1); // Set Start Date
-            SetEndDate(2024, 01, 30); // Set End Date
+            SetEndDate(2024, 04, 30); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
-
-            //SetCash(CryptoName, 0.08m);
 
             _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
             //SetBenchmark(_symbol);
@@ -135,7 +134,7 @@ namespace QuantConnect.Algorithm.CSharp
             _adx = ADX(_symbol, adxPeriod, resolution);
 
             _maximum_price = MAX(_symbol, fastValue, resolution, x => ((TradeBar)x).Close);
-                        
+
             SetWarmUp(TimeSpan.FromDays(7));
 
 #if DEBUG && PLOT_CHART
@@ -179,7 +178,7 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     string sold_price = ObjectStore.Read(LastSoldObjectStoreKey);
                     Log("Previous Sell found: " + sold_price);
-                }                
+                }
             }
 
 
@@ -213,15 +212,15 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (IsWarmingUp)
             {
-                if(_purchase_status == PurchaseStatus.Bought && !HasBoughtPriceFromPreviousSession)
+                if (_purchase_status == PurchaseStatus.Bought && !HasBoughtPriceFromPreviousSession)
                 {
                     _bought_price = _maximum_price;
                 }
                 return;
             }
-            
+
             OnProcessData(data);
-            
+
             DateTime UtcTimeNow = UtcTime;
 
             if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > resolutionInSeconds)
@@ -243,7 +242,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private void UpdateInternalVariables(Slice data)
         {
-            switch(_purchase_status)
+            switch (_purchase_status)
             {
                 case PurchaseStatus.Bought:
                     {
@@ -257,7 +256,7 @@ namespace QuantConnect.Algorithm.CSharp
                         _min_fast_lsma = Math.Min(_fast_lsma, _min_fast_lsma);
                     }
                     break;
-            }            
+            }
         }
 
         private void OnProcessData(Slice data)
@@ -309,14 +308,13 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = data[SymbolName].Value;
 
             bool is_macd_ok = _macd.Histogram.Current.Value > 0;
-            bool is_adx_ok = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex; // try making combination with distance of positive and negative compared to other indicators
+            bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
 
-            bool is_moving_averages_ok = _very_fast_wma > _slow_hullma && _very_fast_wma > _fast_lsma;
-            //bool is_ao_ok = true; // _ao.AroonUp > 80;
+            bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ _very_fast_wma > _fast_lsma;
 
             bool is_fast_lsma_ok = _fast_lsma > _min_fast_lsma;
 
-            return is_moving_averages_ok && is_fast_lsma_ok/*&& is_adx_ok && is_macd_ok*/ /*&& is_ao_ok*/;
+            return is_moving_averages_ok && is_fast_lsma_ok && is_adx_ok/* && is_macd_ok*/;
         }
 
         private bool IsOkToSell(Slice data)
@@ -325,8 +323,8 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = data[SymbolName].Value;
 
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _very_fast_wma < _fast_lsma ;//&& _very_fast_wma < _slow_hullma;
-            //bool is_ao_ok = _ao.AroonUp < _ao.AroonDown;
+            bool is_moving_averages_ok = _very_fast_wma < _slow_hullma;//&& _very_fast_wma < _slow_hullma;
+            bool is_adx_ok = GetADXDifference() < 10;
 
             bool is_target_price_achieved = current_price > (1.0m + _percentage_price_gain) * _bought_price;
 
@@ -339,10 +337,10 @@ namespace QuantConnect.Algorithm.CSharp
 
             bool is_stop_limit = current_price < 0.98m * _maximum_price;//current_price < current_price + (_maximum_price - current_price) * 0.90m;
 
-            bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
+            bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved && is_adx_ok;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
 
-            return is_target_price_achieved && (is_moving_averages_ok || is_stop_limit) /*|| IsStopLoss(data)*/;
+            return is_gain_ok || is_stop_limit /*|| IsStopLoss(data)*/;
 
         }
 
@@ -351,6 +349,11 @@ namespace QuantConnect.Algorithm.CSharp
             decimal current_price = data[SymbolName].Value;
 
             return current_price < _stop_loss_percentage * _bought_price;
+        }
+
+        private decimal GetADXDifference()
+        {
+            return _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex;
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
@@ -375,7 +378,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 _purchase_status = PurchaseStatus.Sold;
                 _sold_price = orderEvent.FillPrice;
-                _max_price_after_buy = Decimal.MinValue;
+                _max_price_after_buy = decimal.MinValue;
                 _max_fast_lsma = decimal.MaxValue;
                 ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_culture_info));
             }
@@ -401,13 +404,13 @@ namespace QuantConnect.Algorithm.CSharp
         {
             private int _length = 0;
 
-            private Queue<decimal> _datas = new Queue<decimal>();
+            private Queue<decimal> _values = new Queue<decimal>();
 
             public decimal Max
             {
                 get
                 {
-                    return _datas.Max();
+                    return _values.Max();
                 }
             }
 
@@ -415,7 +418,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 get
                 {
-                    return _datas.Min();
+                    return _values.Min();
                 }
             }
 
@@ -426,14 +429,26 @@ namespace QuantConnect.Algorithm.CSharp
 
             public void OnData(decimal mcd_data)
             {
-                _datas.Enqueue(mcd_data);
-                while (_datas.Count > _length)
+                _values.Enqueue(mcd_data);
+                while (_values.Count > _length)
                 {
-                    _datas.Dequeue();
+                    _values.Dequeue();
                 }
             }
 
 
+        }
+
+        internal class Differential
+        {
+            private int _length = 0;
+            private Queue<decimal> _values = new Queue<decimal>();
+
+            public Differential(int length)
+            {
+                _length = length;
+                _values = new Queue<decimal>();
+            }
         }
     }
 }

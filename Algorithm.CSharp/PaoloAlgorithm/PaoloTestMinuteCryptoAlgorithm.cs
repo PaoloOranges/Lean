@@ -22,7 +22,7 @@ using QuantConnect.Indicators;
 using QuantConnect.Orders;
 using QuantConnect.Interfaces;
 
-namespace QuantConnect.Algorithm.CSharp
+namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 {
     /// <summary>
     /// The demonstration algorithm shows some of the most common order methods when working with Crypto assets.
@@ -37,9 +37,9 @@ namespace QuantConnect.Algorithm.CSharp
         private MovingAverageConvergenceDivergence _macd;
         private AverageDirectionalIndex _adx;
 
-        private decimal _max_macd = Decimal.MinValue;
-        private decimal _min_macd = Decimal.MaxValue;
-        private decimal _max_adx = Decimal.MinValue;
+        private decimal _max_macd = decimal.MinValue;
+        private decimal _min_macd = decimal.MaxValue;
+        private decimal _max_adx = decimal.MinValue;
 
         private MinMaxMACD _min_max_macd;
         private int _bought = -1;
@@ -51,7 +51,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private Symbol _symbol = null;
 
-        private decimal _sold_price = Decimal.MaxValue;
+        private decimal _sold_price = decimal.MaxValue;
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
@@ -116,7 +116,7 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal quantity = 0.001m;// Math.Round(1.0m / btcPrice, 3, MidpointRounding.ToZero);
 
                     Buy(_symbol, quantity);
-                }                
+                }
             }
             else if (_bought > 0)
             {
@@ -147,8 +147,8 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal amount_to_buy = Portfolio.CashBook[CashName].Amount;
                     decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / btcPrice) / round_multiplier;
                     var order = Buy(_symbol, quantity);
-                    _max_macd = Decimal.MinValue;
-                    _max_adx = Decimal.MinValue;
+                    _max_macd = decimal.MinValue;
+                    _max_adx = decimal.MinValue;
 
                 }
             }

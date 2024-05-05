@@ -22,7 +22,7 @@ using QuantConnect.Indicators;
 using QuantConnect.Orders;
 using QuantConnect.Interfaces;
 
-namespace QuantConnect.Algorithm.CSharp
+namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 {
     /// <summary>
     /// The demonstration algorithm shows some of the most common order methods when working with Crypto assets.
@@ -86,14 +86,14 @@ namespace QuantConnect.Algorithm.CSharp
             decimal closePrice = data.Bars[SymbolName].Close;
             if (_bought < 0)
             {
-                if(closePrice < 9700)
+                if (closePrice < 9700)
                 {
                     decimal btcPrice = Securities[SymbolName].Price;
                     decimal quantity = Math.Round(Portfolio.CashBook["USD"].Amount / btcPrice, 2);
                     Buy(_symbol, quantity);
                 }
             }
-            else if(_bought > 0)
+            else if (_bought > 0)
             {
                 if (closePrice > _price_bought * 1.20m)
                 {
