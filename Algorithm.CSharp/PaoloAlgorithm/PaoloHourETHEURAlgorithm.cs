@@ -29,6 +29,9 @@ using QuantConnect.Indicators;
 using QuantConnect.Orders;
 using QuantConnect.Data.Market;
 using QuantConnect.Util;
+using MathNet.Numerics;
+using QuantConnect.Algorithm.CSharp.PaoloAlgorithm.Utilities;
+using Accord.MachineLearning.Performance;
 
 
 namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
@@ -41,32 +44,37 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
     /// <meta name="tag" content="trading and orders" />
     public class PaoloHourETHEURAlgorithm : QCAlgorithm
     {
-        enum PurchaseStatus
+        enum PurchaseState
         {
             Init,
             Bought,
-            Sold,
-            ReadyToBuy,
-            ReadyToSell
+            Sold,  
         };
 
-        private HullMovingAverage _slow_hullma;
-        private LeastSquaresMovingAverage _fast_lsma;
-        private LinearWeightedMovingAverage _very_fast_wma;
+        enum ReadyForBuyState
+        {
+            None,
+            UpTrending,
+            LowTrending,
+        }
 
-        private decimal _min_fast_lsma = decimal.MaxValue;
-        private decimal _max_fast_lsma = decimal.MinValue;
+        private ExponentialMovingAverage _slowMA;
+        private ExponentialMovingAverage _fastMA;
+        private ExponentialMovingAverage _veryFastMA;
 
         private MovingAverageConvergenceDivergence _macd;
         //private ParabolicStopAndReverse _psar;
         private AverageDirectionalIndex _adx;
+        private RelativeStrengthIndex _rsi;
 
         private Maximum _maximum_price;
         private const decimal _stop_loss_percentage = 0.95m;
 
-        private PurchaseStatus _purchase_status = PurchaseStatus.Init;
+        private PurchaseState _purchase_status = PurchaseState.Init;
         private decimal _bought_price = 0;
         private decimal _max_price_after_buy = decimal.MinValue;
+
+        private ReadyForBuyState ready_for_buy_state = ReadyForBuyState.None;
 
         private const string CryptoName = "ETH";
         private const string CurrencyName = "EUR";
@@ -93,18 +101,32 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private const decimal _percentage_price_gain = 0.04m;
 
         private const int WarmUpTime = 440;
-        private const double resolutionInSeconds = 3600.0;
+        private const double ResolutionInSeconds = 3600.0;
         private const string EmailAddress = "paolo.oranges@gmail.com";
 
-        private CultureInfo _culture_info = CultureInfo.CreateSpecificCulture("en-GB");
+        readonly private CultureInfo _culture_info = CultureInfo.CreateSpecificCulture("en-GB");
 
+        //// State counters
+        //private Differential _fastMADiff = new Differential(5, 3);
+        //private Differential _slowMADiff = new Differential(5, 3);
+        const int CircularBufferLength = 5;
+        readonly private double[] FixedArray = Enumerable.Range(0, CircularBufferLength).Select(x => Convert.ToDouble(x)).ToArray();
+        FixedCircularBuffer<decimal> _fastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
+        FixedCircularBuffer<decimal> _veryFastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
+        FixedCircularBuffer<decimal> _slowMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
+
+        private int _volumeCounter = 0; //how many consecutive + or - volume
+        private decimal _lastVolume = 0;
+        private decimal _lastPrice = 0;
+
+        private CrossStateHandler _veryFastMACrossState = new CrossStateHandler();
 
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
         public override void Initialize()
         {
-            SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
+            SetBrokerageModel(BrokerageName.Coinbase, AccountType.Cash);
             SetTimeZone(NodaTime.DateTimeZone.Utc);
 
             Resolution resolution = Resolution.Hour;
@@ -115,25 +137,26 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
 
-            _symbol = AddCrypto(SymbolName, resolution, Market.GDAX).Symbol;
+            _symbol = AddCrypto(SymbolName, resolution, Market.Coinbase).Symbol;
             //SetBenchmark(_symbol);
 
-            const int fastValue = 55;
-            const int slowValue = 110;
-            const int veryFastValue = 15;
+            const int fastPeriod = 55;
+            const int slowPeriod = 110;
+            const int veryFastPeriod = 15;
             const int signal = 8;
 
-            _slow_hullma = HMA(_symbol, slowValue, resolution);
-            _fast_lsma = LSMA(_symbol, fastValue, resolution);
-            _very_fast_wma = LWMA(_symbol, veryFastValue, resolution);
+            _slowMA = EMA(_symbol, slowPeriod, resolution);
+            _fastMA = EMA(_symbol, fastPeriod, resolution);
+            _veryFastMA = EMA(_symbol, veryFastPeriod, resolution);
 
-            _macd = MACD(_symbol, fastValue, slowValue, veryFastValue, MovingAverageType.Exponential, resolution);
+            _macd = MACD(_symbol, fastPeriod, slowPeriod, veryFastPeriod, MovingAverageType.Exponential, resolution);
             //_psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
 
-            var adxPeriod = (fastValue + veryFastValue) / 2;
+            var adxPeriod = (fastPeriod + veryFastPeriod) / 2;
             _adx = ADX(_symbol, adxPeriod, resolution);
+            //_rsi = RSI(_symbol, slowPeriod, MovingAverageType.Exponential);
 
-            _maximum_price = MAX(_symbol, fastValue, resolution, x => ((TradeBar)x).Close);
+            _maximum_price = MAX(_symbol, fastPeriod, resolution, x => ((TradeBar)x).Close);
 
             SetWarmUp(TimeSpan.FromDays(7));
 
@@ -146,11 +169,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(VolumeSeriesName, SeriesType.Bar, ""));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
-            IndicatorBase[] indicatorsToPlot = { _slow_hullma, _fast_lsma, _very_fast_wma };
+            IndicatorBase[] indicatorsToPlot = { _slowMA, _fastMA, _veryFastMA };
             PlotIndicator("Indicators", indicatorsToPlot);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
-            IndicatorBase[] oscillatorsToPlot = { /*_adx,*/ _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex, _macd.Histogram };
+            IndicatorBase[] oscillatorsToPlot = { /*_adx,*/ _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex, _macd.Histogram};
             PlotIndicator("Oscillators", oscillatorsToPlot);
 #endif
 
@@ -158,11 +181,12 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         public override void PostInitialize()
         {
+
             var cryptoCashBook = Portfolio.CashBook[CryptoName];
             if (cryptoCashBook.Amount > 0)
             {
                 Log(CryptoName + " amount in Portfolio: " + cryptoCashBook.Amount + " - Initialized to Bought");
-                _purchase_status = PurchaseStatus.Bought;
+                _purchase_status = PurchaseState.Bought;
                 if (HasBoughtPriceFromPreviousSession)
                 {
                     string bought_price = ObjectStore.Read(LastBoughtObjectStoreKey);
@@ -173,7 +197,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             else
             {
                 Log(CurrencyName + " amount in Portfolio: " + Portfolio.CashBook[CurrencyName].Amount + " - Initialized to Sold");
-                _purchase_status = PurchaseStatus.Sold;
+                _purchase_status = PurchaseState.Sold;
+                ready_for_buy_state = ReadyForBuyState.None;
                 if (HasSoldPriceFromPreviousSession)
                 {
                     string sold_price = ObjectStore.Read(LastSoldObjectStoreKey);
@@ -181,8 +206,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 }
             }
 
-
             base.PostInitialize();
+
         }
 
         private bool HasBoughtPriceFromPreviousSession
@@ -208,22 +233,23 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            UpdateInternalVariables(data);
 
             if (IsWarmingUp)
             {
-                if (_purchase_status == PurchaseStatus.Bought && !HasBoughtPriceFromPreviousSession)
+                if (_purchase_status == PurchaseState.Bought && !HasBoughtPriceFromPreviousSession)
                 {
                     _bought_price = _maximum_price;
                 }
                 return;
             }
 
+            UpdateInternalVariables(data);
+
             OnProcessData(data);
 
             DateTime UtcTimeNow = UtcTime;
 
-            if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > resolutionInSeconds)
+            if (Math.Floor((UtcTimeNow - UtcTimeLast).TotalSeconds) > ResolutionInSeconds)
             {
                 Log("WrongTime! Last: " + UtcTimeLast.ToString(_culture_info) + " Now: " + UtcTimeNow.ToString(_culture_info));
             }
@@ -242,21 +268,56 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private void UpdateInternalVariables(Slice data)
         {
+            _veryFastMACircularBuffer.Push(_veryFastMA);
+            _fastMACircularBuffer.Push(_fastMA);
+            _slowMACircularBuffer.Push(_slowMA);
+
+            decimal current_price = data[SymbolName].Value;
             switch (_purchase_status)
             {
-                case PurchaseStatus.Bought:
+                case PurchaseState.Bought:
                     {
-                        decimal current_price = data[SymbolName].Value;
                         _max_price_after_buy = Math.Max(_max_price_after_buy, current_price);
-                        _max_fast_lsma = Math.Max(_fast_lsma, _max_fast_lsma);
                     }
-                    break;
-                case PurchaseStatus.Sold:
+                    break;                
+                case PurchaseState.Sold:
                     {
-                        _min_fast_lsma = Math.Min(_fast_lsma, _min_fast_lsma);
+
                     }
-                    break;
+                    break;               
+                
             }
+
+
+            decimal volume = data[SymbolName].Volume;
+            _lastVolume = volume;
+
+            if (current_price > _lastPrice) 
+            {
+                if(_volumeCounter > 0)
+                {
+                    _volumeCounter++;
+                }
+                else
+                { 
+                    _volumeCounter = 1; 
+                }
+            }
+            else
+            {
+                if (_volumeCounter < 0)
+                {
+                    _volumeCounter--;
+                }
+                else
+                {
+                    _volumeCounter = -1;
+                }
+            }
+
+            _lastPrice = current_price;
+
+            _veryFastMACrossState.OnData(_veryFastMA, _slowMA);
         }
 
         private void OnProcessData(Slice data)
@@ -266,7 +327,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 #endif
             decimal current_price = Securities[SymbolName].Price;
 
-            if (_purchase_status == PurchaseStatus.Sold)
+            if (_purchase_status == PurchaseState.Sold)
             {
                 if (IsOkToBuy(data))
                 {
@@ -285,7 +346,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 #endif
                 }
             }
-            else if (_purchase_status == PurchaseStatus.Bought)
+            else if (_purchase_status == PurchaseState.Bought)
             {
                 if (IsOkToSell(data))
                 {
@@ -306,25 +367,63 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private bool IsOkToBuy(Slice data)
         {
             decimal current_price = data[SymbolName].Value;
+                        
+            bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ current_price > _slowMA;
 
-            bool is_macd_ok = _macd.Histogram.Current.Value > 0;
-            bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
+            if(_veryFastMACrossState.CrossState == CrossStateEnum.None)
+            {
+                bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
 
-            bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ _very_fast_wma > _fast_lsma;
+                return is_moving_averages_ok && is_adx_ok /* && isVolumeOk && is_macd_ok*/;
+            }
+            else
+            {
+                bool isMACrossingOk = _veryFastMACrossState.CrossState == CrossStateEnum.Up;
+                bool isAdxOk = GetADXDifference() > 0;
 
-            bool is_fast_lsma_ok = _fast_lsma > _min_fast_lsma;
+                return is_moving_averages_ok && isMACrossingOk && isAdxOk;
+            }
+            //bool isSlopesOk = false;
 
-            return is_moving_averages_ok && is_fast_lsma_ok && is_adx_ok/* && is_macd_ok*/;
+            //if(_fastMACircularBuffer.Length == FixedArray.Length)
+            //{
+            //    var fastMALine = Fit.Line(FixedArray, _fastMACircularBuffer.ToArray().Select(x => Convert.ToDouble(x)).ToArray());
+            //    var veryFastMALine = Fit.Line(FixedArray, _veryFastMACircularBuffer.ToArray().Select(x => Convert.ToDouble(x)).ToArray());
+            //    var slowMALine = Fit.Line(FixedArray, _slowMACircularBuffer.ToArray().Select(x => Convert.ToDouble(x)).ToArray());
+
+            //    isSlopesOk = fastMALine.Item2 >= 0.0 && veryFastMALine.Item2 >= 0.0;
+
+            //    if (_veryFastMA > _fastMA && _fastMA > _slowMA)
+            //    {
+            //        isSlopesOk = slowMALine.Item2 >= 0.0;
+            //    }
+            //    else
+            //    {
+            //        isSlopesOk = slowMALine.Item2 <= 0.0;
+            //    }
+            //}
+            
+            //bool is_macd_ok = _macd.Histogram.Current.Value > 0;
+            //bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
+
+            //bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ current_price > _slowMA;
+
+            //bool isVolumeOk = _volumeCounter > 1;
+
+            //return is_moving_averages_ok && is_adx_ok /* && isVolumeOk && is_macd_ok*/;
         }
 
         private bool IsOkToSell(Slice data)
         {
-
-            decimal current_price = data[SymbolName].Value;
+            decimal current_price = data[SymbolName].Value; // Value == Close
 
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            bool is_moving_averages_ok = _very_fast_wma < _slow_hullma;//&& _very_fast_wma < _slow_hullma;
-            bool is_adx_ok = GetADXDifference() < 10;
+            const decimal cross_ma_linear_interp_value = 0.3m;
+            var cross_ma_value = _veryFastMA * cross_ma_linear_interp_value + _fastMA * (1m - cross_ma_linear_interp_value);
+
+            bool is_moving_averages_ok = current_price < cross_ma_value;//&& _very_fast_wma < _slow_hullma;
+
+            bool is_adx_ok = GetADXDifference() < 10; // compute line and see slope
 
             bool is_target_price_achieved = current_price > (1.0m + _percentage_price_gain) * _bought_price;
 
@@ -335,9 +434,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 //Log(body);
             }
 
-            bool is_stop_limit = current_price < 0.98m * _maximum_price;//current_price < current_price + (_maximum_price - current_price) * 0.90m;
+            bool is_stop_limit = false;// current_price < 0.98m * _maximum_price;//current_price < current_price + (_maximum_price - current_price) * 0.90m;
 
-            bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved && is_adx_ok;
+            bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
 
             return is_gain_ok || is_stop_limit /*|| IsStopLoss(data)*/;
@@ -354,6 +453,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private decimal GetADXDifference()
         {
             return _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex;
+        }               
+
+        private void ResetCrossStates()
+        {
+            _veryFastMACrossState.Reset();
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
@@ -367,25 +471,25 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             if (orderEvent.Direction == OrderDirection.Buy && orderEvent.Status == OrderStatus.Filled)
             {
-                _purchase_status = PurchaseStatus.Bought;
+                _purchase_status = PurchaseState.Bought;
                 _bought_price = orderEvent.FillPrice;
                 _max_price_after_buy = _bought_price;
-                _max_fast_lsma = decimal.MinValue;
+                ResetCrossStates();
                 ObjectStore.Save(LastBoughtObjectStoreKey, _bought_price.ToString(_culture_info));
             }
 
             if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
             {
-                _purchase_status = PurchaseStatus.Sold;
+                _purchase_status = PurchaseState.Sold;
                 _sold_price = orderEvent.FillPrice;
                 _max_price_after_buy = decimal.MinValue;
-                _max_fast_lsma = decimal.MaxValue;
+                ResetCrossStates();
                 ObjectStore.Save(LastSoldObjectStoreKey, _sold_price.ToString(_culture_info));
             }
 
             if (orderEvent.Status == OrderStatus.Invalid)
             {
-                _purchase_status = orderEvent.Direction == OrderDirection.Buy ? PurchaseStatus.Sold : PurchaseStatus.Bought;
+                _purchase_status = orderEvent.Direction == OrderDirection.Buy ? PurchaseState.Sold : PurchaseState.Bought;
             }
 
             if (orderEvent.Status == OrderStatus.Submitted)
@@ -403,7 +507,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         internal class MinMaxMACD
         {
             private int _length = 0;
-
             private Queue<decimal> _values = new Queue<decimal>();
 
             public decimal Max
@@ -435,20 +538,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                     _values.Dequeue();
                 }
             }
-
-
         }
-
-        internal class Differential
-        {
-            private int _length = 0;
-            private Queue<decimal> _values = new Queue<decimal>();
-
-            public Differential(int length)
-            {
-                _length = length;
-                _values = new Queue<decimal>();
-            }
-        }
+       
     }
 }
