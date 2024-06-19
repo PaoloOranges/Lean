@@ -1,22 +1,29 @@
-    #
-    # Release Version
-    #
+FROM mcr.microsoft.com/dotnet/sdk:7.0 as builder
 
-    FROM mcr.microsoft.com/dotnet/sdk:6.0 as build
-    
-    WORKDIR /Lean
-    
-    COPY . .
-    
-    RUN dotnet publish Launcher/QuantConnect.Lean.Launcher.csproj -c Release -o /output
+RUN apt update && \
+    apt install -y git
 
+WORKDIR /SRC
 
-    FROM mcr.microsoft.com/dotnet/runtime:6.0-alpine-arm32v7
-    WORKDIR /Lean
+RUN git clone -b custom https://github.com/PaoloOranges/Lean.Brokerages.CoinbasePro.git
+COPY . ./Lean
+ARG COINBASE_BROKERAGE_PROJECT_PATH=/SRC/Lean.Brokerages.CoinbasePro/QuantConnect.CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage.csproj
+ARG LEAN_PROJECT_PATH=/SRC/Lean/Launcher/QuantConnect.Lean.Launcher.csproj
 
-    COPY Data/market-hours /Data/market-hours
-    COPY Data/symbol-properties /Data/symbol-properties
-    
-    COPY --from=build /output /Lean
+WORKDIR /BUILD
 
-    ENTRYPOINT [ "dotnet", "QuantConnect.Lean.Launcher.dll" ]
+RUN dotnet publish ${COINBASE_BROKERAGE_PROJECT_PATH} -c Release -o LeanPlugins
+RUN dotnet publish ${LEAN_PROJECT_PATH} -c Release -o Bin
+
+COPY config-live-coinbase.json config.json
+
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/runtime:6.0
+
+WORKDIR /Lean
+
+COPY --from=builder /BUILD/LeanPlugins/QuantConnect.CoinbaseBrokerage.* /Lean/LeanPlugins/
+COPY --from=builder /BUILD/Bin /Lean/Bin
+COPY --from=builder /BUILD/config.json /Lean/Bin/config.json
+
+WORKDIR /Lean/Bin
+ENTRYPOINT [ "dotnet", "/Bin/QuantConnect.Lean.Launcher.dll" ]
