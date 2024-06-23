@@ -1,4 +1,5 @@
 
+using System;
 using System.Collections.Generic;
 
 namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm.Utilities
@@ -33,7 +34,16 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm.Utilities
 
         internal T[] ToArray()
         {
-            return _values.ToArray();
+            var result = _values.ToArray();
+            if (result.Length < Capacity)
+            {
+                T[] newResult = new T[Capacity];
+                int countToFill = Capacity - result.Length;
+                result.CopyTo(newResult, countToFill);
+                Array.Fill(newResult, result[0], 0, countToFill);
+                result = newResult;
+            }
+            return result;
         }
     }
 }
