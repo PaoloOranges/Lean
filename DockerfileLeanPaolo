@@ -18,6 +18,9 @@ RUN dotnet publish ${LEAN_PROJECT_PATH} -c Release -o Bin
 COPY config-live-coinbase.json config.json
 
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/runtime:6.0
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
 
 WORKDIR /Lean
 
