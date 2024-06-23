@@ -108,12 +108,15 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         //// State counters
         //private Differential _fastMADiff = new Differential(5, 3);
         //private Differential _slowMADiff = new Differential(5, 3);
-        const int CircularBufferLength = 5;
+        const int CircularBufferLength = 10;
         readonly private double[] FixedArray = Enumerable.Range(0, CircularBufferLength).Select(x => Convert.ToDouble(x)).ToArray();
 
         FixedCircularBuffer<decimal> _fastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
         FixedCircularBuffer<decimal> _veryFastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
         FixedCircularBuffer<decimal> _slowMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
+        (double, double) _fastMALine;
+        (double, double) _veryFastMALine;
+        (double, double) _slowMALine;
 
         private int _volumeCounter = 0; //how many consecutive + or - volume
         private decimal _lastVolume = 0;
@@ -231,6 +234,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
+            UpdateInternalVariables(data);
 
             if (IsWarmingUp)
             {
@@ -240,8 +244,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 }
                 return;
             }
-
-            UpdateInternalVariables(data);
 
             OnProcessData(data);
 
@@ -269,6 +271,10 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             _veryFastMACircularBuffer.Push(_veryFastMA);
             _fastMACircularBuffer.Push(_fastMA);
             _slowMACircularBuffer.Push(_slowMA);
+
+            _fastMALine = Fit.Line(FixedArray, _fastMACircularBuffer.ToArray().Select(x => Convert.ToDouble(x)).ToArray());
+            _veryFastMALine = Fit.Line(FixedArray, _veryFastMACircularBuffer.ToArray().Select(x => Convert.ToDouble(x)).ToArray());
+            _slowMALine = Fit.Line(FixedArray, _slowMACircularBuffer.ToArray().Select(x => Convert.ToDouble(x)).ToArray());
 
             decimal current_price = data[SymbolName].Value;
             switch (_purchase_status)
@@ -365,7 +371,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private bool IsOkToBuy(Slice data)
         {
             decimal current_price = data[SymbolName].Value;
-                        
+
+
+
             bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ current_price > _slowMA;
 
             var signalDeltaPercent = (_macd - _macd.Signal) / _macd.Fast;
@@ -379,10 +387,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
             else
             {
+                bool slowSlopeOk = _slowMALine.Item2 >= 0.0;
                 bool isMACrossingOk = _veryFastMACrossState.CrossState == CrossStateEnum.Up;
                 bool isAdxOk = GetADXDifference() > 0;
 
-                return is_moving_averages_ok && isMACrossingOk && isAdxOk;
+                return is_moving_averages_ok && isMACrossingOk && isAdxOk && slowSlopeOk;
             }
             //bool isSlopesOk = false;
 
@@ -403,7 +412,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             //        isSlopesOk = slowMALine.Item2 <= 0.0;
             //    }
             //}
-            
+
             //bool is_macd_ok = _macd.Histogram.Current.Value > 0;
             //bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
 
@@ -412,6 +421,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             //bool isVolumeOk = _volumeCounter > 1;
 
             //return is_moving_averages_ok && is_adx_ok /* && isVolumeOk && is_macd_ok*/;
+            return false;
         }
 
         private bool IsOkToSell(Slice data)
@@ -435,12 +445,15 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 //Log(body);
             }
 
-            bool is_stop_limit = false; //  _veryFastMA < _fastMA && current_price < 0.98m * _max_price_after_buy;
+            bool slowSlopeOk = _slowMALine.Item2 < 0.0 && _veryFastMALine.Item2 < _fastMALine.Item2;
+
+            bool is_stop_limit = slowSlopeOk && current_price < 0.94m * _max_price_after_buy; ; // _veryFastMA < _fastMA && _fastMA < _slowMA && _adx.PositiveDirectionalIndex < _adx.NegativeDirectionalIndex && _macd < 0 ;  
+
 
             bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
 
-            return is_gain_ok || is_stop_limit /*|| IsStopLoss(data)*/;
+            return is_gain_ok || is_stop_limit  /*|| IsStopLoss(data)*/;
 
         }
 
