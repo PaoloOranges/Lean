@@ -67,7 +67,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private AverageDirectionalIndex _adx;
         private RelativeStrengthIndex _rsi;
 
-        private Maximum _maximum_price;
         private const decimal _stop_loss_percentage = 0.95m;
 
         private PurchaseState _purchase_status = PurchaseState.Init;
@@ -133,7 +132,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2023, 1, 1); // Set Start Date
-            SetEndDate(2024, 06, 10); // Set End Date
+            SetEndDate(2023, 04, 1); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -156,8 +155,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             var adxPeriod = (FastPeriod + VeryFastPeriod) / 2;
             _adx = ADX(_symbol, adxPeriod, resolution);
             //_rsi = RSI(_symbol, slowPeriod, MovingAverageType.Exponential);
-
-            _maximum_price = MAX(_symbol, FastPeriod, resolution, x => ((TradeBar)x).Close);
 
             SetWarmUp(TimeSpan.FromDays(7));
 
@@ -239,7 +236,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             {
                 if (_purchase_status == PurchaseState.Bought && !HasBoughtPriceFromPreviousSession)
                 {
-                    _bought_price = _maximum_price;
+                    _bought_price = Math.Max(data[SymbolName].Value, _bought_price);
                 }
                 return;
             }
@@ -371,11 +368,14 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                         
             bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ current_price > _slowMA;
 
-            if(_veryFastMACrossState.CrossState == CrossStateEnum.None)
+            var signalDeltaPercent = (_macd - _macd.Signal) / _macd.Fast;
+            var tolerance = 0.0025m;
+
+            if (_veryFastMACrossState.CrossState == CrossStateEnum.None)
             {
                 bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
 
-                return is_moving_averages_ok && is_adx_ok /* && isVolumeOk && is_macd_ok*/;
+                return is_moving_averages_ok && is_adx_ok && signalDeltaPercent > tolerance /* && isVolumeOk && is_macd_ok*/;
             }
             else
             {
@@ -435,7 +435,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 //Log(body);
             }
 
-            bool is_stop_limit = false;// current_price < 0.98m * _maximum_price;//current_price < current_price + (_maximum_price - current_price) * 0.90m;
+            bool is_stop_limit = false; //  _veryFastMA < _fastMA && current_price < 0.98m * _max_price_after_buy;
 
             bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
