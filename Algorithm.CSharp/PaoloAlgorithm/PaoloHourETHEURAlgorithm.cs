@@ -111,6 +111,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         //private Differential _slowMADiff = new Differential(5, 3);
         const int CircularBufferLength = 5;
         readonly private double[] FixedArray = Enumerable.Range(0, CircularBufferLength).Select(x => Convert.ToDouble(x)).ToArray();
+
         FixedCircularBuffer<decimal> _fastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
         FixedCircularBuffer<decimal> _veryFastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
         FixedCircularBuffer<decimal> _slowMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
@@ -132,7 +133,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2023, 1, 1); // Set Start Date
-            SetEndDate(2024, 04, 30); // Set End Date
+            SetEndDate(2024, 06, 10); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -140,23 +141,23 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             _symbol = AddCrypto(SymbolName, resolution, Market.Coinbase).Symbol;
             //SetBenchmark(_symbol);
 
-            const int fastPeriod = 55;
-            const int slowPeriod = 110;
-            const int veryFastPeriod = 15;
-            const int signal = 8;
+            const int FastPeriod = 55;
+            const int SlowPeriod = 110;
+            const int VeryFastPeriod = 15;
+            const int Signal = 8;
 
-            _slowMA = EMA(_symbol, slowPeriod, resolution);
-            _fastMA = EMA(_symbol, fastPeriod, resolution);
-            _veryFastMA = EMA(_symbol, veryFastPeriod, resolution);
+            _slowMA = EMA(_symbol, SlowPeriod, resolution);
+            _fastMA = EMA(_symbol, FastPeriod, resolution);
+            _veryFastMA = EMA(_symbol, VeryFastPeriod, resolution);
 
-            _macd = MACD(_symbol, fastPeriod, slowPeriod, veryFastPeriod, MovingAverageType.Exponential, resolution);
+            _macd = MACD(_symbol, FastPeriod, SlowPeriod, VeryFastPeriod, MovingAverageType.Exponential, resolution);
             //_psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
 
-            var adxPeriod = (fastPeriod + veryFastPeriod) / 2;
+            var adxPeriod = (FastPeriod + VeryFastPeriod) / 2;
             _adx = ADX(_symbol, adxPeriod, resolution);
             //_rsi = RSI(_symbol, slowPeriod, MovingAverageType.Exponential);
 
-            _maximum_price = MAX(_symbol, fastPeriod, resolution, x => ((TradeBar)x).Close);
+            _maximum_price = MAX(_symbol, FastPeriod, resolution, x => ((TradeBar)x).Close);
 
             SetWarmUp(TimeSpan.FromDays(7));
 
