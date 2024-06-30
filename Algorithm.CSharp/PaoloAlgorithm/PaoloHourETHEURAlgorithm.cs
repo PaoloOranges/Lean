@@ -341,18 +341,19 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 #if LOG_INDICATORS
             Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
-            decimal current_price = Securities[SymbolName].Price;
-            switch(_purchase_status)
+            decimal current_price = data[SymbolName].Value; // Value == Close
+            switch (_purchase_status)
             {
                 case PurchaseState.Init:
                     break;
                 case PurchaseState.ReadyToBuy:
+                    OnReadyToBuy(data, current_price);
                     break;
                 case PurchaseState.Bought:
-                    OnBought(data);
+                    OnBought(data, current_price);
                     break;
                 case PurchaseState.Sold:
-                    OnReadyToBuy(data, current_price);
+                    OnPrepareToBuy(data, current_price);
                     break;
                 default:
                     Error("Invalid Purchase state");
@@ -360,9 +361,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
         }
 
-        private void OnBought(Slice data)
+        private void OnBought(Slice data, decimal current_price)
         {
-            if (IsOkToSell(data))
+            if (IsOkToSell(data, current_price))
             {
 #if !(LIVE_NO_TRADE)
                 Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
@@ -379,7 +380,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private void OnReadyToBuy(Slice data, decimal current_price)
         {
-            if (IsOkToBuy(data))
+            if (IsOkToBuy(data, current_price))
             {
                 const decimal round_multiplier = 1000m;
                 decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
@@ -397,11 +398,46 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
         }
 
-        private bool IsOkToBuy(Slice data)
+        private void OnPrepareToBuy(Slice data, decimal current_price)
         {
-            decimal current_price = data[SymbolName].Value;
+            bool transitionToNextState = false;
 
-            bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ current_price > _slowMA;
+            var veryFastSlope = GetSlope(_veryFastMALine);
+            var fastSlope = GetSlope(_fastMALine);
+            var slowSlope = GetSlope(_slowMALine);
+            var macdSlope = GetSlope(_macdLine);
+                        
+            if(_veryFastMACrossState.CrossState == CrossStateEnum.Down)
+            {
+                if (_veryFastMA < _slowMA)
+                {
+                    bool isPriceAndMAOk = current_price > _veryFastMA;
+                    bool isSlopeOk = veryFastSlope > slowSlope && veryFastSlope > Math.PI / 6;
+                    bool isMacdSlopeOk = macdSlope > 0.1;
+                    bool isAdxOk = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex;
+
+                    transitionToNextState = isPriceAndMAOk && isMacdSlopeOk && isSlopeOk;
+                }
+            }
+            else if(_veryFastMACrossState.CrossState == CrossStateEnum.Up)
+            {
+                bool isMAOk = _veryFastMA > _fastMA && _fastMA > _slowMA;
+                bool isAdxOk = _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex > 5;
+                bool isMACDOk = _macd > 0;
+                bool isMACDSlopeOk = macdSlope > 0;
+
+                transitionToNextState = isMAOk && isAdxOk && isMACDOk && isMACDSlopeOk;
+            }
+
+            if(transitionToNextState)
+            {
+                _purchase_status = PurchaseState.ReadyToBuy;
+            }
+        }
+
+        private bool IsOkToBuy(Slice data, decimal current_price)
+        {
+            bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ current_price > _veryFastMA;
 
             var signalDeltaPercent = (_macd - _macd.Signal) / _macd.Fast;
             var tolerance = 0.0025m;
@@ -411,52 +447,52 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             var slowSlope = GetSlope(_slowMALine);
             var macdSlope = GetSlope(_macdLine);
 
-            if (_veryFastMA < _slowMA)
-            {
-                bool isVolumeOk = _volumeCounter > 2 && _lastVolume > 0;
-                bool isPriceAndMAOk = current_price > _fastMA;
-                bool isMacdSlopeOk = macdSlope > 0.1;
-                bool isSlopeOk = veryFastSlope > slowSlope;
-                bool isAdxOk = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex;
+            //if (_veryFastMA < _slowMA)
+            //{
+            //    bool isVolumeOk = _volumeCounter > 2 && _lastVolume > 0;
+            //    bool isPriceAndMAOk = current_price > _fastMA;
+            //    bool isMacdSlopeOk = macdSlope > 0.1;
+            //    bool isSlopeOk = veryFastSlope > slowSlope;
+            //    bool isAdxOk = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex;
 
-                return isPriceAndMAOk && isVolumeOk && isMacdSlopeOk && isSlopeOk;
-            }
-            else if(_veryFastMA < _fastMA)
-            {
-                bool isSlopeOk = veryFastSlope > fastSlope /*&& veryFastSlope > 0.5*/;
+            //    return isPriceAndMAOk && isVolumeOk && isMacdSlopeOk && isSlopeOk;
+            //}
+            //else if(_veryFastMA < _fastMA)
+            //{
+            //    bool isSlopeOk = veryFastSlope > fastSlope /*&& veryFastSlope > 0.5*/;
 
-                bool isMacdSlopeOk = macdSlope > 0.1;
-                bool isVolumeOk = _volumeCounter > 2 && _lastVolume > 0;
+            //    bool isMacdSlopeOk = macdSlope > 0.1;
+            //    bool isVolumeOk = _volumeCounter > 2 && _lastVolume > 0;
 
-                bool isPriceAndMAOk = current_price > _veryFastMA;
+            //    bool isPriceAndMAOk = current_price > _veryFastMA;
 
-                return isPriceAndMAOk && isVolumeOk && isMacdSlopeOk && isSlopeOk;
+            //    return isPriceAndMAOk && isVolumeOk && isMacdSlopeOk && isSlopeOk;
 
-            }             
-            else
-            {
-                bool isSlopeOk = veryFastSlope > fastSlope;
-                bool isAdxOk = _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex > 9;
-                bool isPriceOk = current_price > _veryFastMA;
+            //}             
+            //else
+            //{
+            //    bool isSlopeOk = veryFastSlope > fastSlope;
+            //    bool isAdxOk = _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex > 9;
+            //    bool isPriceOk = current_price > _veryFastMA;
 
-                return isAdxOk && isPriceOk && isSlopeOk;
-            }
+            //    return isAdxOk && isPriceOk && isSlopeOk;
+            //}
 
-            if (_veryFastMACrossState.CrossState == CrossStateEnum.None)
-            {
-                bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
+            //if (_veryFastMACrossState.CrossState == CrossStateEnum.None)
+            //{
+            //    bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
 
-                return is_moving_averages_ok && is_adx_ok && signalDeltaPercent > tolerance /* && isVolumeOk && is_macd_ok*/;
-            }
-            else
-            {
-                bool slowSlopeOk = GetSlope(_veryFastMALine) > 0.0 && GetSlope(_veryFastMALine) > GetSlope(_fastMALine) && GetSlope(_slowMALine) >= 0.0;
-                bool isMACrossingOk = _veryFastMACrossState.CrossState == CrossStateEnum.Up;
-                bool isPriceOverFast = current_price > _veryFastMA;
-                bool isAdxOk = GetADXDifference() > 0;
+            //    return is_moving_averages_ok && is_adx_ok && signalDeltaPercent > tolerance /* && isVolumeOk && is_macd_ok*/;
+            //}
+            //else
+            //{
+            //    bool slowSlopeOk = GetSlope(_veryFastMALine) > 0.0 && GetSlope(_veryFastMALine) > GetSlope(_fastMALine) && GetSlope(_slowMALine) >= 0.0;
+            //    bool isMACrossingOk = _veryFastMACrossState.CrossState == CrossStateEnum.Up;
+            //    bool isPriceOverFast = current_price > _veryFastMA;
+            //    bool isAdxOk = GetADXDifference() > 0;
 
-                return is_moving_averages_ok && isPriceOverFast && isAdxOk && slowSlopeOk;
-            }
+            //    return is_moving_averages_ok && isPriceOverFast && isAdxOk && slowSlopeOk;
+            //}
 
             //bool is_macd_ok = _macd.Histogram.Current.Value > 0;
             //bool is_adx_ok = GetADXDifference() > 10; // try making combination with distance of positive and negative compared to other indicators
@@ -466,13 +502,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             //bool isVolumeOk = _volumeCounter > 1;
 
             //return is_moving_averages_ok && is_adx_ok /* && isVolumeOk && is_macd_ok*/;
-            return false;
+            return true;
         }
 
-        private bool IsOkToSell(Slice data)
+        private bool IsOkToSell(Slice data, decimal current_price)
         {
-            decimal current_price = data[SymbolName].Value; // Value == Close
-
             bool is_macd_ok = _macd.Histogram.Current.Value < 0;
             const decimal cross_ma_linear_interp_value = 0.3m;
             var cross_ma_value = _veryFastMA * cross_ma_linear_interp_value + _fastMA * (1m - cross_ma_linear_interp_value);
