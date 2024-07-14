@@ -525,14 +525,13 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
 
             bool slowSlopeOk = GetSlope(_slowMALine) <= 0.0 && GetSlope(_veryFastMALine) < 1.5 * GetSlope(_fastMALine);
+            bool isFastSlopeOk = GetSlope(_veryFastMALine) < 1.5 * GetSlope(_fastMALine);
 
             bool is_stop_limit = slowSlopeOk && current_price < 0.94m * _max_price_after_buy; ; // _veryFastMA < _fastMA && _fastMA < _slowMA && _adx.PositiveDirectionalIndex < _adx.NegativeDirectionalIndex && _macd < 0 ;  
 
-
-            bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
 
-            return (is_gain_ok && slowSlopeOk) || is_stop_limit  /*|| IsStopLoss(data)*/;
+            return (is_moving_averages_ok && is_target_price_achieved && isFastSlopeOk) || is_stop_limit  /*|| IsStopLoss(data)*/;
 
         }
 
