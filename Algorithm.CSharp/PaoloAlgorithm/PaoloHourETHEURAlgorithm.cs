@@ -511,7 +511,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             const decimal cross_ma_linear_interp_value = 0.3m;
             var cross_ma_value = _veryFastMA * cross_ma_linear_interp_value + _fastMA * (1m - cross_ma_linear_interp_value);
 
-            bool is_moving_averages_ok = current_price < cross_ma_value;//&& _very_fast_wma < _slow_hullma;
+            bool is_moving_averages_ok = current_price < cross_ma_value && _veryFastMA < _fastMA;
 
             bool is_adx_ok = GetADXDifference() < 10; // compute line and see slope
 
@@ -524,7 +524,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 //Log(body);
             }
 
-            bool slowSlopeOk = GetSlope(_slowMALine) < 0.0 && GetSlope(_veryFastMALine) < GetSlope(_fastMALine);
+            bool slowSlopeOk = GetSlope(_slowMALine) <= 0.0 && GetSlope(_veryFastMALine) < 1.5 * GetSlope(_fastMALine);
 
             bool is_stop_limit = slowSlopeOk && current_price < 0.94m * _max_price_after_buy; ; // _veryFastMA < _fastMA && _fastMA < _slowMA && _adx.PositiveDirectionalIndex < _adx.NegativeDirectionalIndex && _macd < 0 ;  
 
@@ -532,7 +532,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             bool is_gain_ok = is_moving_averages_ok && is_target_price_achieved;
             //is_gain_ok = is_target_price_achieved && is_stop_limit;
 
-            return is_gain_ok || is_stop_limit  /*|| IsStopLoss(data)*/;
+            return (is_gain_ok && slowSlopeOk) || is_stop_limit  /*|| IsStopLoss(data)*/;
 
         }
 
