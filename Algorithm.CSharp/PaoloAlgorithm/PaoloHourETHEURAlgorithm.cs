@@ -422,7 +422,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             else if(_veryFastMACrossState.CrossState == CrossStateEnum.Up)
             {
                 bool isMAOk = _veryFastMA > _fastMA && _fastMA > _slowMA;
-                bool isAdxOk = _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex > 5;
+                bool isAdxOk = _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex > 3;
                 bool isMACDOk = _macd > 0;
                 bool isMACDSlopeOk = macdSlope > 0;
 
