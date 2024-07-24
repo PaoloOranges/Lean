@@ -158,7 +158,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             _fastMA = EMA(_symbol, FastPeriod, resolution);
             _veryFastMA = EMA(_symbol, VeryFastPeriod, resolution);
 
-            _macd = MACD(_symbol, FastPeriod, SlowPeriod, VeryFastPeriod, MovingAverageType.Exponential, resolution);
+            _macd = MACD(_symbol, VeryFastPeriod, FastPeriod, SlowPeriod, MovingAverageType.Exponential, resolution);
             //_psar = PSAR(_symbol, 0.02m, 0.005m, 1m, resolution);
 
             var adxPeriod = (FastPeriod + VeryFastPeriod) / 2;
@@ -422,9 +422,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             else if(_veryFastMACrossState.CrossState == CrossStateEnum.Up)
             {
                 bool isMAOk = _veryFastMA > _fastMA && _fastMA > _slowMA;
-                bool isAdxOk = _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex > 3;
+                bool isAdxOk = _adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex > 2;
                 bool isMACDOk = _macd > 0;
-                bool isMACDSlopeOk = macdSlope > 0;
+                bool isMACDSlopeOk = macdSlope > 0.2;
 
                 transitionToNextState = isMAOk && isAdxOk && isMACDOk && isMACDSlopeOk;
             }
