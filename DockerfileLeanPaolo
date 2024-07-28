@@ -5,15 +5,16 @@ RUN apt update && \
 
 WORKDIR /SRC
 
-RUN git clone -b custom https://github.com/PaoloOranges/Lean.Brokerages.CoinbasePro.git
+RUN git clone -b custom https://github.com/PaoloOranges/Lean.Brokerages.CoinbasePro.git CoinbaseBrokerage
 COPY . ./Lean
-ARG COINBASE_BROKERAGE_PROJECT_PATH=/SRC/Lean.Brokerages.CoinbasePro/QuantConnect.CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage.csproj
+
+ARG COINBASE_BROKERAGE_PROJECT_PATH=/SRC/CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage.csproj
 ARG LEAN_PROJECT_PATH=/SRC/Lean/Launcher/QuantConnect.Lean.Launcher.csproj
 
 WORKDIR /BUILD
 
-RUN dotnet publish ${COINBASE_BROKERAGE_PROJECT_PATH} -c Release -o LeanPlugins
-RUN dotnet publish ${LEAN_PROJECT_PATH} -c Release -o Bin
+RUN dotnet publish $COINBASE_BROKERAGE_PROJECT_PATH -c Release -o LeanPlugins
+RUN dotnet publish $LEAN_PROJECT_PATH -c Release -o Bin
 
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/runtime:6.0
 ARG TARGETPLATFORM
