@@ -66,13 +66,13 @@ namespace QuantConnect.Algorithm.CSharp
             AddUniverse(Universe.ETF(_gdvd, universeFilterFunc: FilterETFs));
         }
 
-        private IEnumerable<Symbol> FilterETFs(IEnumerable<ETFConstituentData> constituents)
+        private IEnumerable<Symbol> FilterETFs(IEnumerable<ETFConstituentUniverse> constituents)
         {
             _universeSelectionDone = true;
 
             if (UtcTime.Date > _delistingDate)
             {
-                throw new Exception($"Performing constituent universe selection on {UtcTime:yyyy-MM-dd HH:mm:ss.fff} after composite ETF has been delisted");
+                throw new RegressionTestException($"Performing constituent universe selection on {UtcTime:yyyy-MM-dd HH:mm:ss.fff} after composite ETF has been delisted");
             }
 
             var constituentSymbols = constituents.Select(x => x.Symbol);
@@ -85,11 +85,11 @@ namespace QuantConnect.Algorithm.CSharp
         /// OnData event is the primary entry point for your algorithm. Each new data point will be pumped in here.
         /// </summary>
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
-        public override void OnData(Slice data)
+        public override void OnData(Slice slice)
         {
-            if (UtcTime.Date > _delistingDate && data.Keys.Any(x => x != _aapl))
+            if (UtcTime.Date > _delistingDate && slice.Keys.Any(x => x != _aapl))
             {
-                throw new Exception($"Received unexpected slice in OnData(...) after universe was deselected");
+                throw new RegressionTestException($"Received unexpected slice in OnData(...) after universe was deselected");
             }
 
             if (!Portfolio.Invested)
@@ -102,7 +102,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (changes.AddedSecurities.Count != 0 && UtcTime > _delistingDate)
             {
-                throw new Exception("New securities added after ETF constituents were delisted");
+                throw new RegressionTestException("New securities added after ETF constituents were delisted");
             }
 
             // if we added the etf subscription it will get added and delisted and send us a addition/removal event
@@ -126,15 +126,15 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!_universeAdded)
             {
-                throw new Exception("ETF constituent universe was never added to the algorithm");
+                throw new RegressionTestException("ETF constituent universe was never added to the algorithm");
             }
             if (!_universeRemoved)
             {
-                throw new Exception("ETF constituent universe was not removed from the algorithm after delisting");
+                throw new RegressionTestException("ETF constituent universe was not removed from the algorithm after delisting");
             }
             if (ActiveSecurities.Count > 2)
             {
-                throw new Exception($"Expected less than 2 securities after algorithm ended, found {Securities.Count}");
+                throw new RegressionTestException($"Expected less than 2 securities after algorithm ended, found {Securities.Count}");
             }
         }
 
@@ -146,7 +146,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -159,16 +159,23 @@ namespace QuantConnect.Algorithm.CSharp
         public virtual int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "1"},
+            {"Total Orders", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "30.084%"},
             {"Drawdown", "5.400%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "104393.19"},
             {"Net Profit", "4.393%"},
             {"Sharpe Ratio", "1.543"},
             {"Sortino Ratio", "2.111"},
@@ -187,7 +194,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$160000000.00"},
             {"Lowest Capacity Asset", "AAPL R735QTJ8XC9X"},
             {"Portfolio Turnover", "0.83%"},
-            {"OrderListHash", "8a541d0d9c3e9b7e39733dbccc19eea5"}
+            {"OrderListHash", "d38318f2dd0a38f11ef4e4fd704706a7"}
         };
     }
 }

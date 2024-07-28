@@ -17,8 +17,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using QuantConnect.Brokerages;
+using QuantConnect.Brokerages.Backtesting;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.Results;
 using QuantConnect.Logging;
@@ -37,6 +39,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
     {
         private IAlgorithm _algorithm;
         private IBrokerage _brokerage;
+        private bool _brokerageIsBacktesting;
         private bool _loggedFeeAdjustmentWarning;
 
         // Counter to keep track of total amount of processed orders
@@ -55,7 +58,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// OrderQueue holds the newly updated orders from the user algorithm waiting to be processed. Once
         /// orders are processed they are moved into the Orders queue awaiting the brokerage response.
         /// </summary>
-        protected IBusyCollection<OrderRequest> _orderRequestQueue;
+        protected IBusyCollection<OrderRequest> _orderRequestQueue { get; set; }
 
         private Thread _processingThread;
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
@@ -96,7 +99,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// <summary>
         /// The _cancelPendingOrders instance will help to keep track of CancelPending orders and their Status
         /// </summary>
-        protected readonly CancelPendingOrders _cancelPendingOrders = new CancelPendingOrders();
+        protected CancelPendingOrders _cancelPendingOrders { get; init; } = new CancelPendingOrders();
 
         private IResultHandler _resultHandler;
 
@@ -157,6 +160,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             _resultHandler = resultHandler;
 
             _brokerage = brokerage;
+            _brokerageIsBacktesting = brokerage is BacktestingBrokerage;
 
             _brokerage.OrdersStatusChanged += (sender, orderEvents) =>
             {
@@ -364,7 +368,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 {
                     shortable = _algorithm.Shortable(ticket.Symbol, orderQuantity, order.Id);
 
-                    if(_algorithm.LiveMode && !shortable)
+                    if (_algorithm.LiveMode && !shortable)
                     {
                         // let's override and just send warning
                         shortable = true;
@@ -793,8 +797,11 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 return OrderResponse.UnableToFindOrder(request);
             }
 
+            var comboIsReady = order.TryGetGroupOrders(TryGetOrder, out var orders);
+            var comboSecuritiesFound = orders.TryGetGroupOrdersSecurities(_algorithm.Portfolio, out var securities);
+
             // rounds the order prices
-            RoundOrderPrices(order, security);
+            RoundOrderPrices(order, security, comboIsReady, securities);
 
             // save current security prices
             order.OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Close);
@@ -805,7 +812,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             // update the ticket's internal storage with this new order reference
             ticket.SetOrder(order);
 
-            if (!order.TryGetGroupOrders(TryGetOrder, out var orders))
+            if (!comboIsReady)
             {
                 // an Order of the group is missing
                 return OrderResponse.Success(request);
@@ -820,7 +827,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 return response;
             }
 
-            if (!orders.TryGetGroupOrdersSecurities(_algorithm.Portfolio, out var securities))
+            if (!comboSecuritiesFound)
             {
                 var response = OrderResponse.MissingSecurity(request);
                 _algorithm.Error(response.ErrorMessage);
@@ -1366,7 +1373,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         {
             var originalOrder = GetOrderByIdInternal(brokerageOrderIdChangedEvent.OrderId);
 
-            if(originalOrder == null)
+            if (originalOrder == null)
             {
                 // shouldn't happen but let's be careful
                 Log.Error($"BrokerageTransactionHandler.HandlerBrokerageOrderIdChangedEvent(): Lean order id {brokerageOrderIdChangedEvent.OrderId} not found");
@@ -1453,7 +1460,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                             // If the quantity is already 0 for Lean and the brokerage there is nothing else todo here
                             if (quantity != 0)
                             {
-                                var exerciseOrder = GenerateOptionExerciseOrder(security, quantity);
+                                var exerciseOrder = GenerateOptionExerciseOrder(security, quantity, e.Tag);
 
                                 EmitOptionNotificationEvents(security, exerciseOrder);
                             }
@@ -1505,7 +1512,11 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                                 // so we get ALL orders for this symbol that were placed or got an update in the last 'orderWindowSeconds'
 
                                 const int orderWindowSeconds = 10;
-                                if (!GetOrders(x =>
+                                // NOTE: We do this checks for actual live trading only to handle the race condition stated above
+                                // for actual brokerages (excluding paper trading with PaperBrokerage).
+                                // TODO: If we confirm this race condition applies for IB only, we could move this to the brokerage itself.
+                                if (_brokerageIsBacktesting ||
+                                    !GetOrders(x =>
                                         x.Symbol == e.Symbol
                                         && (x.Status.IsOpen() || x.Status.IsFill() &&
                                             (Math.Abs((x.Time - nowUtc).TotalSeconds) < orderWindowSeconds
@@ -1514,7 +1525,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                                 {
                                     var quantity = e.Position - security.Holdings.Quantity;
 
-                                    var exerciseOrder = GenerateOptionExerciseOrder(security, quantity);
+                                    var exerciseOrder = GenerateOptionExerciseOrder(security, quantity, e.Tag);
 
                                     EmitOptionNotificationEvents(security, exerciseOrder);
                                 }
@@ -1541,10 +1552,15 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             }
         }
 
-        private OptionExerciseOrder GenerateOptionExerciseOrder(Security security, decimal quantity)
+        private OptionExerciseOrder GenerateOptionExerciseOrder(Security security, decimal quantity, string tag)
         {
             // generate new exercise order and ticket for the option
-            var order = new OptionExerciseOrder(security.Symbol, quantity, CurrentTimeUtc);
+            var order = new OptionExerciseOrder(security.Symbol, quantity, CurrentTimeUtc, tag);
+
+            // save current security prices
+            order.OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Close);
+            order.PriceCurrency = security.SymbolProperties.QuoteCurrency;
+
             AddOpenOrder(order, _algorithm);
             return order;
         }
@@ -1612,14 +1628,20 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// </summary>
         protected void RoundOrderPrices(Order order, Security security)
         {
-            // Do not need to round market orders
-            if (order.Type == OrderType.Market ||
-                order.Type == OrderType.MarketOnOpen ||
-                order.Type == OrderType.MarketOnClose)
-            {
-                return;
-            }
+            var comboIsReady = order.TryGetGroupOrders(TryGetOrder, out var orders);
+            orders.TryGetGroupOrdersSecurities(_algorithm.Portfolio, out var securities);
 
+            RoundOrderPrices(order, security, comboIsReady, securities);
+        }
+
+        /// <summary>
+        /// Rounds the order prices to its security minimum price variation.
+        /// <remarks>
+        /// This procedure is needed to meet brokerage precision requirements.
+        /// </remarks>
+        /// </summary>
+        protected void RoundOrderPrices(Order order, Security security, bool comboIsReady, Dictionary<Order, Security> orders)
+        {
             switch (order.Type)
             {
                 case OrderType.Limit:
@@ -1667,12 +1689,52 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                             (roundedPrice) => limitIfTouchedOrder.TriggerPrice = roundedPrice);
                     }
                     break;
+
+                case OrderType.ComboLegLimit:
+                    {
+                        var comboLegOrder = (ComboLegLimitOrder)order;
+                        RoundOrderPrice(security, comboLegOrder.LimitPrice, "LimitPrice",
+                            (roundedPrice) => comboLegOrder.LimitPrice = roundedPrice);
+                    }
+                    break;
+
+                case OrderType.ComboLimit:
+                    {
+                        if (comboIsReady)
+                        {
+                            // all orders in the combo have been received.
+                            // we can now round the limit price of the group order,
+                            // for which we need to find the smallest price variation from each leg security
+                            var groupOrderManager = order.GroupOrderManager;
+                            var increment = 0m;
+                            foreach (var (legOrder, legSecurity) in orders)
+                            {
+                                var legIncrement = legSecurity.PriceVariationModel.GetMinimumPriceVariation(
+                                    new GetMinimumPriceVariationParameters(legSecurity, legOrder.Price));
+                                if (legIncrement > 0 && (increment == 0 || legIncrement < increment))
+                                {
+                                    increment = legIncrement;
+                                }
+                            }
+
+                            RoundOrderPrice(groupOrderManager.LimitPrice, increment, "LimitPrice",
+                                (roundedPrice) => groupOrderManager.LimitPrice = roundedPrice);
+                        }
+
+                    }
+                    break;
             }
         }
 
         private void RoundOrderPrice(Security security, decimal price, string priceType, Action<decimal> setPrice)
         {
             var increment = security.PriceVariationModel.GetMinimumPriceVariation(new GetMinimumPriceVariationParameters(security, price));
+            RoundOrderPrice(price, increment, priceType, setPrice);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RoundOrderPrice(decimal price, decimal increment, string priceType, Action<decimal> setPrice)
+        {
             if (increment > 0)
             {
                 var roundedPrice = Math.Round(price / increment) * increment;

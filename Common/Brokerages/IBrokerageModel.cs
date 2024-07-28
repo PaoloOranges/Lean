@@ -195,7 +195,11 @@ namespace QuantConnect.Brokerages
             switch (brokerage)
             {
                 case BrokerageName.Default:
+                case BrokerageName.TerminalLink:
                     return new DefaultBrokerageModel(accountType);
+
+                case BrokerageName.Alpaca:
+                    return new AlpacaBrokerageModel();
 
                 case BrokerageName.InteractiveBrokersBrokerage:
                     return new InteractiveBrokersBrokerageModel(accountType);
@@ -272,6 +276,9 @@ namespace QuantConnect.Brokerages
                 case BrokerageName.Eze:
                     return new EzeBrokerageModel(accountType);
 
+                case BrokerageName.TradeStation:
+                    return new TradeStationBrokerageModel(accountType);
+
                 default:
                     throw new ArgumentOutOfRangeException(nameof(brokerage), brokerage, null);
             }
@@ -294,6 +301,9 @@ namespace QuantConnect.Brokerages
             // Case order matters to ensure we get the correct brokerage name from the inheritance chain
             switch (model)
             {
+                case AlpacaBrokerageModel:
+                    return BrokerageName.Alpaca;
+
                 case InteractiveBrokersBrokerageModel _:
                     return BrokerageName.InteractiveBrokersBrokerage;
 
@@ -362,6 +372,9 @@ namespace QuantConnect.Brokerages
 
                 case EzeBrokerageModel _:
                     return BrokerageName.Eze;
+
+                case TradeStationBrokerageModel _:
+                    return BrokerageName.TradeStation;
 
                 case DefaultBrokerageModel _:
                     return BrokerageName.Default;

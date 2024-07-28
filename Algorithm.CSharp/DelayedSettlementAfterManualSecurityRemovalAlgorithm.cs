@@ -38,7 +38,8 @@ namespace QuantConnect.Algorithm.CSharp
             var equity = AddEquity("GOOG");
 
             _optionSymbol = OptionChainProvider.GetOptionContractList(equity.Symbol, Time)
-                .OrderByDescending(symbol => symbol.ID.Date)
+                .OrderBy(symbol => symbol.ID.StrikePrice)
+                .ThenByDescending(symbol => symbol.ID.Date)
                 .First(optionContract => optionContract.ID.OptionRight == OptionRight.Call);
             var option = AddOptionContract(_optionSymbol);
 
@@ -60,7 +61,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if (Portfolio.UnsettledCash == 0)
                 {
-                    throw new Exception($"Expected unsettled cash to be non-zero at {Time}");
+                    throw new RegressionTestException($"Expected unsettled cash to be non-zero at {Time}");
                 }
             });
 
@@ -68,7 +69,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if (Portfolio.UnsettledCash != 0)
                 {
-                    throw new Exception($"Expected unsettled cash to be zero at {Time}");
+                    throw new RegressionTestException($"Expected unsettled cash to be zero at {Time}");
                 }
             });
         }
@@ -77,17 +78,17 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (Transactions.OrdersCount != 2)
             {
-                throw new Exception($"Expected 2 orders, found {Transactions.OrdersCount}");
+                throw new RegressionTestException($"Expected 2 orders, found {Transactions.OrdersCount}");
             }
 
             if (Portfolio.Invested)
             {
-                throw new Exception("Expected no holdings at end of algorithm");
+                throw new RegressionTestException("Expected no holdings at end of algorithm");
             }
 
             if (Portfolio.UnsettledCash != 0)
             {
-                throw new Exception($"Expected no unsettled cash at end of algorithm, found {Portfolio.UnsettledCash}");
+                throw new RegressionTestException($"Expected no unsettled cash at end of algorithm, found {Portfolio.UnsettledCash}");
             }
         }
 
@@ -99,7 +100,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -112,17 +113,24 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "2"},
+            {"Total Orders", "2"},
             {"Average Win", "0%"},
-            {"Average Loss", "-0.36%"},
-            {"Compounding Annual Return", "-15.857%"},
-            {"Drawdown", "0.400%"},
+            {"Average Loss", "-0.73%"},
+            {"Compounding Annual Return", "-29.516%"},
+            {"Drawdown", "0.700%"},
             {"Expectancy", "-1"},
-            {"Net Profit", "-0.362%"},
+            {"Start Equity", "100000"},
+            {"End Equity", "99268"},
+            {"Net Profit", "-0.732%"},
             {"Sharpe Ratio", "0"},
             {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
@@ -137,10 +145,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Tracking Error", "0.104"},
             {"Treynor Ratio", "0"},
             {"Total Fees", "$2.00"},
-            {"Estimated Strategy Capacity", "$150000.00"},
-            {"Lowest Capacity Asset", "GOOCV WRCOZDXBITL2|GOOCV VP83T1ZUHROL"},
-            {"Portfolio Turnover", "1.06%"},
-            {"OrderListHash", "490dd9430dec6cb3daadcca495ff5f12"}
+            {"Estimated Strategy Capacity", "$720000.00"},
+            {"Lowest Capacity Asset", "GOOCV WHEA9CWI9A86|GOOCV VP83T1ZUHROL"},
+            {"Portfolio Turnover", "11.63%"},
+            {"OrderListHash", "0a3ff33e46a1ca590b9163b07fcd7e0c"}
         };
     }
 }

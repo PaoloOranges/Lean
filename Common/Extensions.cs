@@ -217,6 +217,10 @@ namespace QuantConnect
             List<string> result = new();
             try
             {
+                if (string.IsNullOrEmpty(jsonArray))
+                {
+                    return result;
+                }
                 result = JsonConvert.DeserializeObject<List<string>>(jsonArray);
             }
             catch(JsonReaderException)
@@ -589,8 +593,8 @@ namespace QuantConnect
         }
 
         /// <summary>
-        /// Returns if the specified <see cref="Chart"/> instance  holds no <see cref="Series"/>
-        /// or they are all empty <see cref="IsEmpty(Series)"/>
+        /// Returns if the specified <see cref="Chart"/> instance holds no <see cref="Series"/>
+        /// or they are all empty <see cref="Extensions.IsEmpty(BaseSeries)"/>
         /// </summary>
         public static bool IsEmpty(this Chart chart)
         {
@@ -607,12 +611,65 @@ namespace QuantConnect
         {
             using (Py.GIL())
             {
-                var method = instance.GetAttr(name);
-                var pythonType = method.GetPythonType();
-                var isPythonDefined = pythonType.Repr().Equals("<class \'method\'>");
+                PyObject method;
 
-                return isPythonDefined ? method : null;
+                // Let's try first with snake-case style in case the user is using it
+                var snakeCasedNamed = name.ToSnakeCase();
+                if (snakeCasedNamed != name)
+                {
+                    method = instance.GetPythonMethodWithChecks(snakeCasedNamed);
+                    if (method != null)
+                    {
+                        return method;
+                    }
+                }
+
+                method = instance.GetAttr(name);
+                var pythonType = method.GetPythonType();
+                var isPythonDefined = pythonType.Repr().Equals("<class \'method\'>", StringComparison.Ordinal);
+
+                if (isPythonDefined)
+                {
+                    return method;
+                }
+
+
+
+                return null;
             }
+        }
+
+        /// <summary>
+        /// Gets a python method by name
+        /// </summary>
+        /// <param name="instance">The object instance to search the method in</param>
+        /// <param name="name">The name of the method</param>
+        /// <returns>The python method or null if not defined or CSharp implemented</returns>
+        public static dynamic GetPythonMethodWithChecks(this PyObject instance, string name)
+        {
+            using (Py.GIL())
+            {
+                if (!instance.HasAttr(name))
+                {
+                    return null;
+                }
+
+                return instance.GetPythonMethod(name);
+            }
+        }
+
+        /// <summary>
+        /// Gets a method from a <see cref="PyObject"/> instance by name.
+        /// First, it tries to get the snake-case version of the method name, in case the user is using that style.
+        /// Else, it tries to get the method with the original name, regardless of whether the class has a Python overload or not.
+        /// </summary>
+        /// <param name="instance">The object instance to search the method in</param>
+        /// <param name="name">The name of the method</param>
+        /// <returns>The method matching the name</returns>
+        public static dynamic GetMethod(this PyObject instance, string name)
+        {
+            using var _ = Py.GIL();
+            return instance.GetPythonMethodWithChecks(name.ToSnakeCase()) ?? instance.GetAttr(name);
         }
 
         /// <summary>
@@ -762,6 +819,18 @@ namespace QuantConnect
             var bytes = new byte[str.Length * sizeof(char)];
             Buffer.BlockCopy(str.ToCharArray(), 0, bytes, 0, bytes.Length);
             return bytes;
+        }
+
+        /// <summary>
+        /// Reads the entire content of a stream and returns it as a byte array.
+        /// </summary>
+        /// <param name="stream">Stream to read bytes from</param>
+        /// <returns>The bytes read from the stream</returns>
+        public static byte[] GetBytes(this Stream stream)
+        {
+            using var memoryStream = new MemoryStream();
+            stream.CopyTo(memoryStream);
+            return memoryStream.ToArray();
         }
 
         /// <summary>
@@ -2086,7 +2155,7 @@ namespace QuantConnect
             // If we have multiple names we need to search the names based on the given algorithmTypeName
             // If the given name already contains dots (fully named) use it as it is
             // otherwise add a dot to the beginning to avoid matching any subsets of other names
-            var searchName = algorithmTypeName.Contains(".") ? algorithmTypeName : "." + algorithmTypeName;
+            var searchName = algorithmTypeName.Contains('.', StringComparison.InvariantCulture) ? algorithmTypeName : "." + algorithmTypeName;
             return names.SingleOrDefault(x => x.EndsWith(searchName));
         }
 
@@ -2584,10 +2653,13 @@ namespace QuantConnect
                     {
                         result = (T)pyObject.AsManagedObject(type);
                         // pyObject is a C# object wrapped in PyObject, in this case return true
+                        if(!pyObject.HasAttr("__name__"))
+                        {
+                            return true;
+                        }
                         // Otherwise, pyObject is a python object that subclass a C# class, only return true if 'allowPythonDerivative'
                         var castedResult = (Type)pyObject.AsManagedObject(type);
                         var pythonName = pyObject.GetAttr("__name__").GetAndDispose<string>();
-
                         return pythonName == castedResult.Name;
                     }
 
@@ -2598,22 +2670,38 @@ namespace QuantConnect
                         return true;
                     }
 
-                    var pythonType = pyObject.GetPythonType();
+                    using var pythonType = pyObject.GetPythonType();
                     var csharpType = pythonType.As<Type>();
 
                     if (!type.IsAssignableFrom(csharpType))
                     {
-                        pythonType.Dispose();
                         return false;
                     }
 
                     result = (T)pyObject.AsManagedObject(type);
 
+                    // The PyObject is a Python object of a Python class that is a subclass of a C# class.
+                    // In this case, we return false just because we want the actual Python object
+                    // so it gets wrapped in a python wrapper, not the C# object.
+                    if (result is IPythonDerivedType)
+                    {
+                        return false;
+                    }
+
+                    // If the python type object is just a representation of the C# type, the conversion is direct,
+                    // the python object is an instance of the C# class.
+                    // We can compare by reference because pythonnet caches the PyTypes and because the behavior of
+                    // PyObject.Equals is not exactly what we want:
+                    // e.g. type(class PyClass(CSharpClass)) == type(CSharpClass) is true in Python
+                    if (PythonReferenceComparer.Instance.Equals(PyType.Get(csharpType), pythonType))
+                    {
+                        return true;
+                    }
+
                     // If the PyObject type and the managed object names are the same,
                     // pyObject is a C# object wrapped in PyObject, in this case return true
                     // Otherwise, pyObject is a python object that subclass a C# class, only return true if 'allowPythonDerivative'
-                    var name = (((dynamic) pythonType).__name__ as PyObject).GetAndDispose<string>();
-                    pythonType.Dispose();
+                    var name = (((dynamic)pythonType).__name__ as PyObject).GetAndDispose<string>();
                     return name == result.GetType().Name;
                 }
                 catch
@@ -2710,7 +2798,7 @@ namespace QuantConnect
         /// </summary>
         /// <param name="universeFilterFunc">Universe filter function from Python</param>
         /// <returns>Function that provides <typeparamref name="T"/> and returns an enumerable of Symbols</returns>
-        public static Func<IEnumerable<T>, IEnumerable<Symbol>> ConvertPythonUniverseFilterFunction<T>(this PyObject universeFilterFunc)
+        public static Func<IEnumerable<T>, IEnumerable<Symbol>> ConvertPythonUniverseFilterFunction<T>(this PyObject universeFilterFunc) where T : BaseData
         {
             Func<IEnumerable<T>, object> convertedFunc;
             Func<IEnumerable<T>, IEnumerable<Symbol>> filterFunc = null;
@@ -2730,7 +2818,23 @@ namespace QuantConnect
         /// <remarks>This method is a work around for the fact that currently we can not create a delegate which returns
         /// an <see cref="IEnumerable{Symbol}"/> from a python method returning an array, plus the fact that
         /// <see cref="Universe.Unchanged"/> can not be cast to an array</remarks>
-        public static Func<T, IEnumerable<Symbol>> ConvertToUniverseSelectionSymbolDelegate<T>(this Func<T, object> selector)
+        public static Func<IEnumerable<T>, IEnumerable<Symbol>> ConvertToUniverseSelectionSymbolDelegate<T>(this Func<IEnumerable<T>, object> selector) where T : BaseData
+        {
+            if (selector == null)
+            {
+                return (dataPoints) => dataPoints.Select(x => x.Symbol);
+            }
+            return selector.ConvertSelectionSymbolDelegate();
+        }
+
+        /// <summary>
+        /// Wraps the provided universe selection selector checking if it returned <see cref="Universe.Unchanged"/>
+        /// and returns it instead, else enumerates result as <see cref="IEnumerable{Symbol}"/>
+        /// </summary>
+        /// <remarks>This method is a work around for the fact that currently we can not create a delegate which returns
+        /// an <see cref="IEnumerable{Symbol}"/> from a python method returning an array, plus the fact that
+        /// <see cref="Universe.Unchanged"/> can not be cast to an array</remarks>
+        public static Func<T, IEnumerable<Symbol>> ConvertSelectionSymbolDelegate<T>(this Func<T, object> selector)
         {
             return data =>
             {
@@ -2739,11 +2843,10 @@ namespace QuantConnect
                     ? Universe.Unchanged
                     : ((object[])result).Select(x =>
                     {
-                        if (x is Symbol)
+                        if (x is Symbol castedSymbol)
                         {
-                            return (Symbol)x;
+                            return castedSymbol;
                         }
-
                         return SymbolCache.TryGetSymbol((string)x, out var symbol) ? symbol : null;
                     });
             };
@@ -2835,31 +2938,59 @@ namespace QuantConnect
         {
             using (Py.GIL())
             {
+                Exception exception = null;
                 if (!PyList.IsListType(pyObject))
                 {
-                    pyObject = new PyList(new[] {pyObject});
+                    // it's not a pylist try to conver directly
+                    Symbol result = null;
+                    try
+                    {
+                        // we shouldn't dispose of an object we haven't created
+                        result = ConvertToSymbol(pyObject, dispose: false);
+                    }
+                    catch (Exception ex)
+                    {
+                        exception = ex;
+                    }
+
+                    if (result != null)
+                    {
+                        // happy case
+                        yield return result;
+                    }
+                }
+                else
+                {
+                    using var iterator = pyObject.GetIterator();
+                    foreach (PyObject item in iterator)
+                    {
+                        Symbol result;
+                        try
+                        {
+                            result = ConvertToSymbol(item, dispose: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            exception = ex;
+                            break;
+                        }
+                        yield return result;
+                    }
                 }
 
-                using var iterator = pyObject.GetIterator();
-                foreach (PyObject item in iterator)
+                // let's give it once last try, relying on pythonnet internal conversions, else throw
+                if (exception != null)
                 {
-                    if (PyString.IsStringType(item))
+                    if (pyObject.TryConvert(out IEnumerable<Symbol> symbols))
                     {
-                        yield return SymbolCache.GetSymbol(item.GetAndDispose<string>());
+                        foreach (var symbol in symbols)
+                        {
+                            yield return symbol;
+                        }
                     }
                     else
                     {
-                        Symbol symbol;
-                        try
-                        {
-                            symbol = item.GetAndDispose<Symbol>();
-                        }
-                        catch (Exception e)
-                        {
-                            throw new ArgumentException(Messages.Extensions.ConvertToSymbolEnumerableFailed(item), e);
-                        }
-
-                        yield return symbol;
+                        throw exception;
                     }
                 }
             }
@@ -2919,6 +3050,38 @@ namespace QuantConnect
                 }
             }
         }
+
+        /// <summary>
+        /// Try to create a type with a given name, if PyObject is not a CLR type. Otherwise, convert it.
+        /// </summary>
+        /// <param name="pyObject">Python object representing a type.</param>
+        /// <param name="type">Type object</param>
+        /// <returns>True if was able to create the type</returns>
+        public static bool TryCreateType(this PyObject pyObject, out Type type)
+        {
+            if (pyObject.TryConvert(out type))
+            {
+                // handles pure C# types
+                return true;
+            }
+
+            if (!PythonActivators.TryGetValue(pyObject.Handle, out var pythonType))
+            {
+                // Some examples:
+                // pytype: "<class 'DropboxBaseDataUniverseSelectionAlgorithm.StockDataSource'>"
+                // method: "<bound method CoarseFineFundamentalComboAlgorithm.CoarseSelectionFunction of <CoarseFineFunda..."
+                // array: "[<QuantConnect.Symbol object at 0x000001EEF21ED480>]"
+                if (pyObject.ToString().StartsWith("<class '", StringComparison.InvariantCulture))
+                {
+                    type = CreateType(pyObject);
+                    return true;
+                }
+                return false;
+            }
+            type = pythonType.Type;
+            return true;
+        }
+
 
         /// <summary>
         /// Creates a type with a given name, if PyObject is not a CLR type. Otherwise, convert it.
@@ -3808,10 +3971,14 @@ namespace QuantConnect
         public static bool ShouldEmitData(this SubscriptionDataConfig config, BaseData data, bool isUniverse = false)
         {
             // For now we are only filtering Auxiliary data; so if its another type just return true or if it's a margin interest rate which we want to emit always
-            if (data.DataType != MarketDataType.Auxiliary || config.Type == typeof(MarginInterestRate))
+            if (data.DataType != MarketDataType.Auxiliary)
             {
                 return true;
             }
+
+            // This filter does not apply to auxiliary data outside of delisting/splits/dividends so lets those emit
+            var type = data.GetType();
+            var expectedType = type.IsAssignableTo(config.Type);
 
             // Check our config type first to be lazy about using data.GetType() unless required
             var configTypeFilter = (config.Type == typeof(TradeBar) || config.Type == typeof(ZipEntryName) ||
@@ -3819,11 +3986,8 @@ namespace QuantConnect
 
             if (!configTypeFilter)
             {
-                return false;
+                return expectedType;
             }
-
-            // This filter does not apply to auxiliary data outside of delisting/splits/dividends so lets those emit
-            var type = data.GetType();
 
             // We don't want to pump in any data to `Universe.SelectSymbols(...)` if the
             // type is not configured to be consumed by the universe. This change fixes
@@ -3831,7 +3995,7 @@ namespace QuantConnect
             // for filtering/selection, and would result in either a runtime error
             // if casting into the expected type explicitly, or call the filter function with
             // no data being provided, resulting in all universe Symbols being de-selected.
-            if (isUniverse && !type.IsAssignableFrom(config.Type))
+            if (isUniverse && !expectedType)
             {
                 return (data as Delisting)?.Type == DelistingType.Delisted;
             }
@@ -4071,6 +4235,27 @@ namespace QuantConnect
             catch
             {
                 return failValue;
+            }
+        }
+
+        private static Symbol ConvertToSymbol(PyObject item, bool dispose)
+        {
+            if (PyString.IsStringType(item))
+            {
+                return SymbolCache.GetSymbol(dispose ? item.GetAndDispose<string>() : item.As<string>());
+            }
+            else
+            {
+                Symbol symbol;
+                try
+                {
+                    symbol = dispose ? item.GetAndDispose<Symbol>() : item.As<Symbol>();
+                }
+                catch (Exception e)
+                {
+                    throw new ArgumentException(Messages.Extensions.ConvertToSymbolEnumerableFailed(item), e);
+                }
+                return symbol;
             }
         }
     }

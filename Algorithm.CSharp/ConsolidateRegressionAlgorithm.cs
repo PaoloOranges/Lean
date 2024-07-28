@@ -74,7 +74,7 @@ namespace QuantConnect.Algorithm.CSharp
             try
             {
                 Consolidate<QuoteBar>(symbol, TimeSpan.FromDays(1), bar => { UpdateQuoteBar(bar, -1); });
-                throw new Exception($"Expected {nameof(ArgumentException)} to be thrown");
+                throw new RegressionTestException($"Expected {nameof(ArgumentException)} to be thrown");
             }
             catch (ArgumentException)
             {
@@ -98,7 +98,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!(tradeBar is TradeBar))
             {
-                throw new Exception("Expected a TradeBar");
+                throw new RegressionTestException("Expected a TradeBar");
             }
             _consolidationCounts[position]++;
             _smas[position].Update(tradeBar.EndTime, tradeBar.Value);
@@ -121,19 +121,19 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (_consolidationCounts.Any(i => i != _expectedConsolidations) || _customDataConsolidator == 0)
             {
-                throw new Exception("Unexpected consolidation count");
+                throw new RegressionTestException("Unexpected consolidation count");
             }
 
             for (var i = 0; i < _smas.Count; i++)
             {
                 if (_smas[i].Samples != _expectedConsolidations)
                 {
-                    throw new Exception($"Expected {_expectedConsolidations} samples in each SMA but found {_smas[i].Samples} in SMA in index {i}");
+                    throw new RegressionTestException($"Expected {_expectedConsolidations} samples in each SMA but found {_smas[i].Samples} in SMA in index {i}");
                 }
 
                 if (_smas[i].Current.Time != _lastSmaUpdates[i])
                 {
-                    throw new Exception($"Expected SMA in index {i} to have been last updated at {_lastSmaUpdates[i]} but was {_smas[i].Current.Time}");
+                    throw new RegressionTestException($"Expected SMA in index {i} to have been last updated at {_lastSmaUpdates[i]} but was {_smas[i].Current.Time}");
                 }
             }
         }
@@ -142,7 +142,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// OnData event is the primary entry point for your algorithm. Each new data point will be pumped in here.
         /// </summary>
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
-        public override void OnData(Slice data)
+        public override void OnData(Slice slice)
         {
             if (!Portfolio.Invested)
             {
@@ -158,7 +158,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -171,16 +171,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "1"},
+            {"Total Orders", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "6636.699%"},
             {"Drawdown", "15.900%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "116177.7"},
             {"Net Profit", "16.178%"},
             {"Sharpe Ratio", "640.313"},
             {"Sortino Ratio", "0"},
@@ -199,7 +206,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$210000000.00"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
             {"Portfolio Turnover", "81.19%"},
-            {"OrderListHash", "23cf084b30ec3d70b1b9f54c9b3b975f"}
+            {"OrderListHash", "dfd9a280d3c6470b305c03e0b72c234e"}
         };
     }
 }

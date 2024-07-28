@@ -36,14 +36,92 @@ using QuantConnect.Lean.Engine.HistoricalData;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Packets;
+using QuantConnect.Python;
 using QuantConnect.Scheduling;
 using QuantConnect.Securities;
+using QuantConnect.Tests.Brokerages;
 
 namespace QuantConnect.Tests.Common.Util
 {
     [TestFixture]
     public class ExtensionsTests
     {
+        [TestCase(true)]
+        [TestCase(false)]
+        public void ConvertPythonSymbolEnumerableSingle(bool useSymbol)
+        {
+            using (Py.GIL())
+            {
+                PyObject source = null;
+                if (useSymbol)
+                {
+                    source = Symbols.SPY.ToPython();
+                }
+                else
+                {
+                    SymbolCache.Set("SPY", Symbols.SPY);
+                    source = "SPY".ToPython();
+                }
+                var enumerable = source.ConvertToSymbolEnumerable();
+                for (var i = 0; i < 2; i++)
+                {
+                    var symbols = enumerable.ToList();
+                    Assert.AreEqual(1, symbols.Count);
+                    Assert.AreEqual(Symbols.SPY, symbols[0]);
+                }
+                source.Dispose();
+            }
+        }
+
+        [TestCase("pylist")]
+        [TestCase("pyiterable")]
+        [TestCase("csharp")]
+        public void ConvertPythonSymbolEnumerablePyList(string testCase)
+        {
+            using (Py.GIL())
+            {
+                PyObject source = null;
+                if (testCase == "csharp")
+                {
+                    source = (new[] { Symbols.SPY, Symbols.AAPL }).ToPython();
+                }
+                else if (testCase == "pylist")
+                {
+                    source = new PyList((new[] { Symbols.SPY.ToPython(), Symbols.AAPL.ToPython() }));
+                }
+                else
+                {
+                    source = new PyIterable((new[] { Symbols.SPY, Symbols.AAPL }).ToPython());
+                }
+                var enumerable = source.ConvertToSymbolEnumerable();
+                for (var i = 0; i < 2; i++)
+                {
+                    var symbols = enumerable.ToList();
+                    Assert.AreEqual(2, symbols.Count);
+                    Assert.AreEqual(Symbols.SPY, symbols[0]);
+                    Assert.AreEqual(Symbols.AAPL, symbols[1]);
+                }
+                source.Dispose();
+            }
+        }
+
+        [Test]
+        public void ConvertPythonSymbolEnumerableCSharp()
+        {
+            using (Py.GIL())
+            {
+                using var source = (new[] { Symbols.SPY, Symbols.AAPL }).ToPython();
+                var enumerable = source.ConvertToSymbolEnumerable();
+                for (var i = 0; i < 2; i++)
+                {
+                    var symbols = enumerable.ToList();
+                    Assert.AreEqual(2, symbols.Count);
+                    Assert.AreEqual(Symbols.SPY, symbols[0]);
+                    Assert.AreEqual(Symbols.AAPL, symbols[1]);
+                }
+            }
+        }
+
         [Test]
         public void NonExistingEmptyDirectory()
         {
@@ -1149,18 +1227,18 @@ class Test(PythonData):
         [Test]
         public void PyObjectTryConvertSymbolArray()
         {
-            PyObject value;
             using (Py.GIL())
             {
                 // Wrap a Symbol Array around a PyObject and convert it back
-                value = new PyList(new[] { Symbols.SPY.ToPython(), Symbols.AAPL.ToPython() });
-            }
+                using PyObject value = new PyList(new[] { Symbols.SPY.ToPython(), Symbols.AAPL.ToPython() });
+            
 
-            Symbol[] symbols;
-            var canConvert = value.TryConvert(out symbols);
-            Assert.IsTrue(canConvert);
-            Assert.IsNotNull(symbols);
-            Assert.IsAssignableFrom<Symbol[]>(symbols);
+                Symbol[] symbols;
+                var canConvert = value.TryConvert(out symbols);
+                Assert.IsTrue(canConvert);
+                Assert.IsNotNull(symbols);
+                Assert.IsAssignableFrom<Symbol[]>(symbols);
+            }
         }
 
         [Test]
@@ -1313,10 +1391,10 @@ class Test(PythonData):
             IEnumerable<Symbol> symbols;
             using (Py.GIL())
             {
-                symbols = new PyString("SPY").ConvertToSymbolEnumerable();
+                using var pyString = new PyString("SPY");
+                symbols = pyString.ConvertToSymbolEnumerable();
+                Assert.AreEqual(Symbols.SPY, symbols.Single());
             }
-
-            Assert.AreEqual(Symbols.SPY, symbols.Single());
         }
 
         [Test]
@@ -1328,10 +1406,10 @@ class Test(PythonData):
             IEnumerable<Symbol> symbols;
             using (Py.GIL())
             {
-                symbols = new PyList(new[] { "SPY".ToPython() }).ConvertToSymbolEnumerable();
+                using var pyList = new PyList(new[] { "SPY".ToPython() });
+                symbols = pyList.ConvertToSymbolEnumerable();
+                Assert.AreEqual(Symbols.SPY, symbols.Single());
             }
-
-            Assert.AreEqual(Symbols.SPY, symbols.Single());
         }
 
         [Test]
@@ -1352,10 +1430,10 @@ class Test(PythonData):
             IEnumerable<Symbol> symbols;
             using (Py.GIL())
             {
-                symbols = new PyList(new[] {Symbols.SPY.ToPython()}).ConvertToSymbolEnumerable();
+                using var pyList = new PyList(new[] { Symbols.SPY.ToPython() });
+                symbols = pyList.ConvertToSymbolEnumerable();
+                Assert.AreEqual(Symbols.SPY, symbols.Single());
             }
-
-            Assert.AreEqual(Symbols.SPY, symbols.Single());
         }
 
         [Test]
@@ -1433,6 +1511,56 @@ actualDictionary.update({'IBM': 5})
             }
         }
 
+        public class TestGenericClass<T>
+        {
+            public T Value { get; set; }
+        }
+
+        public static TestGenericClass<int> GetGenericClassObject()
+        {
+            return new TestGenericClass<int>();
+        }
+
+        [Test]
+        public void PyObjectConvertFromGenericCSharpType()
+        {
+            using (Py.GIL())
+            {
+                var module = PyModule.FromString(
+                    "PyObjectConvertFromGenericCSharpType",
+                    @"
+from QuantConnect.Tests.Common.Util import ExtensionsTests
+
+def GetGenericClassObject():
+    return ExtensionsTests.GetGenericClassObject()
+");
+
+                var genericObject = module.GetAttr("GetGenericClassObject").Invoke();
+                var result = genericObject.TryConvert<TestGenericClass<int>>(out var _);
+                Assert.IsTrue(result);
+            }
+        }
+
+        [Test]
+        public void PyObjectConvertPythonTypeDerivedFromCSharpType([Values] bool allowPythonDerivative)
+        {
+            using (Py.GIL())
+            {
+                var module = PyModule.FromString(
+                    "PyObjectConvertPythonTypeDerivedFromCSharpType",
+                    @"
+from AlgorithmImports import *
+
+class TestPythonDerivedClass(PythonData):
+    pass
+");
+
+                var obj = module.GetAttr("TestPythonDerivedClass").Invoke();
+                var result = obj.TryConvert<PythonData>(out var _, allowPythonDerivative);
+
+                Assert.AreEqual(allowPythonDerivative, result);
+            }
+        }
 
         [Test]
         public void BatchByDoesNotDropItems()
@@ -1517,8 +1645,9 @@ actualDictionary.update({'IBM': 5})
         [Test]
         public void DateRulesToFunc()
         {
+            var mhdb = MarketHoursDatabase.FromDataFolder();
             var dateRules = new DateRules(new SecurityManager(
-                new TimeKeeper(new DateTime(2015, 1, 1), DateTimeZone.Utc)), DateTimeZone.Utc);
+                new TimeKeeper(new DateTime(2015, 1, 1), DateTimeZone.Utc)), DateTimeZone.Utc, mhdb);
             var first = new DateTime(2015, 1, 10);
             var second = new DateTime(2015, 1, 30);
             var dateRule = dateRules.On(first, second);
@@ -1586,7 +1715,8 @@ actualDictionary.update({'IBM': 5})
                     (_) => {},
                     false,
                     new DataPermissionManager(),
-                    algo.ObjectStore));
+                    algo.ObjectStore,
+                    algo.Settings));
 
             algo.SetStartDate(DateTime.UtcNow.AddDays(-1));
 
@@ -1748,6 +1878,61 @@ def select_symbol(fundamental):
         public void SafeDivisionWorksAsExpectedWithEdgeCases(decimal numerator, decimal denominator)
         {
             Assert.DoesNotThrow(() => numerator.SafeDivision(denominator));
+        }
+
+        [TestCase("GOOGL", "2004/08/19", "2024/03/01", 2, "GOOG,GOOGL")] // IPO: August 19, 2004
+        [TestCase("GOOGL", "2010/02/01", "2012/03/01", 1, "GOOG")]
+        [TestCase("GOOGL", "2014/04/02", "2024/03/01", 2, "GOOG,GOOGL")] // The restructuring: "GOOG" to "GOOGL"
+        [TestCase("GOOGL", "2014/02/01", "2024/03/01", 2, "GOOG,GOOGL")]
+        [TestCase("GOOGL", "2020/02/01", "2024/03/01", 1, "GOOGL")]
+        [TestCase("GOOGL", "2023/02/01", "2024/03/01", 1, "GOOGL")]
+        [TestCase("GOOG", "2020/02/01", "2024/03/01", 1, "GOOG")]
+        [TestCase("AAPL", "2008/02/01", "2024/03/01", 1, "AAPL")]
+        [TestCase("AAPL", "2008/02/01", "2024/03/01", 1, "AAPL")]
+        [TestCase("GOOG", "2014/04/03", "2024/03/01", 1, "GOOG")] // The restructuring: April 2, 2014 "GOOCV" to "GOOG"
+        [TestCase("GOOG", "2013/04/03", "2014/04/01", 1, "GOOCV")]
+        [TestCase("GOOG", "2013/04/03", "2024/03/01", 2, "GOOCV,GOOG")]
+        [TestCase("GOOG", "2015/04/03", "2024/03/01", 1, "GOOG")]
+        [TestCase("GOOCV", "2010/01/01", "2024/03/01", 2, "GOOCV,GOOG")]
+        [TestCase("GOOG", "2014/01/01", "2024/03/01", 2, "GOOCV,GOOG")]
+        [TestCase("SPWR", "2005/11/17", "2024/03/01", 3, "SPWR,SPWRA,SPWR")] // IPO: November 17, 2005
+        [TestCase("SPWR", "2023/11/16", "2024/03/01", 1, "SPWR")]
+        [TestCase("NFLX", "2023/11/16", "2024/03/01", 0, null, Description = "The Symbol is not mapped")]
+        public void GetHistoricalSymbolNamesByDateRequest(string ticker, DateTime startDateTime, DateTime endDateTime, int expectedAmount, string expectedTickers)
+        {
+            var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
+
+            var request = TestsHelpers.GetHistoryRequest(symbol, startDateTime, endDateTime, Resolution.Daily, TickType.Trade);
+
+            var tickers = TestGlobals.MapFileProvider.RetrieveSymbolHistoricalDefinitionsInDateRange(symbol, request.StartTimeUtc, request.EndTimeUtc).ToList();
+
+            Assert.That(tickers.Count, Is.EqualTo(expectedAmount));
+
+            if (tickers.Count != 0)
+            {
+                Assert.That(tickers.First().StartDateTimeLocal, Is.EqualTo(startDateTime));
+                Assert.That(tickers.Last().EndDateTimeLocal, Is.EqualTo(endDateTime));
+
+                if (expectedTickers != null)
+                {
+                    foreach (var (actualTicker, expectedTicker) in tickers.Zip(expectedTickers.Split(','), (t, et) => (t.Ticker, et)))
+                    {
+                        Assert.That(actualTicker, Is.EqualTo(expectedTicker));
+                    }
+                }
+            }
+        }
+
+        [TestCase(Futures.Indices.SP500EMini, "2023/11/16", 1)]
+        [TestCase(Futures.Metals.Gold,"2023/11/16", 0, Description = "The startDateTime is not mapped")]
+        public void GetHistoricalFutureSymbolNamesByDateRequest(string ticker, DateTime expiryTickerDate, int expectedAmount)
+        {
+            var futureSymbol = Symbols.CreateFutureSymbol(ticker, expiryTickerDate);
+
+            var tickers =
+                TestGlobals.MapFileProvider.RetrieveSymbolHistoricalDefinitionsInDateRange(futureSymbol, new DateTime(2023, 11, 5), expiryTickerDate).ToList();
+
+            Assert.That(tickers.Count, Is.EqualTo(expectedAmount));
         }
 
         private PyObject ConvertToPyObject(object value)

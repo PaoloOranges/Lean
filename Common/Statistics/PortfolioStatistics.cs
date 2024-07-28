@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MathNet.Numerics.Distributions;
 using MathNet.Numerics.Statistics;
 using Newtonsoft.Json;
 using QuantConnect.Data;
@@ -66,6 +67,18 @@ namespace QuantConnect.Statistics
         /// </summary>
         [JsonConverter(typeof(JsonRoundingConverter))]
         public decimal Expectancy { get; set; }
+
+        /// <summary>
+        /// Initial Equity Total Value
+        /// </summary>
+        [JsonConverter(typeof(JsonRoundingConverter))]
+        public decimal StartEquity { get; set; }
+
+        /// <summary>
+        /// Final Equity Total Value
+        /// </summary>
+        [JsonConverter(typeof(JsonRoundingConverter))]
+        public decimal EndEquity { get; set; }
 
         /// <summary>
         /// Annual compounded returns statistic based on the final-starting capital and years.
@@ -159,6 +172,20 @@ namespace QuantConnect.Statistics
         public decimal PortfolioTurnover { get; set; }
 
         /// <summary>
+        /// The 1-day VaR for the portfolio, using the Variance-covariance approach.
+        /// Assumes a 99% confidence level, 1 year lookback period, and that the returns are normally distributed.
+        /// </summary>
+        [JsonConverter(typeof(JsonRoundingConverter))]
+        public decimal ValueAtRisk99 { get; set; }
+
+        /// <summary>
+        /// The 1-day VaR for the portfolio, using the Variance-covariance approach.
+        /// Assumes a 95% confidence level, 1 year lookback period, and that the returns are normally distributed.
+        /// </summary>
+        [JsonConverter(typeof(JsonRoundingConverter))]
+        public decimal ValueAtRisk95 { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="PortfolioStatistics"/> class
         /// </summary>
         /// <param name="profitLoss">Trade record of profits and losses</param>
@@ -186,6 +213,9 @@ namespace QuantConnect.Statistics
             int? winCount = null,
             int? lossCount = null)
         {
+            StartEquity = startingCapital;
+            EndEquity = equity.LastOrDefault().Value;
+
             if (portfolioTurnover.Count > 0)
             {
                 PortfolioTurnover = portfolioTurnover.Select(kvp => kvp.Value).Average();
@@ -275,6 +305,9 @@ namespace QuantConnect.Statistics
             // deannualize a 1 sharpe ratio
             var benchmarkSharpeRatio = 1.0d / Math.Sqrt(tradingDaysPerYear);
             ProbabilisticSharpeRatio = Statistics.ProbabilisticSharpeRatio(listPerformance, benchmarkSharpeRatio).SafeDecimalCast();
+            
+            ValueAtRisk99 = GetValueAtRisk(listPerformance, tradingDaysPerYear, 0.99d);
+            ValueAtRisk95 = GetValueAtRisk(listPerformance, tradingDaysPerYear, 0.95d);
         }
 
         /// <summary>
@@ -315,7 +348,42 @@ namespace QuantConnect.Statistics
         /// <returns>Double annual performance percentage</returns>
         private static decimal GetAnnualPerformance(List<double> performance, int tradingDaysPerYear)
         {
-            return Statistics.AnnualPerformance(performance, tradingDaysPerYear).SafeDecimalCast();
+            try
+            {
+                return Statistics.AnnualPerformance(performance, tradingDaysPerYear).SafeDecimalCast();
+            }
+            catch (ArgumentException ex)
+            {
+                var partialSums = 0.0;
+                var points = 0;
+                double troublePoint = default;
+                foreach(var point in performance)
+                {
+                    points++;
+                    partialSums += point;
+                    if (Math.Pow(partialSums / points, tradingDaysPerYear).IsNaNOrInfinity())
+                    {
+                        troublePoint = point;
+                        break;
+                    }
+                }
+
+                throw new ArgumentException($"PortfolioStatistics.GetAnnualPerformance(): An exception was thrown when trying to cast the annual performance value due to the following performance point: {troublePoint}. " +
+                    $"The exception thrown was the following: {ex.Message}.");
+            }
+        }
+
+        private static decimal GetValueAtRisk(
+            List<double> performance,
+            int lookbackPeriodDays,
+            double confidenceLevel,
+            int rounding = 3)
+        {
+            var periodPerformance = performance.TakeLast(lookbackPeriodDays);
+            var mean = periodPerformance.Mean();
+            var standardDeviation = periodPerformance.StandardDeviation();
+            var valueAtRisk = (decimal)Normal.InvCDF(mean, standardDeviation, 1 - confidenceLevel);
+            return Math.Round(valueAtRisk, rounding);
         }
     }
 }

@@ -55,6 +55,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         private SubscriptionCollection _subscriptions;
         private IFactorFileProvider _factorFileProvider;
         private IDataChannelProvider _channelProvider;
+        // in live trading we delay scheduled universe selection between 11 & 12 hours after midnight UTC so that we allow new selection data to be piped in
+        // NY goes from -4/-5 UTC time, so:
+        // 11 UTC - 4 => 7am NY
+        // 12 UTC - 4 => 8am NY
+        private readonly TimeSpan _scheduledUniverseUtcTimeShift = TimeSpan.FromMinutes(11 * 60 + DateTime.UtcNow.Second);
         private readonly HashSet<string> _unsupportedConfigurations = new();
 
         /// <summary>
@@ -176,7 +181,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <returns>The loaded <see cref="IDataQueueHandler"/></returns>
         protected virtual IDataQueueHandler GetDataQueueHandler()
         {
-            var result = new DataQueueHandlerManager();
+            var result = new DataQueueHandlerManager(_algorithm.Settings);
             result.UnsupportedConfiguration += HandleUnsupportedConfigurationEvent;
             return result;
         }
@@ -257,8 +262,10 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             if (request.Configuration.FillDataForward)
             {
                 var fillForwardResolution = _subscriptions.UpdateAndGetFillForwardResolution(request.Configuration);
+                var useDailyStrictEndTimes = LeanData.UseDailyStrictEndTimes(_algorithm.Settings, request, request.Configuration.Symbol, request.Configuration.Increment);
 
-                enumerator = new LiveFillForwardEnumerator(_frontierTimeProvider, enumerator, request.Security.Exchange, fillForwardResolution, request.Configuration.ExtendedMarketHours, localEndTime, request.Configuration.Increment, request.Configuration.DataTimeZone);
+                enumerator = new LiveFillForwardEnumerator(_frontierTimeProvider, enumerator, request.Security.Exchange, fillForwardResolution, request.Configuration.ExtendedMarketHours,
+                    localEndTime, request.Configuration.Resolution, request.Configuration.DataTimeZone, useDailyStrictEndTimes);
             }
 
             // make our subscriptions aware of the frontier of the data feed, prevents future data from spewing into the feed
@@ -272,7 +279,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
             enumerator = GetWarmupEnumerator(request, enumerator);
 
-            var subscriptionDataEnumerator = new SubscriptionDataEnumerator(request.Configuration, request.Security.Exchange.Hours, timeZoneOffsetProvider, enumerator, request.IsUniverseSubscription);
+            var subscriptionDataEnumerator = new SubscriptionDataEnumerator(request.Configuration, request.Security.Exchange.Hours, timeZoneOffsetProvider,
+                enumerator, request.IsUniverseSubscription, _algorithm.Settings.DailyPreciseEndTime);
             subscription = new Subscription(request, subscriptionDataEnumerator, timeZoneOffsetProvider);
 
             return subscription;
@@ -327,7 +335,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 _customExchange.AddEnumerator(new EnumeratorHandler(config.Symbol, enumerator, enqueueable));
                 enumerator = enqueueable;
             }
-            else if (config.Type == typeof(ETFConstituentData) || config.Type == typeof(Fundamentals))
+            else if (config.Type.IsAssignableTo(typeof(ETFConstituentUniverse)) || config.Type.IsAssignableTo(typeof(FundamentalUniverse)))
             {
                 Log.Trace($"LiveTradingDataFeed.CreateUniverseSubscription(): Creating {config.Type.Name} universe: {config.Symbol.ID}");
 
@@ -360,12 +368,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                 Func<SubscriptionRequest, IEnumerator<BaseData>> configure = (subRequest) =>
                 {
+                    var useDailyStrictEndTimes = LeanData.UseDailyStrictEndTimes(_algorithm.Settings, request, request.Configuration.Symbol, request.Configuration.Increment);
                     var fillForwardResolution = _subscriptions.UpdateAndGetFillForwardResolution(subRequest.Configuration);
                     var input = Subscribe(subRequest.Configuration, (sender, args) => subscription?.OnNewDataAvailable(), (_) => false);
-                    return new LiveFillForwardEnumerator(_frontierTimeProvider, input, subRequest.Security.Exchange, fillForwardResolution, subRequest.Configuration.ExtendedMarketHours, localEndTime, subRequest.Configuration.Increment, subRequest.Configuration.DataTimeZone);
+                    return new LiveFillForwardEnumerator(_frontierTimeProvider, input, subRequest.Security.Exchange, fillForwardResolution, subRequest.Configuration.ExtendedMarketHours,
+                        localEndTime, subRequest.Configuration.Resolution, subRequest.Configuration.DataTimeZone, useDailyStrictEndTimes);
                 };
 
-                var symbolUniverse = GetUniverseProvider(SecurityType.Option);
+                var symbolUniverse = GetUniverseProvider(request.Configuration.SecurityType);
 
                 var enumeratorFactory = new OptionChainUniverseSubscriptionEnumeratorFactory(configure, symbolUniverse, _timeProvider);
                 enumerator = enumeratorFactory.CreateEnumerator(request, _dataProvider);
@@ -394,17 +404,17 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 enumerator = enqueueable;
             }
 
+            enumerator = AddScheduleWrapper(request, enumerator, new PredicateTimeProvider(_frontierTimeProvider, (currentUtcDateTime) => {
+                // will only let time advance after it's passed the live time shift frontier
+                return currentUtcDateTime.TimeOfDay > _scheduledUniverseUtcTimeShift;
+            }));
+
             enumerator = GetWarmupEnumerator(request, enumerator);
 
             // create the subscription
-            var subscriptionDataEnumerator = new SubscriptionDataEnumerator(request.Configuration, request.Security.Exchange.Hours, tzOffsetProvider, enumerator, request.IsUniverseSubscription);
+            var subscriptionDataEnumerator = new SubscriptionDataEnumerator(request.Configuration, request.Security.Exchange.Hours, tzOffsetProvider,
+                enumerator, request.IsUniverseSubscription, _algorithm.Settings.DailyPreciseEndTime);
             subscription = new Subscription(request, subscriptionDataEnumerator, tzOffsetProvider);
-
-            // send the subscription for the new symbol through to the data queuehandler
-            if (_channelProvider.ShouldStreamSubscription(subscription.Configuration))
-            {
-                Subscribe(request.Configuration, (sender, args) => subscription?.OnNewDataAvailable(), (_) => false);
-            }
 
             return subscription;
         }
@@ -446,6 +456,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         // if required by the original request, we will fill forward the Synced warmup data
                         request.Configuration.FillDataForward,
                         _algorithm.Settings.WarmupResolution);
+                    synchronizedWarmupEnumerator = AddScheduleWrapper(warmupRequest, synchronizedWarmupEnumerator, null);
 
                     // don't let future data past. We let null pass because that's letting the next enumerator know we've ended because we always return true in live
                     synchronizedWarmupEnumerator = new FilterEnumerator<BaseData>(synchronizedWarmupEnumerator, data => data == null || data.EndTime <= warmupRequest.EndTimeLocal);
@@ -507,7 +518,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     var startTimeUtc = warmup.StartTimeUtc;
                     if (lastPointTracker != null && lastPointTracker.LastDataPoint != null)
                     {
-                        var utcLastPointTime = lastPointTracker.LastDataPoint.Time.ConvertToUtc(warmup.ExchangeHours.TimeZone);
+                        var lastPointExchangeTime = lastPointTracker.LastDataPoint.Time;
+                        if (warmup.Configuration.Resolution == Resolution.Daily)
+                        {
+                            // time could be 9.30 for example using strict daily end times, but we just want the date in this case
+                            lastPointExchangeTime = lastPointExchangeTime.Date;
+                        }
+
+                        var utcLastPointTime = lastPointExchangeTime.ConvertToUtc(warmup.ExchangeHours.TimeZone);
                         if (utcLastPointTime > startTimeUtc)
                         {
                             if (Log.DebuggingEnabled)

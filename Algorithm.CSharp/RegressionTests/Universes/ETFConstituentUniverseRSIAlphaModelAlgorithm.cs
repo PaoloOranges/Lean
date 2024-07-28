@@ -60,7 +60,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         /// <param name="constituents">ETF constituents, i.e. the components of the ETF and their weighting</param>
         /// <returns>Symbols to add to universe</returns>
-        public IEnumerable<Symbol> FilterETFConstituents(IEnumerable<ETFConstituentData> constituents)
+        public IEnumerable<Symbol> FilterETFConstituents(IEnumerable<ETFConstituentUniverse> constituents)
         {
             return constituents
                 .Where(x => x.Weight != null && x.Weight >= 0.001m)
@@ -85,8 +85,8 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 // Cast first, and then access the constituents collection defined in our algorithm.
                 var algoConstituents = data.Bars.Keys
-                    .Where(x => algorithm.Securities[x].Cache.HasData(typeof(ETFConstituentData)))
-                    .Select(x => algorithm.Securities[x].Cache.GetData<ETFConstituentData>())
+                    .Where(x => algorithm.Securities[x].Cache.HasData(typeof(ETFConstituentUniverse)))
+                    .Select(x => algorithm.Securities[x].Cache.GetData<ETFConstituentUniverse>())
                     .ToList();
                 
                 if (algoConstituents.Count == 0 || data.Bars.Count == 0)
@@ -167,7 +167,7 @@ namespace QuantConnect.Algorithm.CSharp
             /// <summary>
             /// Symbol's constituent data for the ETF it belongs to
             /// </summary>
-            public ETFConstituentData Constituent { get; }
+            public ETFConstituentUniverse Constituent { get; }
             
             /// <summary>
             /// RSI indicator for the Symbol's price data
@@ -180,7 +180,7 @@ namespace QuantConnect.Algorithm.CSharp
             /// <param name="symbol">The symbol to add data for</param>
             /// <param name="constituent">ETF constituent data</param>
             /// <param name="period">RSI period</param>
-            public SymbolData(Symbol symbol, QCAlgorithm algorithm, ETFConstituentData constituent, int period)
+            public SymbolData(Symbol symbol, QCAlgorithm algorithm, ETFConstituentUniverse constituent, int period)
             {
                 Symbol = symbol;
                 Constituent = constituent;
@@ -196,7 +196,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -209,16 +209,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "55"},
+            {"Total Orders", "55"},
             {"Average Win", "0.09%"},
             {"Average Loss", "-0.05%"},
             {"Compounding Annual Return", "3.321%"},
             {"Drawdown", "0.500%"},
             {"Expectancy", "0.047"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100535.45"},
             {"Net Profit", "0.535%"},
             {"Sharpe Ratio", "1.377"},
             {"Sortino Ratio", "1.963"},
@@ -237,7 +244,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$440000000.00"},
             {"Lowest Capacity Asset", "AAPL R735QTJ8XC9X"},
             {"Portfolio Turnover", "11.16%"},
-            {"OrderListHash", "f812bfd22719be4f329ccb2eecc527a1"}
+            {"OrderListHash", "d41a5ba07ca662d7bfbeace8a05b34aa"}
         };
     }
 }

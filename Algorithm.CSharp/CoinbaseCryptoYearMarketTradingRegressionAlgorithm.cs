@@ -82,7 +82,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (Settings.TradingDaysPerYear != _daysInYear)
             {
-                throw new Exception("The Algorithm was using invalid `TradingDaysPerYear` for this brokerage. The ExpectedStatistics is wrong.");
+                throw new RegressionTestException("The Algorithm was using invalid `TradingDaysPerYear` for this brokerage. The ExpectedStatistics is wrong.");
             }
         }
 
@@ -94,7 +94,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all time slices of algorithm
@@ -107,16 +107,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 43;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "388"},
+            {"Total Orders", "388"},
             {"Average Win", "0.01%"},
             {"Average Loss", "-0.01%"},
             {"Compounding Annual Return", "-0.597%"},
             {"Drawdown", "0.700%"},
             {"Expectancy", "-0.400"},
+            {"Start Equity", "100000.00"},
+            {"End Equity", "99365.56"},
             {"Net Profit", "-0.634%"},
             {"Sharpe Ratio", "-7.126"},
             {"Sortino Ratio", "-7.337"},
@@ -135,7 +142,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$71000.00"},
             {"Lowest Capacity Asset", "BTCUSD 2XR"},
             {"Portfolio Turnover", "0.29%"},
-            {"OrderListHash", "3833cb6d62095f129d078c8ccd57a0a6"}
+            {"OrderListHash", "179b672b3c1024bbe49dd3b4974232f1"}
         };
     }
 }

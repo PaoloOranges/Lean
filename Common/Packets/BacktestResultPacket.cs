@@ -31,92 +31,77 @@ namespace QuantConnect.Packets
         /// <summary>
         /// User Id placing this task
         /// </summary>
-        [JsonProperty(PropertyName = "iUserID")]
-        public int UserId;
+        public int UserId { get; set; }
 
         /// <summary>
         /// Project Id of the this task.
         /// </summary>
-        [JsonProperty(PropertyName = "iProjectID")]
-        public int ProjectId;
+        public int ProjectId { get; set; }
 
         /// <summary>
         /// User Session Id
         /// </summary>
-        [JsonProperty(PropertyName = "sSessionID")]
-        public string SessionId = string.Empty;
+        public string SessionId { get; set; } = string.Empty;
 
         /// <summary>
         /// BacktestId for this result packet
         /// </summary>
-        [JsonProperty(PropertyName = "sBacktestID")]
-        public string BacktestId = string.Empty;
+        public string BacktestId { get; set; } = string.Empty;
 
         /// <summary>
         /// OptimizationId for this result packet if any
         /// </summary>
-        [JsonProperty(PropertyName = "sOptimizationID")]
-        public string OptimizationId;
+        public string OptimizationId { get; set; }
 
         /// <summary>
         /// Compile Id for the algorithm which generated this result packet.
         /// </summary>
-        [JsonProperty(PropertyName = "sCompileID")]
-        public string CompileId = string.Empty;
+        public string CompileId { get; set; } = string.Empty;
 
         /// <summary>
         /// Start of the backtest period as defined in Initialize() method.
         /// </summary>
-        [JsonProperty(PropertyName = "dtPeriodStart")]
-        public DateTime PeriodStart;
+        public DateTime PeriodStart { get; set; }
 
         /// <summary>
         /// End of the backtest period as defined in the Initialize() method.
         /// </summary>
-        [JsonProperty(PropertyName = "dtPeriodFinish")]
-        public DateTime PeriodFinish;
+        public DateTime PeriodFinish { get; set; }
 
         /// <summary>
         /// DateTime (EST) the user requested this backtest.
         /// </summary>
-        [JsonProperty(PropertyName = "dtDateRequested")]
-        public DateTime DateRequested;
+        public DateTime DateRequested { get; set; }
 
         /// <summary>
         /// DateTime (EST) when the backtest was completed.
         /// </summary>
-        [JsonProperty(PropertyName = "dtDateFinished")]
-        public DateTime DateFinished;
+        public DateTime DateFinished { get; set; }
 
         /// <summary>
         /// Progress of the backtest as a percentage from 0-1 based on the days lapsed from start-finish.
         /// </summary>
-        [JsonProperty(PropertyName = "dProgress")]
-        public decimal Progress;
+        public decimal Progress { get; set; }
 
         /// <summary>
         /// Name of this backtest.
         /// </summary>
-        [JsonProperty(PropertyName = "sName")]
-        public string Name = string.Empty;
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Result data object for this backtest
         /// </summary>
-        [JsonProperty(PropertyName = "oResults")]
-        public BacktestResult Results = new ();
+        public BacktestResult Results { get; set; } = new ();
 
         /// <summary>
         /// Processing time of the algorithm (from moment the algorithm arrived on the algorithm node)
         /// </summary>
-        [JsonProperty(PropertyName = "dProcessingTime")]
-        public double ProcessingTime;
+        public double ProcessingTime { get; set; }
 
         /// <summary>
         /// Estimated number of tradeable days in the backtest based on the start and end date or the backtest
         /// </summary>
-        [JsonProperty(PropertyName = "iTradeableDates")]
-        public int TradeableDates;
+        public int TradeableDates { get; set; }
 
         /// <summary>
         /// Default constructor for JSON Serialization
@@ -221,12 +206,12 @@ namespace QuantConnect.Packets
         /// <summary>
         /// Rolling window detailed statistics.
         /// </summary>
-        public Dictionary<string, AlgorithmPerformance> RollingWindow = new Dictionary<string, AlgorithmPerformance>();
+        public Dictionary<string, AlgorithmPerformance> RollingWindow { get; set; } = new Dictionary<string, AlgorithmPerformance>();
 
         /// <summary>
         /// Rolling window detailed statistics.
         /// </summary>
-        public AlgorithmPerformance TotalPerformance = null;
+        public AlgorithmPerformance TotalPerformance { get; set; }
 
         /// <summary>
         /// Default Constructor

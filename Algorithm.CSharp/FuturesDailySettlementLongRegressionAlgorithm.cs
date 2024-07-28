@@ -123,7 +123,7 @@ namespace QuantConnect.Algorithm.CSharp
                 var value = Portfolio.CashBook.TotalValueInAccountCurrency;
                 if (expected != Math.Round(value, 5))
                 {
-                    throw new Exception($"Unexpected cash balance {value} expected {expected}");
+                    throw new RegressionTestException($"Unexpected cash balance {value} expected {expected}");
                 }
             }
         }
@@ -148,15 +148,15 @@ namespace QuantConnect.Algorithm.CSharp
             var expected = _initialPortfolioValue + holdings.NetProfit;
             if (expected != Portfolio.TotalPortfolioValue || expected != Portfolio.CashBook[Currencies.USD].Amount)
             {
-                throw new Exception($"Unexpected future profit {holdings.NetProfit}");
+                throw new RegressionTestException($"Unexpected future profit {holdings.NetProfit}");
             }
             if(holdings.SettledProfit != 0)
             {
-                throw new Exception($"Unexpected SettledProfit value {holdings.SettledProfit}");
+                throw new RegressionTestException($"Unexpected SettledProfit value {holdings.SettledProfit}");
             }
             if (holdings.UnrealizedProfit != 0)
             {
-                throw new Exception($"Unexpected UnrealizedProfit value {holdings.UnrealizedProfit}");
+                throw new RegressionTestException($"Unexpected UnrealizedProfit value {holdings.UnrealizedProfit}");
             }
 
             AssertCash(Time);
@@ -170,7 +170,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -183,16 +183,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "6"},
+            {"Total Orders", "6"},
             {"Average Win", "0.89%"},
             {"Average Loss", "-0.87%"},
             {"Compounding Annual Return", "142.879%"},
             {"Drawdown", "3.800%"},
             {"Expectancy", "0.349"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100905.65"},
             {"Net Profit", "0.906%"},
             {"Sharpe Ratio", "-3.968"},
             {"Sortino Ratio", "-8.141"},
@@ -211,7 +218,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$100000000.00"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
             {"Portfolio Turnover", "183.82%"},
-            {"OrderListHash", "0bc2214035105b7c7f63562491214ec3"}
+            {"OrderListHash", "0a1d9c87a1aced914c355e762c255a31"}
         };
     }
 }

@@ -85,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                 if (!time.IsOpen(orderEvent.UtcTime, _SP500EMini.IsExtendedMarketHours))
                 {
-                    throw new Exception($"The Exchange hours was closed, verify 'extendedMarketHours' flag in {nameof(Initialize)} when added new security(ies).");
+                    throw new RegressionTestException($"The Exchange hours was closed, verify 'extendedMarketHours' flag in {nameof(Initialize)} when added new security(ies).");
                 }
             }
         }
@@ -96,7 +96,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (stopMarketOrders.Any(x => x.Status != OrderStatus.Filled))
             {
-                throw new Exception("The Algorithms was not handled any StopMarketOrders");
+                throw new RegressionTestException("The Algorithms was not handled any StopMarketOrders");
             }
         }
 
@@ -108,12 +108,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all time slices of algorithm
         /// </summary>
-        public long DataPoints => 75961;
+        public long DataPoints => 75960;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -121,16 +121,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "10"},
+            {"Total Orders", "10"},
             {"Average Win", "0%"},
             {"Average Loss", "-0.02%"},
             {"Compounding Annual Return", "-6.736%"},
             {"Drawdown", "0.100%"},
             {"Expectancy", "-1"},
+            {"Start Equity", "100000"},
+            {"End Equity", "99891"},
             {"Net Profit", "-0.109%"},
             {"Sharpe Ratio", "-22.29"},
             {"Sortino Ratio", "-26.651"},
@@ -149,7 +156,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$3400000.00"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
             {"Portfolio Turnover", "138.95%"},
-            {"OrderListHash", "b26a8ad66a8dc5af768a22fbf9a80cec"}
+            {"OrderListHash", "957191893a3de4975ec14b2a3b2490de"}
         };
     }
 }

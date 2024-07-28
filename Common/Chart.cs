@@ -18,8 +18,8 @@ using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using QuantConnect.Logging;
-using QuantConnect.Util;
 
 namespace QuantConnect
 {
@@ -28,16 +28,18 @@ namespace QuantConnect
     /// </summary>
     public class Chart
     {
-        /// Name of the Chart:
-        public string Name = "";
+        /// <summary>
+        /// Name of the Chart
+        /// </summary>
+        public string Name { get; set; } = string.Empty;
 
         /// Type of the Chart, Overlayed or Stacked.
         [Obsolete("ChartType is now obsolete. Please use Series indexes instead by setting index in the series constructor.")]
-        public ChartType ChartType = ChartType.Overlay;
+        public ChartType ChartType { get; set; } = ChartType.Overlay;
 
         /// List of Series Objects for this Chart:
         [JsonConverter(typeof(ChartSeriesJsonConverter))]
-        public Dictionary<string, BaseSeries> Series = new Dictionary<string, BaseSeries>();
+        public Dictionary<string, BaseSeries> Series { get; set; } = new();
 
         /// <summary>
         /// Associated symbol if any, making this an asset plot

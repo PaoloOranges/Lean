@@ -294,7 +294,7 @@ namespace QuantConnect.Lean.Engine.Results
                                 Algorithm.Portfolio.TotalPortfolioValue,
                                 GetNetReturn(),
                                 Algorithm.Portfolio.TotalSaleVolume,
-                                TransactionHandler.OrdersCount, 0);
+                                TotalTradesCount(), 0);
                         }
                         catch (Exception err)
                         {
@@ -398,7 +398,7 @@ namespace QuantConnect.Lean.Engine.Results
             var filename = $"{AlgorithmId}-{utcTime:yyyy-MM-dd}-order-events.json";
             var path = GetResultsPath(filename);
 
-            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None, OrderEventJsonConverter);
+            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None, SerializerSettings);
 
             File.WriteAllText(path, data);
         }

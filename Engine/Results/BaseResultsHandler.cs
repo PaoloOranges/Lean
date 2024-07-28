@@ -21,6 +21,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using QuantConnect.Configuration;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
@@ -54,12 +55,39 @@ namespace QuantConnect.Lean.Engine.Results
 
         private Bar _currentAlgorithmEquity;
 
+        /// <summary>
+        /// String message saying: Strategy Equity
+        /// </summary>
         public const string StrategyEquityKey = "Strategy Equity";
+
+        /// <summary>
+        /// String message saying: Equity
+        /// </summary>
         public const string EquityKey = "Equity";
+
+        /// <summary>
+        /// String message saying: Return
+        /// </summary>
         public const string ReturnKey = "Return";
+
+        /// <summary>
+        /// String message saying: Benchmark
+        /// </summary>
         public const string BenchmarkKey = "Benchmark";
+
+        /// <summary>
+        /// String message saying: Drawdown
+        /// </summary>
         public const string DrawdownKey = "Drawdown";
+
+        /// <summary>
+        /// String message saying: PortfolioTurnover
+        /// </summary>
         public const string PortfolioTurnoverKey = "Portfolio Turnover";
+
+        /// <summary>
+        /// String message saying: Portfolio Margin
+        /// </summary>
         public const string PortfolioMarginKey = "Portfolio Margin";
 
         /// <summary>
@@ -70,17 +98,32 @@ namespace QuantConnect.Lean.Engine.Results
         /// <summary>
         /// The chart update interval
         /// </summary>
-        protected TimeSpan ChartUpdateInterval = TimeSpan.FromMinutes(1);
+        protected TimeSpan ChartUpdateInterval { get; set; } = TimeSpan.FromMinutes(1);
 
         /// <summary>
         /// The last position consumed from the <see cref="ITransactionHandler.OrderEvents"/> by <see cref="GetDeltaOrders"/>
         /// </summary>
-        protected int LastDeltaOrderPosition;
+        protected int LastDeltaOrderPosition { get; set; }
 
         /// <summary>
         /// The last position consumed from the <see cref="ITransactionHandler.OrderEvents"/> while determining delta order events
         /// </summary>
-        protected int LastDeltaOrderEventsPosition;
+        protected int LastDeltaOrderEventsPosition { get; set; }
+
+        /// <summary>
+        /// Serializer settings to use
+        /// </summary>
+        protected JsonSerializerSettings SerializerSettings { get; set; } = new ()
+        {
+            ContractResolver = new DefaultContractResolver
+            {
+                NamingStrategy = new CamelCaseNamingStrategy
+                {
+                    ProcessDictionaryKeys = false,
+                    OverrideSpecifiedNames = true
+                }
+            }
+        };
 
         /// <summary>
         /// The current aggregated equity bar for sampling.
@@ -188,12 +231,12 @@ namespace QuantConnect.Lean.Engine.Results
         /// <summary>
         /// The handler responsible for communicating messages to listeners
         /// </summary>
-        protected IMessagingHandler MessagingHandler;
+        protected IMessagingHandler MessagingHandler { get; set; }
 
         /// <summary>
         /// The transaction handler used to get the algorithms Orders information
         /// </summary>
-        protected ITransactionHandler TransactionHandler;
+        protected ITransactionHandler TransactionHandler { get; set; }
 
         /// <summary>
         /// The algorithms starting portfolio value.
@@ -214,12 +257,12 @@ namespace QuantConnect.Lean.Engine.Results
         /// <summary>
         /// Closing portfolio value. Used to calculate daily performance.
         /// </summary>
-        protected decimal DailyPortfolioValue;
+        protected decimal DailyPortfolioValue { get; set; }
 
         /// <summary>
         /// Cumulative max portfolio value. Used to calculate drawdown underwater.
         /// </summary>
-        protected decimal CumulativeMaxPortfolioValue;
+        protected decimal CumulativeMaxPortfolioValue { get; set; }
 
         /// <summary>
         /// Sampling period for timespans between resamples of the charting equity.
@@ -236,12 +279,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <summary>
         /// Directory location to store results
         /// </summary>
-        protected string ResultsDestinationFolder;
-
-        /// <summary>
-        /// The order event json converter instance to use
-        /// </summary>
-        protected OrderEventJsonConverter OrderEventJsonConverter { get; set; }
+        protected string ResultsDestinationFolder { get; set; }
 
         /// <summary>
         /// The map file provider instance to use
@@ -278,7 +316,7 @@ namespace QuantConnect.Lean.Engine.Results
                 ["OrderCount"] = "0",
                 ["InsightCount"] = "0"
             };
-            _previousSalesVolume = new (2);
+            _previousSalesVolume = new(2);
             _previousSalesVolume.Add(0);
             _customSummaryStatistics = new();
         }
@@ -329,7 +367,7 @@ namespace QuantConnect.Lean.Engine.Results
             var filename = $"{AlgorithmId}-order-events.json";
             var path = GetResultsPath(filename);
 
-            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None, OrderEventJsonConverter);
+            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None, SerializerSettings);
 
             File.WriteAllText(path, data);
         }
@@ -357,7 +395,7 @@ namespace QuantConnect.Lean.Engine.Results
                     directory.Create();
                 }
                 var orderedInsights = allInsights.OrderBy(insight => insight.GeneratedTimeUtc);
-                File.WriteAllText(alphaResultsPath, JsonConvert.SerializeObject(orderedInsights, Formatting.Indented));
+                File.WriteAllText(alphaResultsPath, JsonConvert.SerializeObject(orderedInsights, Formatting.Indented, SerializerSettings));
             }
         }
 
@@ -412,11 +450,23 @@ namespace QuantConnect.Lean.Engine.Results
             AlgorithmId = parameters.Job.AlgorithmId;
             ProjectId = parameters.Job.ProjectId;
             RamAllocation = parameters.Job.RamAllocation.ToStringInvariant();
-            OrderEventJsonConverter = new OrderEventJsonConverter(AlgorithmId);
             _updateRunner = new Thread(Run, 0) { IsBackground = true, Name = "Result Thread" };
             _updateRunner.Start();
             State["Hostname"] = _hostName;
             MapFileProvider = parameters.MapFileProvider;
+
+            SerializerSettings = new()
+            {
+                Converters = new [] { new OrderEventJsonConverter(AlgorithmId) },
+                ContractResolver = new DefaultContractResolver
+                {
+                    NamingStrategy = new CamelCaseNamingStrategy
+                    {
+                        ProcessDictionaryKeys = false,
+                        OverrideSpecifiedNames = true
+                    }
+                }
+            };
         }
 
         /// <summary>
@@ -463,7 +513,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="result">The results to save</param>
         public virtual void SaveResults(string name, Result result)
         {
-            File.WriteAllText(GetResultsPath(name), JsonConvert.SerializeObject(result, Formatting.Indented));
+            File.WriteAllText(GetResultsPath(name), JsonConvert.SerializeObject(result, Formatting.Indented, SerializerSettings));
         }
 
         /// <summary>
@@ -518,7 +568,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="time">Time to resolve benchmark value at</param>
         protected virtual decimal GetBenchmarkValue(DateTime time)
         {
-            if(Algorithm == null || Algorithm.Benchmark == null)
+            if (Algorithm == null || Algorithm.Benchmark == null)
             {
                 // this could happen if the algorithm exploded mid initialization
                 return 0;
@@ -631,9 +681,9 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="currentPortfolioValue">Current equity value</param>
         protected virtual void SamplePortfolioTurnover(DateTime time, decimal currentPortfolioValue)
         {
-            if(currentPortfolioValue != 0)
+            if (currentPortfolioValue != 0)
             {
-                if(Algorithm.StartDate == time.ConvertFromUtc(Algorithm.TimeZone))
+                if (Algorithm.StartDate == time.ConvertFromUtc(Algorithm.TimeZone))
                 {
                     // the first sample in backtesting is at start, we only want to sample after a full algorithm execution date
                     return;
@@ -816,7 +866,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// </summary>
         protected Dictionary<string, string> GetAlgorithmState(DateTime? endTime = null)
         {
-            if(Algorithm == null || !string.IsNullOrEmpty(State["RuntimeError"]))
+            if (Algorithm == null || !string.IsNullOrEmpty(State["RuntimeError"]))
             {
                 State["Status"] = AlgorithmStatus.RuntimeError.ToStringInvariant();
             }
@@ -859,7 +909,6 @@ namespace QuantConnect.Lean.Engine.Results
                     charts.TryGetValue(BenchmarkKey, out var benchmarkChart) &&
                     benchmarkChart.Series.TryGetValue(BenchmarkKey, out var benchmark))
                 {
-                    var totalTransactions = Algorithm.Transactions.GetOrders(x => x.Status.IsFill()).Count();
                     var trades = Algorithm.TradeBuilder.ClosedTrades;
 
                     BaseSeries portfolioTurnover;
@@ -873,7 +922,7 @@ namespace QuantConnect.Lean.Engine.Results
                     }
 
                     statisticsResults = StatisticsBuilder.Generate(trades, profitLoss, equity.Values, performance.Values, benchmark.Values,
-                        portfolioTurnover.Values, StartingPortfolioValue, Algorithm.Portfolio.TotalFees, totalTransactions,
+                        portfolioTurnover.Values, StartingPortfolioValue, Algorithm.Portfolio.TotalFees, TotalTradesCount(),
                         estimatedStrategyCapacity, AlgorithmCurrencySymbol, Algorithm.Transactions, Algorithm.RiskFreeInterestRateModel,
                         Algorithm.Settings.TradingDaysPerYear.Value // already set in Brokerage|Backtesting-SetupHandler classes
                         );
@@ -887,6 +936,14 @@ namespace QuantConnect.Lean.Engine.Results
             }
 
             return statisticsResults;
+        }
+
+        /// <summary>
+        /// Helper method to get the total trade count statistic
+        /// </summary>
+        protected int TotalTradesCount()
+        {
+            return TransactionHandler?.OrdersCount ?? 0;
         }
 
         /// <summary>

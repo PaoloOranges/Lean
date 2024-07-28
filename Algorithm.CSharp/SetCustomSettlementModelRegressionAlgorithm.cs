@@ -49,7 +49,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (Portfolio.CashBook[Currencies.USD].Amount != 10101)
             {
-                throw new Exception($"It was expected to have 10101 USD in Portfolio, but was {Portfolio.CashBook[Currencies.USD].Amount}");
+                throw new RegressionTestException($"It was expected to have 10101 USD in Portfolio, but was {Portfolio.CashBook[Currencies.USD].Amount}");
             }
 
             var parameters = new ScanSettlementModelParameters(Portfolio, _spy, new DateTime(2013, 10, 6));
@@ -57,7 +57,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (Portfolio.CashBook[Currencies.USD].Amount != 10000)
             {
-                throw new Exception($"It was expected to have 10000 USD in Portfolio, but was {Portfolio.CashBook[Currencies.USD].Amount}");
+                throw new RegressionTestException($"It was expected to have 10000 USD in Portfolio, but was {Portfolio.CashBook[Currencies.USD].Amount}");
             }
         }
 
@@ -69,7 +69,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -82,16 +82,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "0"},
+            {"Total Orders", "0"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "108.257%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "10000"},
+            {"End Equity", "10101"},
             {"Net Profit", "1.010%"},
             {"Sharpe Ratio", "10.983"},
             {"Sortino Ratio", "0"},

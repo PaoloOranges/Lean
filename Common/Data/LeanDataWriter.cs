@@ -35,7 +35,12 @@ namespace QuantConnect.Data
     public class LeanDataWriter
     {
         private static KeyStringSynchronizer _keySynchronizer = new();
-        private static readonly Lazy<IMapFileProvider> MapFileProvider = new(
+
+        /// <summary>
+        /// The map file provider instance to use
+        /// </summary>
+        /// <remarks>Public for testing</remarks>
+        public static Lazy<IMapFileProvider> MapFileProvider { get; set; } = new(
             Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "LocalDiskMapFileProvider"), forceTypeNameOnExisting: false)
         );
 
@@ -299,6 +304,7 @@ namespace QuantConnect.Data
         /// a sorted dictionary of DateTimes and strings. </remarks>
         private void WriteFile(string filePath, List<TimedLine> data, Symbol symbol)
         {
+            filePath = FileExtension.ToNormalizedPath(filePath);
             if (data == null || data.Count == 0)
             {
                 return;

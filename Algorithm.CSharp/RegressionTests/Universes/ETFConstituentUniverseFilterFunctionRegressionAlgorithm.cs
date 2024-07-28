@@ -27,7 +27,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// </summary>
     public class ETFConstituentUniverseFilterFunctionRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
-        private Dictionary<Symbol, ETFConstituentData> _etfConstituentData = new Dictionary<Symbol, ETFConstituentData>();
+        private Dictionary<Symbol, ETFConstituentUniverse> _etfConstituentData = new Dictionary<Symbol, ETFConstituentUniverse>();
         
         private Symbol _aapl;
         private Symbol _spy;
@@ -61,7 +61,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="constituents">Constituents of the ETF universe added above</param>
         /// <returns>Constituent Symbols to add to algorithm</returns>
         /// <exception cref="ArgumentException">Constituents collection was not structured as expected</exception>
-        private IEnumerable<Symbol> FilterETFs(IEnumerable<ETFConstituentData> constituents)
+        private IEnumerable<Symbol> FilterETFs(IEnumerable<ETFConstituentUniverse> constituents)
         {
             var constituentsData = constituents.ToList();
             _etfConstituentData = constituentsData.ToDictionary(x => x.Symbol, x => x);
@@ -91,22 +91,22 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// OnData event is the primary entry point for your algorithm. Each new data point will be pumped in here.
         /// </summary>
-        /// <param name="data">Slice object keyed by symbol containing the stock data</param>
-        public override void OnData(Slice data)
+        /// <param name="slice">Slice object keyed by symbol containing the stock data</param>
+        public override void OnData(Slice slice)
         {
-            if (!_filtered && data.Bars.Count != 0 && data.Bars.ContainsKey(_aapl))
+            if (!_filtered && slice.Bars.Count != 0 && slice.Bars.ContainsKey(_aapl))
             {
-                throw new Exception("AAPL TradeBar data added to algorithm before constituent universe selection took place");
+                throw new RegressionTestException("AAPL TradeBar data added to algorithm before constituent universe selection took place");
             }
 
-            if (data.Bars.Count == 1 && data.Bars.ContainsKey(_spy))
+            if (slice.Bars.Count == 1 && slice.Bars.ContainsKey(_spy))
             {
                 return;
             }
             
-            if (data.Bars.Count != 0 && !data.Bars.ContainsKey(_aapl))
+            if (slice.Bars.Count != 0 && !slice.Bars.ContainsKey(_aapl))
             {
-                throw new Exception($"Expected AAPL TradeBar data in OnData on {UtcTime:yyyy-MM-dd HH:mm:ss}");
+                throw new RegressionTestException($"Expected AAPL TradeBar data in OnData on {UtcTime:yyyy-MM-dd HH:mm:ss}");
             }
 
             _receivedData = true;
@@ -116,7 +116,7 @@ namespace QuantConnect.Algorithm.CSharp
                 return;
             }
 
-            foreach (var bar in data.Bars.Values)
+            foreach (var bar in slice.Bars.Values)
             {
                 if (_etfConstituentData.TryGetValue(bar.Symbol, out var constituentData) && 
                     constituentData.Weight != null && 
@@ -156,28 +156,28 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Ensures that all expected events were triggered by the end of the algorithm
         /// </summary>
-        /// <exception cref="Exception">An expected event didn't happen</exception>
+        /// <exception cref="RegressionTestException">An expected event didn't happen</exception>
         public override void OnEndOfAlgorithm()
         {
             if (_rebalanceCount != 2)
             {
-                throw new Exception($"Expected 2 rebalances, instead rebalanced: {_rebalanceCount}");
+                throw new RegressionTestException($"Expected 2 rebalances, instead rebalanced: {_rebalanceCount}");
             }
             if (_rebalanceAssetCount != 8)
             {
-                throw new Exception($"Invested in {_rebalanceAssetCount} assets (expected 8)");
+                throw new RegressionTestException($"Invested in {_rebalanceAssetCount} assets (expected 8)");
             }
             if (!_filtered)
             {
-                throw new Exception("Universe selection was never triggered");
+                throw new RegressionTestException("Universe selection was never triggered");
             }
             if (!_securitiesChanged)
             {
-                throw new Exception("Security changes never propagated to the algorithm");
+                throw new RegressionTestException("Security changes never propagated to the algorithm");
             }
             if (!_receivedData)
             {
-                throw new Exception("Data was never loaded for the S&P 500 constituent AAPL");
+                throw new RegressionTestException("Data was never loaded for the S&P 500 constituent AAPL");
             }
         }
 
@@ -189,7 +189,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -202,16 +202,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "4"},
+            {"Total Orders", "4"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "1.989%"},
             {"Drawdown", "0.600%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100322.52"},
             {"Net Profit", "0.323%"},
             {"Sharpe Ratio", "0.838"},
             {"Sortino Ratio", "1.122"},
@@ -230,7 +237,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$130000000.00"},
             {"Lowest Capacity Asset", "AIG R735QTJ8XC9X"},
             {"Portfolio Turnover", "0.13%"},
-            {"OrderListHash", "1294267a5fcce8d828a8ccfa6f2cf5a2"}
+            {"OrderListHash", "0c0cb7214d49cee63fc08115f62fe357"}
         };
     }
 }

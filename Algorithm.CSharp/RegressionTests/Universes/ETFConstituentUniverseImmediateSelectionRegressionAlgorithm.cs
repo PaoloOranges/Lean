@@ -56,7 +56,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="constituents">Constituents of the ETF universe added above</param>
         /// <returns>Constituent Symbols to add to algorithm</returns>
         /// <exception cref="ArgumentException">Constituents collection was not structured as expected</exception>
-        private IEnumerable<Symbol> FilterETFs(IEnumerable<ETFConstituentData> constituents)
+        private IEnumerable<Symbol> FilterETFs(IEnumerable<ETFConstituentUniverse> constituents)
         {
             _filtered = true;
             _constituents = constituents.Select(x => x.Symbol).Distinct().ToList();
@@ -67,14 +67,14 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// OnData event is the primary entry point for your algorithm. Each new data point will be pumped in here.
         /// </summary>
-        /// <param name="data">Slice object keyed by symbol containing the stock data</param>
-        public override void OnData(Slice data)
+        /// <param name="slice">Slice object keyed by symbol containing the stock data</param>
+        public override void OnData(Slice slice)
         {
             if (_firstOnData)
             {
                 if (!_filtered)
                 {
-                    throw new Exception("Universe selection should have been triggered right away. " +
+                    throw new RegressionTestException("Universe selection should have been triggered right away. " +
                         "The first OnData call should have had happened after the universe selection");
                 }
 
@@ -91,7 +91,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!_filtered)
             {
-                throw new Exception("Universe selection should have been triggered right away");
+                throw new RegressionTestException("Universe selection should have been triggered right away");
             }
 
             if (!_securitiesChanged)
@@ -99,20 +99,20 @@ namespace QuantConnect.Algorithm.CSharp
                 // Selection should be happening right on algorithm start
                 if (Time != StartDate)
                 {
-                    throw new Exception("Universe selection should have been triggered right away");
+                    throw new RegressionTestException("Universe selection should have been triggered right away");
                 }
 
                 // All constituents should have been added to the algorithm.
                 // Plus the ETF itself.
                 if (changes.AddedSecurities.Count != _constituents.Count + 1)
                 {
-                    throw new Exception($"Expected {_constituents.Count + 1} stocks to be added to the algorithm, " +
+                    throw new RegressionTestException($"Expected {_constituents.Count + 1} stocks to be added to the algorithm, " +
                         $"instead added: {changes.AddedSecurities.Count}");
                 }
 
                 if (!_constituents.All(constituent => changes.AddedSecurities.Any(security => security.Symbol == constituent)))
                 {
-                    throw new Exception("Not all constituents were added to the algorithm");
+                    throw new RegressionTestException("Not all constituents were added to the algorithm");
                 }
 
                 _securitiesChanged = true;
@@ -122,12 +122,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Ensures that all expected events were triggered by the end of the algorithm
         /// </summary>
-        /// <exception cref="Exception">An expected event didn't happen</exception>
+        /// <exception cref="RegressionTestException">An expected event didn't happen</exception>
         public override void OnEndOfAlgorithm()
         {
             if (_firstOnData || !_filtered || !_securitiesChanged)
             {
-                throw new Exception("Expected events didn't happen");
+                throw new RegressionTestException("Expected events didn't happen");
             }
         }
 
@@ -139,7 +139,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -152,16 +152,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "0"},
+            {"Total Orders", "0"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100000"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
             {"Sortino Ratio", "0"},

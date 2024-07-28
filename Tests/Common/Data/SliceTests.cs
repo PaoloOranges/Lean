@@ -470,36 +470,39 @@ def Test(slice, symbol):
             }
         }
 
-        [Test]
-        public void PythonGetPythonCustomData()
+        [TestCase("reader", "get_source", "get")]
+        [TestCase("Reader", "GetSource", "get")]
+        [TestCase("reader", "get_source", "Get")]
+        [TestCase("Reader", "GetSource", "Get")]
+        public void PythonGetPythonCustomData(string reader, string getSource, string get)
         {
             using (Py.GIL())
             {
                 dynamic testModule = PyModule.FromString("testModule",
-                    @"
+                    $@"
 
 from AlgorithmImports import *
 
 class CustomDataTest(PythonData):
-    def Reader(self, config, line, date, isLiveMode):
+    def {reader}(self, config, line, date, isLiveMode):
         result = CustomDataTest()
         result.Symbol = config.Symbol
         result.Value = 10
         return result
-    def GetSource(config, date, isLiveMode):
+    def {getSource}(config, date, isLiveMode):
         return None
 
 class CustomDataTest2(PythonData):
-    def Reader(self, config, line, date, isLiveMode):
+    def {reader}(self, config, line, date, isLiveMode):
         result = CustomDataTest2()
         result.Symbol = config.Symbol
         result.Value = 11
         return result
-    def GetSource(config, date, isLiveMode):
+    def {getSource}(config, date, isLiveMode):
         return None
 
 def Test(slice):
-    data = slice.Get(CustomDataTest)
+    data = slice.{get}(CustomDataTest)
     return data");
                 var test = testModule.GetAttr("Test");
 
@@ -783,7 +786,9 @@ def Test(slice):
                 new Tick{Time = DateTime.Now, Symbol = Symbols.AAPL, Value = 1.1m, Quantity = 2.1m}
             }, DateTime.Now);
 
+            #pragma warning disable CA1829
             Assert.AreEqual(4, slice.Count());
+            #pragma warning restore CA1829
         }
 
         [Test]
@@ -1375,7 +1380,7 @@ def Test(slice, symbol):
 
     public class PublicArrayTest
     {
-        public int[] items;
+        public int[] items { get; set; }
 
         public PublicArrayTest()
         {

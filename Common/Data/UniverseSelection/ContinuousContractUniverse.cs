@@ -19,7 +19,6 @@ using QuantConnect.Util;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using System.Collections.Generic;
-using QuantConnect.Configuration;
 using QuantConnect.Data.Auxiliary;
 
 namespace QuantConnect.Data.UniverseSelection
@@ -35,11 +34,6 @@ namespace QuantConnect.Data.UniverseSelection
         private readonly bool _liveMode;
         private Symbol _currentSymbol;
         private string _mappedSymbol;
-
-        /// <summary>
-        /// Gets the settings used for subscriptions added for this universe
-        /// </summary>
-        public override UniverseSettings UniverseSettings { get; }
 
         /// <summary>
         /// True if this universe filter can run async in the data stack
@@ -126,7 +120,7 @@ namespace QuantConnect.Data.UniverseSelection
             var startTimeLocal = startTimeUtc.ConvertFromUtc(_security.Exchange.TimeZone);
             var endTimeLocal = endTimeUtc.ConvertFromUtc(_security.Exchange.TimeZone);
 
-            return Time.EachTradeableDay(_security, startTimeLocal, endTimeLocal)
+            return Time.EachTradeableDay(_security, startTimeLocal, endTimeLocal, extendedMarketHours: false)
                 // in live trading selection happens on start see 'DataQueueFuturesChainUniverseDataCollectionEnumerator'
                 .Where(tradeableDay => _liveMode || tradeableDay >= startTimeLocal)
                 // in live trading we delay selection so that we make sure auxiliary data is ready

@@ -37,7 +37,7 @@ namespace QuantConnect.Algorithm.CSharp
             var consolidatorCount = SubscriptionManager.Subscriptions.Sum(s => s.Consolidators.Count);
             if (consolidatorCount > 0)
             {
-                throw new Exception($"The number of consolidators should be zero. Actual: {consolidatorCount}");
+                throw new RegressionTestException($"The number of consolidators should be zero. Actual: {consolidatorCount}");
             }
         }
 
@@ -46,16 +46,23 @@ namespace QuantConnect.Algorithm.CSharp
         public override int AlgorithmHistoryDataPoints => 56;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new()
         {
-            {"Total Trades", "25"},
+            {"Total Orders", "25"},
             {"Average Win", "0.13%"},
             {"Average Loss", "-0.08%"},
             {"Compounding Annual Return", "4.402%"},
             {"Drawdown", "1.900%"},
             {"Expectancy", "0.558"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100354.68"},
             {"Net Profit", "0.355%"},
             {"Sharpe Ratio", "0.52"},
             {"Sortino Ratio", "0.643"},
@@ -74,7 +81,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$38000000.00"},
             {"Lowest Capacity Asset", "NB R735QTJ8XC9X"},
             {"Portfolio Turnover", "14.59%"},
-            {"OrderListHash", "8a1198fa0723754413e848b98902cc46"}
+            {"OrderListHash", "b591190e6ccf3e5addbc9fcf322039b9"}
         };
     }
 }

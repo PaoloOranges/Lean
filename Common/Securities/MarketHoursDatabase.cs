@@ -120,12 +120,15 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Reload entries dictionary from MHDB file and merge them with previous custom ones
         /// </summary>
-        public void ReloadEntries()
+        internal void ReloadEntries()
         {
-            Reset();
-            var fileEntries = FromDataFolder()._entries.Where(x => !_customEntries.ContainsKey(x.Key));
-            var newEntries = fileEntries.Concat(_customEntries).ToDictionary();
-            _entries = newEntries;
+            lock (DataFolderMarketHoursDatabaseLock)
+            {
+                Reset();
+                var fileEntries = FromDataFolder()._entries.Where(x => !_customEntries.ContainsKey(x.Key));
+                var newEntries = fileEntries.Concat(_customEntries).ToDictionary();
+                _entries = newEntries;
+            }
         }
 
         /// <summary>
@@ -178,8 +181,11 @@ namespace QuantConnect.Securities
             dataTimeZone = dataTimeZone ?? exchangeHours.TimeZone;
             var key = new SecurityDatabaseKey(market, symbol, securityType);
             var entry = new Entry(dataTimeZone, exchangeHours);
-            _entries[key] = entry;
-            _customEntries[key] = entry;
+            lock (DataFolderMarketHoursDatabaseLock)
+            {
+                _entries[key] = entry;
+                _customEntries[key] = entry;
+            }
             return entry;
         }
 
@@ -336,11 +342,11 @@ namespace QuantConnect.Securities
             /// <summary>
             /// Gets the raw data time zone for this entry
             /// </summary>
-            public readonly DateTimeZone DataTimeZone;
+            public DateTimeZone DataTimeZone { get; init; }
             /// <summary>
             /// Gets the exchange hours for this entry
             /// </summary>
-            public readonly SecurityExchangeHours ExchangeHours;
+            public SecurityExchangeHours ExchangeHours { get; init; }
             /// <summary>
             /// Initializes a new instance of the <see cref="Entry"/> class
             /// </summary>

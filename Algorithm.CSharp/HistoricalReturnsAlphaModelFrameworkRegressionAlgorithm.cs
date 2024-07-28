@@ -35,7 +35,7 @@ namespace QuantConnect.Algorithm.CSharp
             const int expected = 74;
             if (Insights.TotalCount != expected)
             {
-                throw new Exception($"The total number of insights should be {expected}. Actual: {Insights.TotalCount}");
+                throw new RegressionTestException($"The total number of insights should be {expected}. Actual: {Insights.TotalCount}");
             }
         }
 
@@ -44,16 +44,23 @@ namespace QuantConnect.Algorithm.CSharp
         public override int AlgorithmHistoryDataPoints => 4;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new()
         {
-            {"Total Trades", "58"},
+            {"Total Orders", "58"},
             {"Average Win", "0.19%"},
             {"Average Loss", "-0.20%"},
             {"Compounding Annual Return", "37.277%"},
             {"Drawdown", "1.300%"},
             {"Expectancy", "0.269"},
+            {"Start Equity", "100000"},
+            {"End Equity", "102638.26"},
             {"Net Profit", "2.638%"},
             {"Sharpe Ratio", "4.183"},
             {"Sortino Ratio", "6.011"},
@@ -72,7 +79,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$11000000.00"},
             {"Lowest Capacity Asset", "NB R735QTJ8XC9X"},
             {"Portfolio Turnover", "59.78%"},
-            {"OrderListHash", "d203d8d469a8a7b7c439733bc2617967"}
+            {"OrderListHash", "b7ff5378caf82356666be8307dc4e6e0"}
         };
     }
 }

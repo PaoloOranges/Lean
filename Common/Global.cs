@@ -16,7 +16,6 @@
 using System;
 using Newtonsoft.Json;
 using QuantConnect.Securities;
-using System.Collections.Generic;
 using Newtonsoft.Json.Converters;
 using System.Runtime.Serialization;
 using System.Runtime.CompilerServices;
@@ -35,7 +34,7 @@ namespace QuantConnect
         /// Daily and hourly time format
         public const string TwelveCharacter = "yyyyMMdd HH:mm";
         /// JSON Format Date Representation
-        public static string JsonFormat = "yyyy-MM-ddTHH:mm:ss";
+        public static string JsonFormat { get; } = "yyyy-MM-ddTHH:mm:ss";
         /// MySQL Format Date Representation
         public const string DB = "yyyy-MM-dd HH:mm:ss";
         /// QuantConnect UX Date Representation
@@ -65,42 +64,44 @@ namespace QuantConnect
     public class Holding
     {
         /// Symbol of the Holding:
-        public Symbol Symbol = Symbol.Empty;
+        [JsonProperty(PropertyName = "symbol")]
+        public Symbol Symbol { get; set; } = Symbol.Empty;
 
         /// Type of the security
-        [JsonIgnore]
+        [JsonProperty(PropertyName = "type")]
         public SecurityType Type => Symbol.SecurityType;
 
         /// The currency symbol of the holding, such as $
-        public string CurrencySymbol;
+        [JsonProperty(PropertyName = "currencySymbol")]
+        public string CurrencySymbol { get; set; }
 
         /// Average Price of our Holding in the currency the symbol is traded in
-        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public decimal AveragePrice;
+        [JsonProperty(PropertyName = "averagePrice", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public decimal AveragePrice { get; set; }
 
         /// Quantity of Symbol We Hold.
-        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public decimal Quantity;
+        [JsonProperty(PropertyName = "quantity", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public decimal Quantity { get; set; }
 
         /// Current Market Price of the Asset in the currency the symbol is traded in
-        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public decimal MarketPrice;
+        [JsonProperty(PropertyName = "marketPrice", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public decimal MarketPrice { get; set; }
 
         /// Current market conversion rate into the account currency
-        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public decimal? ConversionRate;
+        [JsonProperty(PropertyName = "conversionRate", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public decimal? ConversionRate { get; set; }
 
         /// Current market value of the holding
-        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public decimal MarketValue;
+        [JsonProperty(PropertyName = "marketValue", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public decimal MarketValue { get; set; }
 
         /// Current unrealized P/L of the holding
-        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public decimal UnrealizedPnL;
+        [JsonProperty(PropertyName = "unrealizedPnl", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public decimal UnrealizedPnL { get; set; }
 
         /// Current unrealized P/L % of the holding
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public decimal UnrealizedPnLPercent;
+        public decimal UnrealizedPnLPercent { get; set; }
 
         /// Create a new default holding:
         public Holding()
@@ -530,22 +531,22 @@ namespace QuantConnect
         /// <summary>
         /// Register this control packet as not defaults.
         /// </summary>
-        public bool Initialized;
+        public bool Initialized { get; set; }
 
         /// <summary>
         /// Current run status of the algorithm id.
         /// </summary>
-        public AlgorithmStatus Status;
+        public AlgorithmStatus Status { get; set; }
 
         /// <summary>
         /// Currently requested chart.
         /// </summary>
-        public string ChartSubscription;
+        public string ChartSubscription { get; set; }
 
         /// <summary>
         /// True if there's subscribers on the channel
         /// </summary>
-        public bool HasSubscribers;
+        public bool HasSubscribers { get; set; }
     }
 
     /// <summary>

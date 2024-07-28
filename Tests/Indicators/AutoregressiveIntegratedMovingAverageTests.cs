@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -98,13 +98,6 @@ namespace QuantConnect.Tests.Indicators
             Assert.LessOrEqual(1.19542348709062, betweenMethods.ToDoubleArray().StandardDeviation()); // Std. Dev
         }
 
-        [Test]
-        public override void WorksWithLowValues()
-        {
-            // Since this indicator uses the least squares fitting method, if the matrix computed with the input
-            // values is not positive definite it will fail. Thus we omit this test for this indicator.
-        }
-
         protected override IndicatorBase<IndicatorDataPoint> CreateIndicator()
         {
             var ARIMA = new AutoRegressiveIntegratedMovingAverage("ARIMA", 1, 0, 1, 50);
@@ -120,7 +113,7 @@ namespace QuantConnect.Tests.Indicators
             var data = TestHelper.GetCsvFileStream(TestFileName);
             foreach (var val in data)
             {
-                if (val["Close"] != string.Empty)
+                if (!string.IsNullOrEmpty(val["Close"]))
                 {
                     var close = val["Close"];
                     realValues.Add(decimal.Parse(val["Close"], new NumberFormatInfo()));
@@ -128,7 +121,7 @@ namespace QuantConnect.Tests.Indicators
                         Convert.ToDecimal(close, new NumberFormatInfo())));
                 }
 
-                if (val[TestColumnName] != string.Empty)
+                if (!string.IsNullOrEmpty(val[TestColumnName]))
                 {
                     var fromTest = decimal.Parse(val[TestColumnName], new NumberFormatInfo());
                     testValues.Add(new[] {ARIMA.Current.Value, fromTest});

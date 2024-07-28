@@ -100,6 +100,7 @@ namespace QuantConnect.Securities
         public SymbolProperties SymbolProperties
         {
             get;
+            protected set;
         }
 
         /// <summary>
@@ -1135,6 +1136,26 @@ namespace QuantConnect.Securities
             }
 
             return value;
+        }
+
+        /// <summary>
+        /// Applies the split to the security
+        /// </summary>
+        internal void ApplySplit(Split split)
+        {
+            Cache.ApplySplit(split);
+            UpdateMarketPrice(Cache.GetData());
+        }
+
+        /// <summary>
+        /// Updates the symbol properties of this security
+        /// </summary>
+        internal virtual void UpdateSymbolProperties(SymbolProperties symbolProperties)
+        {
+            if (symbolProperties != null)
+            {
+                SymbolProperties = symbolProperties;
+            }
         }
     }
 }

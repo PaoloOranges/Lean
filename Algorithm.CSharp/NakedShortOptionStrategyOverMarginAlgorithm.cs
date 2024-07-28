@@ -95,7 +95,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (orderEvent.Quantity == _quantityOverMargin && orderEvent.Status != OrderStatus.Invalid)
             {
-                throw new Exception($"Orders with quantity {_quantityOverMargin} should be invalid");
+                throw new RegressionTestException($"Orders with quantity {_quantityOverMargin} should be invalid");
             }
         }
 
@@ -107,14 +107,14 @@ namespace QuantConnect.Algorithm.CSharp
             var expectedFilledOrdersCount = 2 * _optionStrategy.OptionLegs.Count;
             if (filledOrdersCount != expectedFilledOrdersCount)
             {
-                throw new Exception($"Expected {expectedFilledOrdersCount} filled orders, found {filledOrdersCount}");
+                throw new RegressionTestException($"Expected {expectedFilledOrdersCount} filled orders, found {filledOrdersCount}");
             }
 
             var expectedQuantity = Math.Abs(_quantity - _quantityToLiquidate);
             var positionGroup = Portfolio.Positions.Groups.Single();
             if (positionGroup.Quantity != expectedQuantity)
             {
-                throw new Exception($"Expected position quantity to be {expectedQuantity} but was {positionGroup.Quantity}");
+                throw new RegressionTestException($"Expected position quantity to be {expectedQuantity} but was {positionGroup.Quantity}");
             }
         }
 
@@ -126,7 +126,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -139,16 +139,23 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "4"},
+            {"Total Orders", "6"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "1000000"},
+            {"End Equity", "998775.9"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
             {"Sortino Ratio", "0"},
@@ -167,7 +174,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$1800000.00"},
             {"Lowest Capacity Asset", "GOOCV 30AKMEIPOSS1Y|GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "7.50%"},
-            {"OrderListHash", "e2e0ddfc52c963683da287cf7600fcc5"}
+            {"OrderListHash", "70487a4231ef2237ca24642be28652c4"}
         };
     }
 }

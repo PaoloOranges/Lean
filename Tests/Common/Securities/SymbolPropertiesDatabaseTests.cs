@@ -20,6 +20,7 @@ using System.Net;
 using System.Text;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using QuantConnect.Configuration;
 using QuantConnect.Logging;
 using QuantConnect.Securities;
 
@@ -139,8 +140,61 @@ namespace QuantConnect.Tests.Common.Securities
             Assert.IsTrue(database.SetEntry(Market.USA, ticker, SecurityType.Base, properties));
 
             // Fetch the entry to ensure we can access it with the ticker
+            #pragma warning disable CS0618
             var fetchedProperties = database.GetSymbolProperties(Market.USA, ticker, SecurityType.Base, "USD");
+            #pragma warning restore CS0618
             Assert.AreSame(properties, fetchedProperties);
+        }
+
+        [Test]
+        public void CustomEntriesAreKeptAfterARefresh()
+        {
+            var database = SymbolPropertiesDatabase.FromDataFolder();
+            var ticker = "BTC";
+            var properties = SymbolProperties.GetDefault("USD");
+
+            // Set the entry
+            Assert.IsTrue(database.SetEntry(Market.USA, ticker, SecurityType.Base, properties));
+
+            // Fetch the custom entry to ensure we can access it with the ticker
+            var symbol = Symbol.Create(ticker, SecurityType.Base, Market.USA);
+            var fetchedProperties = database.GetSymbolProperties(Market.USA, symbol, SecurityType.Base, "USD");
+            Assert.AreSame(properties, fetchedProperties);
+
+            // Refresh the database
+            database.ReloadEntries();
+
+            // Fetch the custom entry again to make sure it was not overridden
+            fetchedProperties = database.GetSymbolProperties(Market.USA, symbol, SecurityType.Base, "USD");
+            Assert.AreSame(properties, fetchedProperties);
+        }
+
+        [Test]
+        public void CanQueryMarketAfterRefresh()
+        {
+            var database = SymbolPropertiesDatabase.FromDataFolder();
+
+            // Get market
+            var result = database.TryGetMarket("AU200AUD", SecurityType.Cfd, out var market);
+            Assert.IsTrue(result);
+            Assert.AreEqual(Market.FXCM, market);
+
+            // Change the data folder so another symbol properties file is used
+            var originalDataFolder = Config.Get("data-folder");
+            Config.Set("data-folder", "./TestData");
+            Globals.Reset();
+
+            // Refresh the database
+            database.ReloadEntries();
+
+            // Get market again
+            result = database.TryGetMarket("AU200AUD", SecurityType.Cfd, out market);
+            Assert.IsTrue(result);
+            Assert.AreEqual(Market.Oanda, market);
+
+            // Restore the original data folder
+            Config.Set("data-folder", originalDataFolder);
+            Globals.Reset();
         }
 
         [TestCase(Market.FXCM, SecurityType.Cfd)]
@@ -170,7 +224,7 @@ namespace QuantConnect.Tests.Common.Securities
             var spList = db.GetSymbolPropertiesList(market, securityType).ToList();
 
             Assert.AreEqual(1, spList.Count);
-            Assert.IsTrue(spList[0].Key.Symbol.Contains("*"));
+            Assert.IsTrue(spList[0].Key.Symbol.Contains('*', StringComparison.InvariantCulture));
         }
 
         #region Coinbase brokerage
@@ -326,7 +380,7 @@ namespace QuantConnect.Tests.Common.Securities
                 foreach (var pair in exchangePairs.Union(marginPairs).OrderBy(x => x))
                 {
                     string baseCurrency, quoteCurrency;
-                    if (pair.Contains(":"))
+                    if (pair.Contains(':', StringComparison.InvariantCulture))
                     {
                         var parts = pair.Split(':');
                         baseCurrency = parts[0];

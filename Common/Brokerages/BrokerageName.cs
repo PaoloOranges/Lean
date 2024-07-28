@@ -167,6 +167,16 @@ namespace QuantConnect.Brokerages
         /// <summary>
         /// Transaction and submit/execution rules will use Coinbase broker's model
         /// </summary>
-        Coinbase
+        Coinbase,
+
+        /// <summary>
+        /// Transaction and submit/execution rules will use TradeStation models
+        /// </summary>
+        TradeStation,
+
+        /// <summary>
+        /// Transaction and submit/execution rules will use Terminal link models
+        /// </summary>
+        TerminalLink
     }
 }

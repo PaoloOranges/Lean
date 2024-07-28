@@ -38,24 +38,26 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public override Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public override List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 16265;
+        public override long DataPoints => 16161;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "156"},
+            {"Total Orders", "156"},
             {"Average Win", "0.31%"},
             {"Average Loss", "-0.01%"},
             {"Compounding Annual Return", "-0.024%"},
             {"Drawdown", "0.400%"},
             {"Expectancy", "-0.035"},
+            {"Start Equity", "1000000"},
+            {"End Equity", "999754.94"},
             {"Net Profit", "-0.025%"},
             {"Sharpe Ratio", "-1.602"},
             {"Sortino Ratio", "-1.913"},
@@ -74,7 +76,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$1000.00"},
             {"Lowest Capacity Asset", "ES VRJST036ZY0X"},
             {"Portfolio Turnover", "4.16%"},
-            {"OrderListHash", "ce63f5e611a7ab2f49d49c9fdc777ef5"}
+            {"OrderListHash", "52580f1e94ab1875301d3bbd157f4580"}
         };
     }
 }

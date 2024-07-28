@@ -54,7 +54,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!_ticket.Status.IsFill())
             {
-                throw new Exception("Index is tradable.");
+                throw new RegressionTestException("Index is tradable.");
             }
         }
 
@@ -63,31 +63,33 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new()
         {
-            {"Total Trades", "5"},
-            {"Average Win", "6.15%"},
+            {"Total Orders", "5"},
+            {"Average Win", "7.08%"},
             {"Average Loss", "-0.01%"},
-            {"Compounding Annual Return", "434.741%"},
+            {"Compounding Annual Return", "602.278%"},
             {"Drawdown", "3.400%"},
-            {"Expectancy", "589.124"},
-            {"Net Profit", "5.510%"},
-            {"Sharpe Ratio", "-6.336"},
-            {"Sortino Ratio", "-12.182"},
-            {"Probabilistic Sharpe Ratio", "0.011%"},
+            {"Expectancy", "677.669"},
+            {"Start Equity", "1000000"},
+            {"End Equity", "1064342.82"},
+            {"Net Profit", "6.434%"},
+            {"Sharpe Ratio", "-4.563"},
+            {"Sortino Ratio", "0"},
+            {"Probabilistic Sharpe Ratio", "0.781%"},
             {"Loss Rate", "50%"},
             {"Win Rate", "50%"},
-            {"Profit-Loss Ratio", "1179.25"},
-            {"Alpha", "-0.226"},
-            {"Beta", "0.02"},
-            {"Annual Standard Deviation", "0.034"},
+            {"Profit-Loss Ratio", "1356.34"},
+            {"Alpha", "-0.169"},
+            {"Beta", "0.073"},
+            {"Annual Standard Deviation", "0.028"},
             {"Annual Variance", "0.001"},
-            {"Information Ratio", "-7.032"},
-            {"Tracking Error", "0.107"},
-            {"Treynor Ratio", "-10.906"},
+            {"Information Ratio", "-6.684"},
+            {"Tracking Error", "0.099"},
+            {"Treynor Ratio", "-1.771"},
             {"Total Fees", "$0.00"},
             {"Estimated Strategy Capacity", "$3000.00"},
             {"Lowest Capacity Asset", "SPX XL80P3GHDZXQ|SPX 31"},
-            {"Portfolio Turnover", "24.13%"},
-            {"OrderListHash", "41644492e032f38d0d9be0915f09a03b"}
+            {"Portfolio Turnover", "24.03%"},
+            {"OrderListHash", "fcd6fddb0a315e21095c2b35eb633e2b"}
         };
     }
 }

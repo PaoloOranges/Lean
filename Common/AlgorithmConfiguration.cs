@@ -32,72 +32,62 @@ namespace QuantConnect
         /// <summary>
         /// The algorithm's name
         /// </summary>
-        [JsonProperty(PropertyName = "Name")]
-        public string Name;
+        public string Name { get; set; }
 
         /// <summary>
         /// List of tags associated with the algorithm
         /// </summary>
-        [JsonProperty(PropertyName = "Tags")]
-        public ISet<string> Tags;
+        public ISet<string> Tags { get; set; }
 
         /// <summary>
         /// The algorithm's account currency
         /// </summary>
-        [JsonProperty(PropertyName = "AccountCurrency", NullValueHandling = NullValueHandling.Ignore)]
-        public string AccountCurrency;
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string AccountCurrency { get; set; }
 
         /// <summary>
         /// The algorithm's brokerage model
         /// </summary>
         /// <remarks> Required to set the correct brokerage model on report generation.</remarks>
-        [JsonProperty(PropertyName = "Brokerage")]
-        public BrokerageName BrokerageName;
+        public BrokerageName Brokerage { get; set; }
 
         /// <summary>
         /// The algorithm's account type
         /// </summary>
         /// <remarks> Required to set the correct brokerage model on report generation.</remarks>
-        [JsonProperty(PropertyName = "AccountType")]
-        public AccountType AccountType;
+        public AccountType AccountType { get; set; }
 
         /// <summary>
         /// The parameters used by the algorithm
         /// </summary>
-        [JsonProperty(PropertyName = "Parameters")]
-        public IReadOnlyDictionary<string, string> Parameters;
+        public IReadOnlyDictionary<string, string> Parameters { get; set; }
 
         /// <summary>
         /// Backtest maximum end date
         /// </summary>
-        [JsonProperty(PropertyName = "OutOfSampleMaxEndDate")]
-        public DateTime? OutOfSampleMaxEndDate;
+        public DateTime? OutOfSampleMaxEndDate { get; set; }
 
         /// <summary>
         /// The backtest out of sample day count
         /// </summary>
-        [JsonProperty(PropertyName = "OutOfSampleDays")]
-        public int OutOfSampleDays;
+        public int OutOfSampleDays { get; set; }
 
         /// <summary>
         /// The backtest start date
         /// </summary>
-        [JsonProperty(PropertyName = "StartDate")]
         [JsonConverter(typeof(DateTimeJsonConverter), DateFormat.UI)]
-        public DateTime StartDate;
+        public DateTime StartDate { get; set; }
 
         /// <summary>
         /// The backtest end date
         /// </summary>
-        [JsonProperty(PropertyName = "EndDate")]
         [JsonConverter(typeof(DateTimeJsonConverter), DateFormat.UI)]
-        public DateTime EndDate;
+        public DateTime EndDate { get; set; }
 
         /// <summary>
         /// Number of trading days per year for Algorithm's portfolio statistics.
         /// </summary>
-        [JsonProperty(PropertyName = "TradingDaysPerYear")]
-        public int TradingDaysPerYear;
+        public int TradingDaysPerYear { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AlgorithmConfiguration"/> class
@@ -112,7 +102,7 @@ namespace QuantConnect
             TradingDaysPerYear = tradingDaysPerYear;
             OutOfSampleDays = outOfSampleDays;
             AccountCurrency = accountCurrency;
-            BrokerageName = brokerageName;
+            Brokerage = brokerageName;
             AccountType = accountType;
             Parameters = parameters;
             StartDate = startDate;

@@ -20,6 +20,11 @@ using System.Linq;
 using NUnit.Framework;
 using QuantConnect.Api;
 using System.Collections.Generic;
+using QuantConnect.Optimizer.Parameters;
+using QuantConnect.Util;
+using QuantConnect.Optimizer;
+using QuantConnect.Optimizer.Objectives;
+using System.Threading;
 
 namespace QuantConnect.Tests.API
 {
@@ -29,6 +34,34 @@ namespace QuantConnect.Tests.API
     [TestFixture, Explicit("Requires configured api access and available backtest node to run on")]
     public class ProjectTests : ApiTestBase
     {
+        private readonly Dictionary<string, object> _defaultSettings = new Dictionary<string, object>()
+            {
+                { "id", "QuantConnectBrokerage" },
+                { "environment", "paper" },
+                { "cash", new List<Dictionary<object, object>>()
+                    {
+                    {new Dictionary<object, object>
+                        {
+                            { "currency" , "USD"},
+                            { "amount", 300000}
+                        }
+                    }
+                    }
+                },
+                { "holdings", new List<Dictionary<object, object>>()
+                    {
+                    {new Dictionary<object, object>
+                        {
+                            { "symbolId" , Symbols.AAPL.ID.ToString()},
+                            { "symbol", Symbols.AAPL.Value},
+                            { "quantity", 1 },
+                            { "averagePrice", 1}
+                        }
+                    }
+                    }
+                },
+            };
+
         [Test]
         public void ReadProject()
         {
@@ -90,10 +123,8 @@ namespace QuantConnect.Tests.API
             // Add random file
             var randomAdd = ApiClient.AddProjectFile(TestProject.ProjectId, fakeFile.Name, fakeFile.Code);
             Assert.IsTrue(randomAdd.Success);
-            Assert.IsTrue(randomAdd.Files.First().Code == fakeFile.Code);
-            Assert.IsTrue(randomAdd.Files.First().Name == fakeFile.Name);
             // Update names of file
-            var updatedName = ApiClient.UpdateProjectFileName(TestProject.ProjectId, randomAdd.Files.First().Name, realFile.Name);
+            var updatedName = ApiClient.UpdateProjectFileName(TestProject.ProjectId, fakeFile.Name, realFile.Name);
             Assert.IsTrue(updatedName.Success);
 
             // Replace content of file
@@ -109,8 +140,6 @@ namespace QuantConnect.Tests.API
             // Add a second file
             var secondFile = ApiClient.AddProjectFile(TestProject.ProjectId, secondRealFile.Name, secondRealFile.Code);
             Assert.IsTrue(secondFile.Success);
-            Assert.IsTrue(secondFile.Files.First().Code == secondRealFile.Code);
-            Assert.IsTrue(secondFile.Files.First().Name == secondRealFile.Name);
 
             // Read multiple files
             var readFiles = ApiClient.ReadProjectFiles(TestProject.ProjectId);
@@ -250,7 +279,7 @@ namespace QuantConnect.Tests.API
             Assert.IsTrue(backtestRead.Success);
             Assert.AreEqual(1, backtestRead.Progress);
             Assert.AreEqual(backtestName, backtestRead.Name);
-            Assert.AreEqual("1", backtestRead.Statistics["Total Trades"]);
+            Assert.AreEqual("1", backtestRead.Statistics["Total Orders"]);
             Assert.Greater(backtestRead.Charts["Benchmark"].Series.Count, 0);
 
             // In the same way, read the orders returned in the backtest
@@ -288,7 +317,7 @@ namespace QuantConnect.Tests.API
         }
 
         [Test]
-        public void ReadBacktestOrders()
+        public void ReadBacktestOrdersReportAndChart()
         {
             // Project settings
             var language = Language.CSharp;
@@ -322,6 +351,19 @@ namespace QuantConnect.Tests.API
             var backtestOrdersRead = ApiClient.ReadBacktestOrders(project.ProjectId, backtest.BacktestId);
             Assert.IsTrue(backtestOrdersRead.Any());
             Assert.AreEqual(Symbols.SPY.Value, backtestOrdersRead.First().Symbol.Value);
+
+            var readBacktestReport = ApiClient.ReadBacktestReport(project.ProjectId, backtest.BacktestId);
+            Assert.IsTrue(readBacktestReport.Success);
+            Assert.IsFalse(string.IsNullOrEmpty(readBacktestReport.Report));
+
+            var readBacktestChart = ApiClient.ReadBacktestChart(
+                project.ProjectId, "Strategy Equity",
+                new DateTime(2013, 10, 07).Second,
+                new DateTime(2013, 10, 11).Second,
+                1000,
+                backtest.BacktestId);
+            Assert.IsTrue(readBacktestChart.Success);
+            Assert.IsNotNull(readBacktestChart.Chart);
 
             // Delete the backtest we just created
             var deleteBacktest = ApiClient.DeleteBacktest(project.ProjectId, backtest.BacktestId);
@@ -359,6 +401,68 @@ namespace QuantConnect.Tests.API
         }
 
         [Test]
+        public void ReadLiveInsightsWorksAsExpected()
+        {
+            var quantConnectDataProvider = new Dictionary<string, object>
+            {
+                { "id", "QuantConnectBrokerage" },
+            };
+
+            var dataProviders = new Dictionary<string, object>
+            {
+                { "QuantConnectBrokerage", quantConnectDataProvider }
+            };
+
+            GetProjectAndCompileIdToReadInsights(out var projectId, out var compileId);
+
+            // Get a live node to launch the algorithm on
+            var nodesResponse = ApiClient.ReadProjectNodes(projectId);
+            Assert.IsTrue(nodesResponse.Success);
+            var freeNode = nodesResponse.Nodes.LiveNodes.Where(x => x.Busy == false);
+            Assert.IsNotEmpty(freeNode, "No free Live Nodes found");
+
+            try
+            {
+                // Create live default algorithm
+                var createLiveAlgorithm = ApiClient.CreateLiveAlgorithm(projectId, compileId, freeNode.FirstOrDefault().Id, _defaultSettings, dataProviders: dataProviders);
+                Assert.IsTrue(createLiveAlgorithm.Success, $"ApiClient.CreateLiveAlgorithm(): Error: {string.Join(",", createLiveAlgorithm.Errors)}");
+
+                // Wait 2 minutes
+                Thread.Sleep(120000);
+
+                // Stop the algorithm
+                var stopLive = ApiClient.StopLiveAlgorithm(projectId);
+                Assert.IsTrue(stopLive.Success, $"ApiClient.StopLiveAlgorithm(): Error: {string.Join(",", stopLive.Errors)}");
+
+                // Try to read the insights from the algorithm
+                var readInsights = ApiClient.ReadLiveInsights(projectId, 0, 5);
+                var finish = DateTime.UtcNow.AddMinutes(2);
+                do
+                {
+                    Thread.Sleep(5000);
+                    readInsights = ApiClient.ReadLiveInsights(projectId, 0, 5);
+                }
+                while (finish > DateTime.UtcNow && !readInsights.Insights.Any());
+
+                Assert.IsTrue(readInsights.Success, $"ApiClient.ReadLiveInsights(): Error: {string.Join(",", readInsights.Errors)}");
+                Assert.IsNotEmpty(readInsights.Insights);
+                Assert.IsTrue(readInsights.Length >= 0);
+                Assert.Throws<ArgumentException>(() => ApiClient.ReadLiveInsights(projectId, 0, 101));
+                Assert.DoesNotThrow(() => ApiClient.ReadLiveInsights(projectId));
+            }
+            catch (Exception ex)
+            {
+                // Delete the project in case of an error
+                Assert.IsTrue(ApiClient.DeleteProject(projectId).Success);
+                throw ex;
+            }
+
+            // Delete the project
+            var deleteProject = ApiClient.DeleteProject(projectId);
+            Assert.IsTrue(deleteProject.Success);
+        }
+
+        [Test]
         public void UpdatesBacktestTags()
         {
             // We will be using the existing TestBacktest for this test
@@ -385,9 +489,246 @@ namespace QuantConnect.Tests.API
             Assert.AreEqual(0, backtestsResult.Backtests[0].Tags.Count);
         }
 
+        [Test]
+        public void ReadBacktestInsightsWorksAsExpected()
+        {
+            GetProjectAndCompileIdToReadInsights(out var projectId, out var compileId);
+            try
+            {
+                // Create backtest
+                var backtestName = $"ReadBacktestOrders Backtest {GetTimestamp()}";
+                var backtest = ApiClient.CreateBacktest(projectId, compileId, backtestName);
+
+                // Try to read the insights from the algorithm
+                var readInsights = ApiClient.ReadBacktestInsights(projectId, backtest.BacktestId, 0, 5);
+                var finish = DateTime.UtcNow.AddMinutes(2);
+                do
+                {
+                    Thread.Sleep(1000);
+                    readInsights = ApiClient.ReadBacktestInsights(projectId, backtest.BacktestId, 0, 5);
+                }
+                while (finish > DateTime.UtcNow && !readInsights.Insights.Any());
+
+                Assert.IsTrue(readInsights.Success, $"ApiClient.ReadBacktestInsights(): Error: {string.Join(",", readInsights.Errors)}");
+                Assert.IsNotEmpty(readInsights.Insights);
+                Assert.IsTrue(readInsights.Length >= 0);
+                Assert.Throws<ArgumentException>(() => ApiClient.ReadBacktestInsights(projectId, backtest.BacktestId, 0, 101));
+                Assert.DoesNotThrow(() => ApiClient.ReadBacktestInsights(projectId, backtest.BacktestId));
+            }
+            catch (Exception ex)
+            {
+                // Delete the project in case of an error
+                Assert.IsTrue(ApiClient.DeleteProject(projectId).Success);
+                throw ex;
+            }
+
+            // Delete the project
+            var deleteProject = ApiClient.DeleteProject(projectId);
+            Assert.IsTrue(deleteProject.Success);
+        }
+
+        [Test]
+        public void CreatesLiveAlgorithm()
+        {
+            var quantConnectDataProvider = new Dictionary<string, object>
+            {
+                { "id", "QuantConnectBrokerage" },
+            };
+
+            var dataProviders = new Dictionary<string, object>
+            {
+                { "QuantConnectBrokerage", quantConnectDataProvider }
+            };
+
+            var file = new ProjectFile
+            {
+                Name = "Main.cs",
+                Code = File.ReadAllText("../../../Algorithm.CSharp/BasicTemplateAlgorithm.cs")
+            };
+
+            // Create a new project
+            var project = ApiClient.CreateProject($"Test project - {DateTime.Now.ToStringInvariant()}", Language.CSharp, TestOrganization);
+            var projectId = project.Projects.First().ProjectId;
+
+            // Update Project Files
+            var updateProjectFileContent = ApiClient.UpdateProjectFileContent(projectId, "Main.cs", file.Code);
+            Assert.IsTrue(updateProjectFileContent.Success);
+
+            // Create compile
+            var compile = ApiClient.CreateCompile(projectId);
+            Assert.IsTrue(compile.Success);
+
+            // Wait at max 30 seconds for project to compile
+            var compileCheck = WaitForCompilerResponse(projectId, compile.CompileId);
+            Assert.IsTrue(compileCheck.Success);
+            Assert.IsTrue(compileCheck.State == CompileState.BuildSuccess);
+
+            // Get a live node to launch the algorithm on
+            var nodesResponse = ApiClient.ReadProjectNodes(projectId);
+            Assert.IsTrue(nodesResponse.Success);
+            var freeNode = nodesResponse.Nodes.LiveNodes.Where(x => x.Busy == false);
+            Assert.IsNotEmpty(freeNode, "No free Live Nodes found");
+
+            try
+            {
+                // Create live default algorithm
+                var createLiveAlgorithm = ApiClient.CreateLiveAlgorithm(projectId, compile.CompileId, freeNode.FirstOrDefault().Id, _defaultSettings, dataProviders: dataProviders);
+                Assert.IsTrue(createLiveAlgorithm.Success, $"ApiClient.CreateLiveAlgorithm(): Error: {string.Join(",", createLiveAlgorithm.Errors)}");
+
+                // Read live algorithm
+                var readLiveAlgorithm = ApiClient.ReadLiveAlgorithm(projectId, createLiveAlgorithm.DeployId);
+                Assert.IsTrue(readLiveAlgorithm.Success, $"ApiClient.ReadLiveAlgorithm(): Error: {string.Join(",", readLiveAlgorithm.Errors)}");
+
+                // Stop the algorithm
+                var stopLive = ApiClient.StopLiveAlgorithm(projectId);
+                Assert.IsTrue(stopLive.Success, $"ApiClient.StopLiveAlgorithm(): Error: {string.Join(",", stopLive.Errors)}");
+
+                var readChart = ApiClient.ReadLiveChart(projectId, "Strategy Equity", new DateTime(2013, 10, 07).Second, new DateTime(2013, 10, 11).Second, 1000);
+                Assert.IsTrue(readChart.Success, $"ApiClient.ReadLiveChart(): Error: {string.Join(",", readChart.Errors)}");
+                Assert.IsNotNull(readChart.Chart);
+
+                var readLivePortfolio = ApiClient.ReadLivePortfolio(projectId);
+                Assert.IsTrue(readLivePortfolio.Success, $"ApiClient.ReadLivePortfolio(): Error: {string.Join(",", readLivePortfolio.Errors)}");
+                Assert.IsNotNull(readLivePortfolio.Portfolio, "Portfolio was null!");
+                Assert.IsNotNull(readLivePortfolio.Portfolio.Cash, "Portfolio.Cash was null!");
+                Assert.IsNotNull(readLivePortfolio.Portfolio.Holdings, "Portfolio Holdings was null!");
+
+                var readLiveLogs = ApiClient.ReadLiveLogs(projectId, createLiveAlgorithm.DeployId, 0, 20);
+                Assert.IsTrue(readLiveLogs.Success, $"ApiClient.ReadLiveLogs(): Error: {string.Join(",", readLiveLogs.Errors)}");
+                Assert.IsNotNull(readLiveLogs.Logs, "Logs was null!");
+                Assert.IsTrue(readLiveLogs.Length >= 0, "The length of the logs was negative!");
+                Assert.IsTrue(readLiveLogs.DeploymentOffset >= 0, "The deploymentOffset");
+            }
+            catch(Exception ex)
+            {
+                // Delete the project in case of an error
+                Assert.IsTrue(ApiClient.DeleteProject(projectId).Success);
+                throw ex;
+            }
+
+            // Delete the project
+            var deleteProject = ApiClient.DeleteProject(projectId);
+            Assert.IsTrue(deleteProject.Success);
+        }
+
+        [Test]
+        public void ReadVersionsWorksAsExpected()
+        {
+            var result = ApiClient.ReadLeanVersions();
+            Assert.IsTrue(result.Success);
+            Assert.IsNotEmpty(result.Versions);
+        }
+
+        [Test]
+        public void CreatesOptimization()
+        {
+            var file = new ProjectFile
+            {
+                Name = "Main.cs",
+                Code = File.ReadAllText("../../../Algorithm.CSharp/ParameterizedAlgorithm.cs")
+            };
+
+
+            // Create a new project
+            var project = ApiClient.CreateProject($"Test project optimization - {DateTime.Now.ToStringInvariant()}", Language.CSharp, TestOrganization);
+            var projectId = project.Projects.First().ProjectId;
+
+            // Update Project Files
+            var updateProjectFileContent = ApiClient.UpdateProjectFileContent(projectId, "Main.cs", file.Code);
+            Assert.IsTrue(updateProjectFileContent.Success);
+
+            // Create compile
+            var compile = ApiClient.CreateCompile(projectId);
+            Assert.IsTrue(compile.Success);
+
+            // Wait at max 30 seconds for project to compile
+            var compileCheck = WaitForCompilerResponse(projectId, compile.CompileId);
+            Assert.IsTrue(compileCheck.Success);
+            Assert.IsTrue(compileCheck.State == CompileState.BuildSuccess);
+
+            var backtestName = $"Estimate optimization Backtest";
+            var backtest = ApiClient.CreateBacktest(projectId, compile.CompileId, backtestName);
+
+            // Now wait until the backtest is completed and request the orders again
+            var backtestReady = WaitForBacktestCompletion(projectId, backtest.BacktestId);
+            Assert.IsTrue(backtestReady.Success);
+
+            var optimization = ApiClient.CreateOptimization(
+                projectId: projectId,
+                name: "My Testable Optimization",
+                target: "TotalPerformance.PortfolioStatistics.SharpeRatio",
+                targetTo: "max",
+                targetValue: null,
+                strategy: "QuantConnect.Optimizer.Strategies.GridSearchOptimizationStrategy",
+                compileId: compile.CompileId,
+                parameters: new HashSet<OptimizationParameter>
+                {
+                    new OptimizationStepParameter("ema-fast", 50, 150, 1, 1) // Replace params with valid optimization parameter data for test project
+                },
+                constraints: new List<Constraint>
+                {
+                    new Constraint("TotalPerformance.PortfolioStatistics.SharpeRatio", ComparisonOperatorTypes.GreaterOrEqual, 1)
+                },
+                estimatedCost: 0.06m,
+                nodeType: OptimizationNodes.O2_8,
+                parallelNodes: 12
+            );
+
+            var finish = DateTime.UtcNow.AddMinutes(5);
+            var readOptimization = ApiClient.ReadOptimization(optimization.OptimizationId);
+            do
+            {
+                Thread.Sleep(5000);
+                readOptimization = ApiClient.ReadOptimization(optimization.OptimizationId);
+            }
+            while (finish > DateTime.UtcNow && readOptimization.Status != OptimizationStatus.Completed);
+
+            Assert.IsNotNull(optimization);
+            Assert.IsNotEmpty(optimization.OptimizationId);
+            Assert.AreNotEqual(default(DateTime), optimization.Created);
+            Assert.Positive(optimization.ProjectId);
+            Assert.IsNotEmpty(optimization.Name);
+            Assert.IsInstanceOf<OptimizationStatus>(optimization.Status);
+            Assert.IsNotEmpty(optimization.NodeType);
+            Assert.IsTrue(0 <= optimization.OutOfSampleDays);
+            Assert.AreNotEqual(default(DateTime), optimization.OutOfSampleMaxEndDate);
+            Assert.IsNotNull(optimization.Criterion);
+
+            // Delete the project
+            var deleteProject = ApiClient.DeleteProject(projectId);
+            Assert.IsTrue(deleteProject.Success);
+        }
+
         private static string GetTimestamp()
         {
             return DateTime.UtcNow.ToStringInvariant("yyyyMMddHHmmssfffff");
+        }
+
+        private void GetProjectAndCompileIdToReadInsights(out int projectId, out string compileId)
+        {
+            var file = new ProjectFile
+            {
+                Name = "Main.cs",
+                Code = File.ReadAllText("../../../Algorithm.CSharp/BasicTemplateCryptoFrameworkAlgorithm.cs")
+            };
+
+            // Create a new project
+            var project = ApiClient.CreateProject($"Test project insight - {DateTime.Now.ToStringInvariant()}", Language.CSharp, TestOrganization);
+            projectId = project.Projects.First().ProjectId;
+
+            // Update Project Files
+            var updateProjectFileContent = ApiClient.UpdateProjectFileContent(projectId, "Main.cs", file.Code);
+            Assert.IsTrue(updateProjectFileContent.Success);
+
+            // Create compile
+            var compile = ApiClient.CreateCompile(projectId);
+            Assert.IsTrue(compile.Success);
+            compileId = compile.CompileId;
+
+            // Wait at max 30 seconds for project to compile
+            var compileCheck = WaitForCompilerResponse(projectId, compile.CompileId);
+            Assert.IsTrue(compileCheck.Success);
+            Assert.IsTrue(compileCheck.State == CompileState.BuildSuccess);
         }
     }
 }
