@@ -38,4 +38,5 @@ jobs:
          context: .
          file: ./DockerfileLeanPaolo
          push: true
+         platforms: linux/amd64, linux/arm64, linux/armm/v7
          tags: ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}, ${{ steps.prepare.outputs.docker_image }}:latest        
