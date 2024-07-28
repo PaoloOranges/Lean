@@ -1,4 +1,4 @@
-name: Docker Build/Publish Raspberry Pi Docker Paolo
+name: Docker Build/Publish Raspberry Paolo
 
 on:
   push:
@@ -38,5 +38,5 @@ jobs:
          context: .
          file: ./DockerfileLeanPaolo
          push: true
-         platforms: linux/amd64, linux/arm64, linux/armm/v7
+         platforms: linux/amd64, linux/arm64, linux/arm/v7
          tags: ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}, ${{ steps.prepare.outputs.docker_image }}:latest        
