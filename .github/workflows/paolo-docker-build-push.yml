@@ -1,4 +1,4 @@
-name: Docker Build/Publish Raspberry Paolo
+name: Docker Build/Publish Paolo Custom Algorithm
 
 on:
   push:
