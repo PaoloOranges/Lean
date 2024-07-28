@@ -15,8 +15,6 @@ WORKDIR /BUILD
 RUN dotnet publish ${COINBASE_BROKERAGE_PROJECT_PATH} -c Release -o LeanPlugins
 RUN dotnet publish ${LEAN_PROJECT_PATH} -c Release -o Bin
 
-COPY config-live-coinbase.json config.json
-
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/runtime:6.0
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
@@ -26,7 +24,10 @@ WORKDIR /Lean
 
 COPY --from=builder /BUILD/LeanPlugins/QuantConnect.CoinbaseBrokerage.* /Lean/LeanPlugins/
 COPY --from=builder /BUILD/Bin /Lean/Bin
-COPY --from=builder /BUILD/config.json /Lean/Bin/config.json
+RUN rm /Lean/Bin/*.pdb
+RUN rm /Lean/Bin/*.xml
 
 WORKDIR /Lean/Bin
-ENTRYPOINT [ "dotnet", "/Bin/QuantConnect.Lean.Launcher.dll" ]
+ENTRYPOINT [ "dotnet", "QuantConnect.Lean.Launcher.dll" ]
+
+# docker run --rm -v "G:\SourceCode\QuantitativeTrading\QuantConnect\Data:/Lean/Data" -v "G:\SourceCode\QuantitativeTrading\QuantConnect\LeanStorage:/Lean/Storage" -v "G:\SourceCode\QuantitativeTrading\QuantConnect\Config:/Lean/Config" temp --config=/Lean/Config/config_paper_coinbase.json
