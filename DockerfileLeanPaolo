@@ -1,4 +1,8 @@
-FROM mcr.microsoft.com/dotnet/sdk:7.0 as builder
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:7.0 AS builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
 
 RUN apt update && \
     apt install -y git
@@ -16,7 +20,8 @@ WORKDIR /BUILD
 RUN dotnet publish $COINBASE_BROKERAGE_PROJECT_PATH -c Release -o LeanPlugins
 RUN dotnet publish $LEAN_PROJECT_PATH -c Release -o Bin
 
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/runtime:6.0
+FROM mcr.microsoft.com/dotnet/runtime:6.0
+
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
