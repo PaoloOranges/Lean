@@ -23,11 +23,26 @@ using System.Linq;
 using Python.Runtime;
 using QuantConnect.Util;
 using static QuantConnect.StringExtensions;
+using QuantConnect.Interfaces;
+using QuantConnect.Data.Common;
 
 namespace QuantConnect.Algorithm
 {
     public partial class QCAlgorithm
     {
+        private readonly List<Func<IBaseData, decimal>> _quoteRequiredFields = new() {
+            Field.BidPrice,
+            Field.AskPrice,
+            Field.BidClose,
+            Field.BidOpen,
+            Field.BidLow,
+            Field.BidHigh,
+            Field.AskClose,
+            Field.AskOpen,
+            Field.AskLow,
+            Field.AskHigh,
+        };
+
         /// <summary>
         /// Gets whether or not WarmUpIndicator is allowed to warm up indicators
         /// </summary>
@@ -460,10 +475,30 @@ namespace QuantConnect.Algorithm
             var name = CreateIndicatorName(symbol, $"CHOP({period})", resolution);
             var indicator = new ChoppinessIndex(name, period);
             InitializeIndicator(indicator, resolution, selector, symbol);
-
             return indicator;
         }
 
+        /// <summary>
+        /// Creates a new Chande Kroll Stop indicator which will compute the short and lower stop.
+        /// The indicator will be automatically updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose Chande Kroll Stop we seek.</param>
+        /// <param name="atrPeriod">The period over which to compute the average true range.</param>
+        /// <param name="atrMult">The ATR multiplier to be used to compute stops distance.</param>
+        /// <param name="period">The period over which to compute the max of high stop and min of low stop.</param>
+        /// <param name="resolution">The resolution.</param>
+        /// <param name="movingAverageType">The type of smoothing used to smooth the true range values</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to casting the input value to a TradeBar</param>
+        /// <returns>The Chande Kroll Stop indicator for the requested symbol.</returns>
+        [DocumentationAttribute(Indicators)]
+        public ChandeKrollStop CKS(Symbol symbol, int atrPeriod, decimal atrMult, int period, MovingAverageType movingAverageType = MovingAverageType.Wilders, Resolution ? resolution = null, Func<IBaseData, IBaseDataBar> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"CKS({atrPeriod},{atrMult},{period})", resolution);
+            var indicator = new ChandeKrollStop(name, atrPeriod, atrMult, period, movingAverageType);
+            InitializeIndicator(indicator, resolution, selector, symbol);
+            return indicator;
+        }
+      
         /// <summary>
         /// Creates a new ChaikinMoneyFlow indicator.
         /// </summary>
@@ -482,7 +517,7 @@ namespace QuantConnect.Algorithm
             return chaikinMoneyFlow;
 
         }
-                
+
         /// <summary>
         /// Creates a new ChandeMomentumOscillator indicator.
         /// </summary>
@@ -568,8 +603,8 @@ namespace QuantConnect.Algorithm
         /// <param name="resolution">The desired resolution of the data</param>
         /// <returns>A new Delta indicator for the specified symbol</returns>
         [DocumentationAttribute(Indicators)]
-        public Delta D(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, 
-            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        public Delta D(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null,
+            OptionPricingModelType? optionModel = null, OptionPricingModelType? ivModel = null, Resolution? resolution = null)
         {
             var name = InitializeOptionIndicator<Delta>(symbol, out var riskFreeRateModel, out var dividendYieldModel, riskFreeRate, dividendYield, optionModel, resolution);
 
@@ -614,7 +649,7 @@ namespace QuantConnect.Algorithm
 
             return doubleExponentialMovingAverage;
         }
-        
+
         /// <summary>
         /// Creates a new DerivativeOscillator indicator.
         /// </summary>
@@ -836,8 +871,8 @@ namespace QuantConnect.Algorithm
         /// <param name="resolution">The desired resolution of the data</param>
         /// <returns>A new Gamma indicator for the specified symbol</returns>
         [DocumentationAttribute(Indicators)]
-        public Gamma G(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
-            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        public Gamma G(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null,
+            OptionPricingModelType? optionModel = null, OptionPricingModelType? ivModel = null, Resolution? resolution = null)
         {
             var name = InitializeOptionIndicator<Gamma>(symbol, out var riskFreeRateModel, out var dividendYieldModel, riskFreeRate, dividendYield, optionModel, resolution);
 
@@ -996,7 +1031,7 @@ namespace QuantConnect.Algorithm
         {
             var name = CreateIndicatorName(symbol, fieldName ?? "close", resolution);
             var identity = new Identity(name);
-            RegisterIndicator(symbol, identity, resolution, selector);
+            InitializeIndicator(identity, resolution, selector, symbol);
             return identity;
         }
 
@@ -1031,7 +1066,7 @@ namespace QuantConnect.Algorithm
         /// <returns>A new ImpliedVolatility indicator for the specified symbol</returns>
         [DocumentationAttribute(Indicators)]
         public ImpliedVolatility IV(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null,
-            OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, Resolution? resolution = null)
+            OptionPricingModelType? optionModel = null, Resolution? resolution = null)
         {
             var name = InitializeOptionIndicator<ImpliedVolatility>(symbol, out var riskFreeRateModel, out var dividendYieldModel, riskFreeRate, dividendYield, optionModel, resolution);
 
@@ -1294,13 +1329,7 @@ namespace QuantConnect.Algorithm
                 }
             }
 
-            RegisterIndicator(symbol, maximum, ResolveConsolidator(symbol, resolution), selector);
-
-            if (Settings.AutomaticIndicatorWarmUp)
-            {
-                WarmUpIndicator(symbol, maximum, resolution, selector);
-            }
-
+            InitializeIndicator(maximum, resolution, selector, symbol);
             return maximum;
         }
 
@@ -1405,13 +1434,7 @@ namespace QuantConnect.Algorithm
                 }
             }
 
-            RegisterIndicator(symbol, minimum, ResolveConsolidator(symbol, resolution), selector);
-
-            if (Settings.AutomaticIndicatorWarmUp)
-            {
-                WarmUpIndicator(symbol, minimum, resolution, selector);
-            }
-
+            InitializeIndicator(minimum, resolution, selector, symbol);
             return minimum;
         }
 
@@ -1682,7 +1705,7 @@ namespace QuantConnect.Algorithm
 
             return relativeStrengthIndex;
         }
-        
+
         /// <summary>
         /// Creates a new RelativeVigorIndex indicator.
         /// </summary>
@@ -1734,8 +1757,8 @@ namespace QuantConnect.Algorithm
         /// <param name="resolution">The desired resolution of the data</param>
         /// <returns>A new Rho indicator for the specified symbol</returns>
         [DocumentationAttribute(Indicators)]
-        public Rho R(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
-            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        public Rho R(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null,
+            OptionPricingModelType? optionModel = null, OptionPricingModelType? ivModel = null, Resolution? resolution = null)
         {
             var name = InitializeOptionIndicator<Rho>(symbol, out var riskFreeRateModel, out var dividendYieldModel, riskFreeRate, dividendYield, optionModel, resolution);
 
@@ -2036,8 +2059,8 @@ namespace QuantConnect.Algorithm
         /// <param name="resolution">The desired resolution of the data</param>
         /// <returns>A new Theta indicator for the specified symbol</returns>
         [DocumentationAttribute(Indicators)]
-        public Theta T(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
-            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        public Theta T(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null,
+            OptionPricingModelType? optionModel = null, OptionPricingModelType? ivModel = null, Resolution? resolution = null)
         {
             var name = InitializeOptionIndicator<Theta>(symbol, out var riskFreeRateModel, out var dividendYieldModel, riskFreeRate, dividendYield, optionModel, resolution);
 
@@ -2211,8 +2234,8 @@ namespace QuantConnect.Algorithm
         /// <param name="resolution">The desired resolution of the data</param>
         /// <returns>A new Vega indicator for the specified symbol</returns>
         [DocumentationAttribute(Indicators)]
-        public Vega V(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
-            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        public Vega V(Symbol symbol, Symbol mirrorOption = null, decimal? riskFreeRate = null, decimal? dividendYield = null,
+            OptionPricingModelType? optionModel = null, OptionPricingModelType? ivModel = null, Resolution? resolution = null)
         {
             var name = InitializeOptionIndicator<Vega>(symbol, out var riskFreeRateModel, out var dividendYieldModel, riskFreeRate, dividendYield, optionModel, resolution);
 
@@ -2338,6 +2361,24 @@ namespace QuantConnect.Algorithm
         {
             var name = CreateIndicatorName(symbol, $"VWMA({period})", resolution);
             var indicator = new VolumeWeightedMovingAverage(name, period);
+            InitializeIndicator(indicator, resolution, selector, symbol);
+            return indicator;
+        }
+
+        /// <summary>
+        /// Creates a new Vortex indicator for the symbol. The indicator will be automatically
+        /// updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose VWMA we want</param>
+        /// <param name="period">The smoothing period used to smooth the computed VWMA values</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to casting the input value to a TradeBar</param>
+        /// <returns>A new Vortex indicator with the specified smoothing period</returns>
+        [DocumentationAttribute(Indicators)]
+        public Vortex VTX(Symbol symbol, int period, Resolution? resolution = null, Func<IBaseData, IBaseDataBar> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"VTX({period})", resolution);
+            var indicator = new Vortex(name,period);
             InitializeIndicator(indicator, resolution, selector, symbol);
             return indicator;
         }
@@ -2614,6 +2655,26 @@ namespace QuantConnect.Algorithm
             return msi;
         }
 
+
+        /// <summary>
+        /// Creates a new RogersSatchellVolatility indicator for the symbol. The indicator will be automatically
+        /// updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose RogersSatchellVolatility we want</param>
+        /// <param name="period">The period of the rolling window used to compute volatility</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to casting the input value to a TradeBar</param>
+        /// <returns>A new RogersSatchellVolatility indicator with the specified smoothing type and period</returns>
+        [DocumentationAttribute(Indicators)]
+        public RogersSatchellVolatility RSV(Symbol symbol, int period, Resolution? resolution = null, Func<IBaseData, IBaseDataBar> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"RSV({period})", resolution);
+            var indicator = new RogersSatchellVolatility(name, period);
+            InitializeIndicator(indicator, resolution, selector, symbol);
+
+            return indicator;
+        }
+
         /// <summary>
         /// Creates a ZeroLagExponentialMovingAverage indicator for the symbol. The indicator will be automatically
         /// updated on the given resolution.
@@ -2785,7 +2846,7 @@ namespace QuantConnect.Algorithm
             // default our selector to the Value property on BaseData
             selector = selector ?? (x => x.Value);
 
-            RegisterConsolidator(indicator, symbol, consolidator);
+            RegisterConsolidator(symbol, consolidator, null, indicator);
 
             // attach to the DataConsolidated event so it updates our indicator
             consolidator.DataConsolidated += (sender, consolidated) =>
@@ -2858,7 +2919,7 @@ namespace QuantConnect.Algorithm
             // assign default using cast
             var selectorToUse = selector ?? (x => (T)x);
 
-            RegisterConsolidator(indicator, symbol, consolidator);
+            RegisterConsolidator(symbol, consolidator, null, indicator);
 
             // check the output type of the consolidator and verify we can assign it to T
             var type = typeof(T);
@@ -3033,7 +3094,7 @@ namespace QuantConnect.Algorithm
         private IEnumerable<Slice> GetIndicatorWarmUpHistory(IEnumerable<Symbol> symbols, IIndicator indicator, TimeSpan timeSpan, out bool identityConsolidator)
         {
             identityConsolidator = false;
-            if (AssertIndicatorHasWarmupPeriod(indicator))
+            if (!AssertIndicatorHasWarmupPeriod(indicator))
             {
                 return Enumerable.Empty<Slice>();
             }
@@ -3082,16 +3143,17 @@ namespace QuantConnect.Algorithm
             where T : class, IBaseData
         {
             IDataConsolidator consolidator;
-            if (identityConsolidator)
-            {
-                period = TimeSpan.Zero;
-            }
             if (SubscriptionManager.SubscriptionDataConfigService.GetSubscriptionDataConfigs(symbol).Count > 0)
             {
                 consolidator = Consolidate(symbol, period, handler);
             }
             else
             {
+                if (identityConsolidator)
+                {
+                    period = TimeSpan.Zero;
+                }
+
                 var providedType = typeof(T);
                 if (providedType.IsAbstract)
                 {
@@ -3146,12 +3208,8 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(Indicators)]
         public IDataConsolidator ResolveConsolidator(Symbol symbol, Resolution? resolution, Type dataType = null)
         {
-            TimeSpan? timeSpan = null;
-            if (resolution.HasValue)
-            {
-                timeSpan = resolution.Value.ToTimeSpan();
-            }
-            return ResolveConsolidator(symbol, timeSpan, dataType);
+            var tickType = dataType != null ? LeanData.GetCommonTickTypeForCommonDataTypes(dataType, symbol.SecurityType) : (TickType?)null;
+            return CreateConsolidator(symbol, null, tickType, null, resolution, null);
         }
 
         /// <summary>
@@ -3166,30 +3224,7 @@ namespace QuantConnect.Algorithm
         public IDataConsolidator ResolveConsolidator(Symbol symbol, TimeSpan? timeSpan, Type dataType = null)
         {
             var tickType = dataType != null ? LeanData.GetCommonTickTypeForCommonDataTypes(dataType, symbol.SecurityType) : (TickType?)null;
-            var subscription = GetSubscription(symbol, tickType);
-            var subscriptionTimeSpan = subscription.Resolution.ToTimeSpan();
-
-            // if not specified, default to the subscription resolution
-            if (!timeSpan.HasValue)
-            {
-                timeSpan = subscriptionTimeSpan;
-            }
-
-            // verify this consolidator will give reasonable results, if someone asks for second consolidation but we have minute
-            // data we won't be able to do anything good, we'll call it second, but it would really just be minute!
-            if (timeSpan.Value < subscriptionTimeSpan)
-            {
-                throw new ArgumentException($"Unable to create {symbol} consolidator because {symbol} is registered for " +
-                    Invariant($"{subscription.Resolution.ToStringInvariant()} data. Consolidators require higher resolution data to produce lower resolution data.")
-                );
-            }
-            else if (timeSpan.Value == subscriptionTimeSpan)
-            {
-                // input and expected output share the same time span, means we just want an identity consolidator
-                timeSpan = TimeSpan.Zero;
-            }
-
-            return CreateConsolidator(timeSpan.Value, subscription.Type, subscription.TickType);
+            return CreateConsolidator(symbol, null, tickType, timeSpan, null, null);
         }
 
         /// <summary>
@@ -3202,15 +3237,15 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(ConsolidatingData)]
         public static IDataConsolidator CreateConsolidator(TimeSpan period, Type consolidatorInputType, TickType? tickType = null)
         {
+            if (period.Ticks == 0)
+            {
+                return CreateIdentityConsolidator(consolidatorInputType);
+            }
+
             // if our type can be used as a trade bar, then let's just make one of those
             // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to TradeBar
             if (typeof(TradeBar).IsAssignableFrom(consolidatorInputType))
             {
-                // Use IdentityDataConsolidator when data are not meant to consolidated into bars
-                if (period.Ticks == 0)
-                {
-                    return new IdentityDataConsolidator<TradeBar>();
-                }
                 return new TradeBarConsolidator(period);
             }
 
@@ -3218,11 +3253,6 @@ namespace QuantConnect.Algorithm
             // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to QuoteBar
             if (typeof(QuoteBar).IsAssignableFrom(consolidatorInputType))
             {
-                // Use IdentityDataConsolidator when data are not meant to consolidated into bars
-                if (period.Ticks == 0)
-                {
-                    return new IdentityDataConsolidator<QuoteBar>();
-                }
                 return new QuoteBarConsolidator(period);
             }
 
@@ -3230,12 +3260,6 @@ namespace QuantConnect.Algorithm
             // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to Tick
             if (typeof(Tick).IsAssignableFrom(consolidatorInputType))
             {
-                // Use IdentityDataConsolidator when ticks are not meant to consolidated into bars
-                if (period.Ticks == 0)
-                {
-                    return new IdentityDataConsolidator<Tick>();
-                }
-
                 switch (tickType)
                 {
                     case TickType.OpenInterest:
@@ -3252,19 +3276,9 @@ namespace QuantConnect.Algorithm
             // if our type can be used as a DynamicData then we'll use the DynamicDataConsolidator
             if (typeof(DynamicData).IsAssignableFrom(consolidatorInputType))
             {
-                // Use IdentityDataConsolidator when data are not meant to consolidated into bars
-                if (period.Ticks == 0)
-                {
-                    return new DynamicDataConsolidator(1);
-                }
                 return new DynamicDataConsolidator(period);
             }
 
-            // Use IdentityDataConsolidator when data are not meant to consolidated into bars
-            if (period.Ticks == 0)
-            {
-                return new IdentityDataConsolidator<BaseData>();
-            }
             // no matter what we can always consolidate based on the time-value pair of BaseData
             return new BaseDataConsolidator(period);
         }
@@ -3279,7 +3293,7 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(ConsolidatingData)]
         public IDataConsolidator Consolidate(Symbol symbol, Resolution period, Action<TradeBar> handler)
         {
-            return Consolidate(symbol, period.ToTimeSpan(), TickType.Trade, handler);
+            return Consolidate(symbol, period, TickType.Trade, handler);
         }
 
         /// <summary>
@@ -3353,7 +3367,7 @@ namespace QuantConnect.Algorithm
         public IDataConsolidator Consolidate<T>(Symbol symbol, Resolution period, TickType? tickType, Action<T> handler)
             where T : class, IBaseData
         {
-            return Consolidate(symbol, period.ToTimeSpan(), tickType, handler);
+            return Consolidate(symbol, null, tickType, handler, null, period);
         }
 
         /// <summary>
@@ -3369,14 +3383,7 @@ namespace QuantConnect.Algorithm
         public IDataConsolidator Consolidate<T>(Symbol symbol, TimeSpan period, TickType? tickType, Action<T> handler)
             where T : class, IBaseData
         {
-            // resolve consolidator input subscription
-            var subscription = GetSubscription(symbol, tickType);
-
-            // create requested consolidator
-            var consolidator = CreateConsolidator(period, subscription.Type, subscription.TickType);
-
-            AddConsolidator(symbol, consolidator, handler, tickType);
-            return consolidator;
+            return Consolidate(symbol, null, tickType, handler, period, null);
         }
 
         /// <summary>
@@ -3437,14 +3444,7 @@ namespace QuantConnect.Algorithm
         public IDataConsolidator Consolidate<T>(Symbol symbol, Func<DateTime, CalendarInfo> calendar, TickType? tickType, Action<T> handler)
             where T : class, IBaseData
         {
-            // resolve consolidator input subscription
-            var subscription = GetSubscription(symbol, tickType);
-
-            // create requested consolidator
-            var consolidator = CreateConsolidator(calendar, subscription.Type, subscription.TickType);
-
-            AddConsolidator(symbol, consolidator, handler);
-            return consolidator;
+            return Consolidate(symbol, calendar, tickType, handler, null, null);
         }
 
         /// <summary>
@@ -3475,6 +3475,10 @@ namespace QuantConnect.Algorithm
         public IndicatorHistory IndicatorHistory(IndicatorBase<IndicatorDataPoint> indicator, IEnumerable<Symbol> symbols, int period, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
         {
             var warmupPeriod = (indicator as IIndicatorWarmUpPeriodProvider)?.WarmUpPeriod ?? 0;
+            if (warmupPeriod > 0 && period > 0)
+            {
+                warmupPeriod -= 1;
+            }
             var history = History(symbols, period + warmupPeriod, resolution, dataNormalizationMode: GetIndicatorHistoryDataNormalizationMode(indicator));
             return IndicatorHistory(indicator, history, selector);
         }
@@ -3509,6 +3513,10 @@ namespace QuantConnect.Algorithm
             where T : IBaseData
         {
             var warmupPeriod = (indicator as IIndicatorWarmUpPeriodProvider)?.WarmUpPeriod ?? 0;
+            if (warmupPeriod > 0 && period > 0)
+            {
+                warmupPeriod -= 1;
+            }
             var history = History(symbols, period + warmupPeriod, resolution, dataNormalizationMode: GetIndicatorHistoryDataNormalizationMode(indicator));
             return IndicatorHistory(indicator, history, selector);
         }
@@ -3653,7 +3661,7 @@ namespace QuantConnect.Algorithm
         public IndicatorHistory IndicatorHistory(IndicatorBase<IndicatorDataPoint> indicator, IEnumerable<Slice> history, Func<IBaseData, decimal> selector = null)
         {
             selector ??= (x => x.Value);
-            return IndicatorHistory(indicator, history, (bar) => indicator.Update(new IndicatorDataPoint(bar.Symbol, bar.EndTime, selector(bar))));
+            return IndicatorHistory(indicator, history, (bar) => indicator.Update(new IndicatorDataPoint(bar.Symbol, bar.EndTime, selector(bar))), GetDataTypeFromSelector(selector));
         }
 
         /// <summary>
@@ -3674,31 +3682,76 @@ namespace QuantConnect.Algorithm
         /// Adds the provided consolidator and asserts the handler T type is assignable from the consolidator output,
         /// if not will throw <see cref="ArgumentException"/>
         /// </summary>
-        [DocumentationAttribute(ConsolidatingData)]
-        private void AddConsolidator<T>(Symbol symbol, IDataConsolidator consolidator, Action<T> handler, TickType? tickType = null)
+        private IDataConsolidator Consolidate<T>(Symbol symbol, Func<DateTime, CalendarInfo> calendar, TickType? tickType, Action<T> handler, TimeSpan? period, Resolution? resolution)
+            where T : class, IBaseData
         {
-            if (!typeof(T).IsAssignableFrom(consolidator.OutputType))
+            var consolidator = CreateConsolidator(symbol, calendar, tickType, period, resolution, typeof(T));
+            if (handler != null)
             {
-                // special case downgrading of QuoteBar -> TradeBar
-                if (typeof(T) == typeof(TradeBar) && consolidator.OutputType == typeof(QuoteBar))
-                {
-                    // collapse quote bar into trade bar (ignore the funky casting, required due to generics)
-                    consolidator.DataConsolidated += (sender, consolidated) => handler((T)(object)((QuoteBar)consolidated).Collapse());
-                }
+                // register user-defined handler to receive consolidated data events
+                consolidator.DataConsolidated += (sender, consolidated) => handler((T)consolidated);
 
-                throw new ArgumentException(
-                    $"Unable to consolidate with the specified handler because the consolidator's output type " +
-                    $"is {consolidator.OutputType.Name} but the handler's input type is {typeof(T).Name}.");
+                // register the consolidator for automatic updates via SubscriptionManager
+                RegisterConsolidator(symbol, consolidator, tickType, indicatorBase: null);
             }
-
-            // register user-defined handler to receive consolidated data events
-            consolidator.DataConsolidated += (sender, consolidated) => handler((T)consolidated);
-
-            // register the consolidator for automatic updates via SubscriptionManager
-            SubscriptionManager.AddConsolidator(symbol, consolidator, tickType);
+            return consolidator;
         }
 
-        [DocumentationAttribute(ConsolidatingData)]
+        private IDataConsolidator CreateConsolidator(Symbol symbol, Func<DateTime, CalendarInfo> calendar, TickType? tickType, TimeSpan? period, Resolution? resolution, Type consolidatorType)
+        {
+            // resolve consolidator input subscription
+            var subscription = GetSubscription(symbol, tickType);
+
+            // verify this consolidator will give reasonable results, if someone asks for second consolidation but we have minute
+            // data we won't be able to do anything good, we'll call it second, but it would really just be minute!
+            if (period.HasValue && period.Value < subscription.Increment || resolution.HasValue && resolution.Value < subscription.Resolution)
+            {
+                throw new ArgumentException($"Unable to create {symbol} consolidator because {symbol} is registered for " +
+                    Invariant($"{subscription.Resolution.ToStringInvariant()} data. Consolidators require higher resolution data to produce lower resolution data.")
+                );
+            }
+
+            IDataConsolidator consolidator = null;
+            if (calendar != null)
+            {
+                // create requested consolidator
+                consolidator = CreateConsolidator(calendar, subscription.Type, subscription.TickType);
+            }
+            else
+            {
+                // if not specified, default to the subscription resolution
+                if (!period.HasValue && !resolution.HasValue)
+                {
+                    period = subscription.Increment;
+                }
+
+                if (period.HasValue && period.Value == subscription.Increment || resolution.HasValue && resolution.Value == subscription.Resolution)
+                {
+                    consolidator = CreateIdentityConsolidator(subscription.Type);
+                }
+                else
+                {
+                    if (resolution.HasValue)
+                    {
+                        if (resolution.Value == Resolution.Daily)
+                        {
+                            consolidator = new MarketHourAwareConsolidator(Settings.DailyPreciseEndTime, resolution.Value, subscription.Type, subscription.TickType, subscription.ExtendedMarketHours);
+                        }
+                        period = resolution.Value.ToTimeSpan();
+                    }
+                    consolidator ??= CreateConsolidator(period.Value, subscription.Type, subscription.TickType);
+                }
+            }
+
+            if (consolidatorType != null && !consolidatorType.IsAssignableFrom(consolidator.OutputType))
+            {
+                throw new ArgumentException(
+                    $"Unable to consolidate with the specified handler because the consolidator's output type " +
+                    $"is {consolidator.OutputType.Name} but the handler's input type is {subscription.Type.Name}.");
+            }
+            return consolidator;
+        }
+
         private IDataConsolidator CreateConsolidator(Func<DateTime, CalendarInfo> calendar, Type consolidatorInputType, TickType tickType)
         {
             // if our type can be used as a trade bar, then let's just make one of those
@@ -3737,14 +3790,39 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a new consolidator identity consolidator for the requested output type.
+        /// </summary>
+        private static IDataConsolidator CreateIdentityConsolidator(Type consolidatorInputType)
+        {
+            if (typeof(TradeBar).IsAssignableFrom(consolidatorInputType))
+            {
+                return new IdentityDataConsolidator<TradeBar>();
+            }
+            else if (typeof(QuoteBar).IsAssignableFrom(consolidatorInputType))
+            {
+                return new IdentityDataConsolidator<QuoteBar>();
+            }
+            else if (typeof(Tick).IsAssignableFrom(consolidatorInputType))
+            {
+                return new IdentityDataConsolidator<Tick>();
+            }
+            else if (typeof(DynamicData).IsAssignableFrom(consolidatorInputType))
+            {
+                return new DynamicDataConsolidator(1);
+            }
+            return new IdentityDataConsolidator<BaseData>();
+        }
+
+        /// <summary>
         /// Registers and warms up (if EnableAutomaticIndicatorWarmUp is set) the indicator
         /// </summary>
         private void InitializeIndicator(IndicatorBase<IndicatorDataPoint> indicator, Resolution? resolution = null,
             Func<IBaseData, decimal> selector = null, params Symbol[] symbols)
         {
+            var dataType = GetDataTypeFromSelector(selector);
             foreach (var symbol in symbols)
             {
-                RegisterIndicator(symbol, indicator, resolution, selector);
+                RegisterIndicator(symbol, indicator, ResolveConsolidator(symbol, resolution, dataType), selector);
             }
 
             if (Settings.AutomaticIndicatorWarmUp)
@@ -3785,11 +3863,13 @@ namespace QuantConnect.Algorithm
             }
         }
 
-        private string InitializeOptionIndicator<T>(Symbol symbol, out IRiskFreeInterestRateModel riskFreeRateModel, out IDividendYieldModel dividendYieldModel, 
-            decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, Resolution? resolution = null)
+        private string InitializeOptionIndicator<T>(Symbol symbol, out IRiskFreeInterestRateModel riskFreeRateModel, out IDividendYieldModel dividendYieldModel,
+            decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType? optionModel = null, Resolution? resolution = null)
             where T : OptionIndicatorBase
         {
-            var name = CreateIndicatorName(symbol, $"{typeof(T).Name}({riskFreeRate},{dividendYield},{optionModel})", resolution);
+            var name = CreateIndicatorName(symbol,
+                $"{typeof(T).Name}({riskFreeRate},{dividendYield},{OptionIndicatorBase.GetOptionModel(optionModel, symbol.ID.OptionStyle)})",
+                resolution);
 
             riskFreeRateModel = riskFreeRate.HasValue
                 ? new ConstantRiskFreeRateInterestRateModel(riskFreeRate.Value)
@@ -3800,25 +3880,21 @@ namespace QuantConnect.Algorithm
             {
                 dividendYieldModel = new ConstantDividendYieldModel(dividendYield.Value);
             }
-            else if (symbol.ID.SecurityType == SecurityType.FutureOption || symbol.ID.SecurityType == SecurityType.IndexOption)
-            {
-                dividendYieldModel = new DividendYieldProvider();
-            }
             else
             {
-                dividendYieldModel = new DividendYieldProvider(symbol.Underlying);
+                dividendYieldModel = DividendYieldProvider.CreateForOption(symbol);
             }
 
             return name;
         }
 
-        private void RegisterConsolidator(IndicatorBase indicatorBase, Symbol symbol, IDataConsolidator consolidator)
+        private void RegisterConsolidator(Symbol symbol, IDataConsolidator consolidator, TickType? tickType, IndicatorBase indicatorBase)
         {
             // keep a reference of the consolidator so we can unregister it later using only a reference to the indicator
-            indicatorBase.Consolidators.Add(consolidator);
+            indicatorBase?.Consolidators.Add(consolidator);
 
             // register the consolidator for automatic updates via SubscriptionManager
-            SubscriptionManager.AddConsolidator(symbol, consolidator);
+            SubscriptionManager.AddConsolidator(symbol, consolidator, tickType);
         }
 
         private DateTime GetIndicatorAdjustedHistoryStart(IndicatorBase indicator, IEnumerable<Symbol> symbols, DateTime start, DateTime end, Resolution? resolution = null)
@@ -3826,13 +3902,17 @@ namespace QuantConnect.Algorithm
             var warmupPeriod = (indicator as IIndicatorWarmUpPeriodProvider)?.WarmUpPeriod ?? 0;
             if (warmupPeriod != 0)
             {
-                foreach (var request in CreateDateRangeHistoryRequests(symbols, start, end, resolution))
+                warmupPeriod -= 1;
+                if (warmupPeriod > 0)
                 {
-                    var adjustedStart = _historyRequestFactory.GetStartTimeAlgoTz(request.StartTimeUtc, request.Symbol, warmupPeriod, request.Resolution,
-                        request.ExchangeHours, request.DataTimeZone, request.IncludeExtendedMarketHours);
-                    if (adjustedStart < start)
+                    foreach (var request in CreateDateRangeHistoryRequests(symbols, start, end, resolution))
                     {
-                        start = adjustedStart;
+                        var adjustedStart = _historyRequestFactory.GetStartTimeAlgoTz(request.StartTimeUtc, request.Symbol, warmupPeriod, request.Resolution,
+                            request.ExchangeHours, request.DataTimeZone, request.DataType, request.IncludeExtendedMarketHours);
+                        if (adjustedStart < start)
+                        {
+                            start = adjustedStart;
+                        }
                     }
                 }
             }
@@ -3850,7 +3930,7 @@ namespace QuantConnect.Algorithm
             return dataNormalizationMode;
         }
 
-        private IndicatorHistory IndicatorHistory<T>(IndicatorBase<T> indicator, IEnumerable<Slice> history, Action<IBaseData> updateIndicator)
+        private IndicatorHistory IndicatorHistory<T>(IndicatorBase<T> indicator, IEnumerable<Slice> history, Action<IBaseData> updateIndicator, Type dataType = null)
             where T : IBaseData
         {
             // Reset the indicator
@@ -3865,13 +3945,15 @@ namespace QuantConnect.Algorithm
                 .ToList();
 
             var indicatorsDataPointsByTime = new List<IndicatorDataPoints>();
+            var lastConsumedTime = DateTime.MinValue;
             IndicatorDataPoint lastPoint = null;
             void consumeLastPoint(IndicatorDataPoint newInputPoint)
             {
-                if (lastPoint == null)
+                if (newInputPoint == null || lastConsumedTime == newInputPoint.EndTime)
                 {
                     return;
                 }
+                lastConsumedTime = newInputPoint.EndTime;
 
                 var IndicatorDataPoints = new IndicatorDataPoints { Time = newInputPoint.Time, EndTime = newInputPoint.EndTime };
                 indicatorsDataPointsByTime.Add(IndicatorDataPoints);
@@ -3880,7 +3962,6 @@ namespace QuantConnect.Algorithm
                     var newPoint = indicatorsDataPointPerProperty[i].UpdateValue();
                     IndicatorDataPoints.SetProperty(indicatorsDataPointPerProperty[i].Name, newPoint);
                 }
-                lastPoint = null;
             }
 
             IndicatorUpdatedHandler callback = (object _, IndicatorDataPoint newInputPoint) =>
@@ -3890,23 +3971,22 @@ namespace QuantConnect.Algorithm
                     return;
                 }
 
-                if (lastPoint != null && lastPoint.Time != newInputPoint.Time)
+                if (lastPoint == null || lastPoint.Time != newInputPoint.Time)
                 {
-                    // when the time changes we let through the previous point, some indicators which consume data from multiple symbols might trigger the Updated event
+                    // if null, it's the first point, we transitions from not ready to ready
+                    // else when the time changes we fetch the indicators values, some indicators which consume data from multiple symbols might trigger the Updated event
                     // even if their value has not changed yet
                     consumeLastPoint(newInputPoint);
                 }
                 lastPoint = newInputPoint;
             };
-            // flush the last point
-            consumeLastPoint(lastPoint);
 
             // register the callback, update the indicator and unregister finally
             indicator.Updated += callback;
 
             if (typeof(T) == typeof(IndicatorDataPoint) || typeof(T).IsAbstract)
             {
-                history.PushThrough(bar => updateIndicator(bar));
+                history.PushThrough(bar => updateIndicator(bar), dataType);
             }
             else
             {
@@ -3919,10 +3999,27 @@ namespace QuantConnect.Algorithm
                     }
                 }
             }
+            // flush the last point, this will be useful for indicator consuming time from multiple symbols
+            consumeLastPoint(lastPoint);
             indicator.Updated -= callback;
 
             return new IndicatorHistory(indicatorsDataPointsByTime, indicatorsDataPointPerProperty,
                 new Lazy<PyObject>(() => PandasConverter.GetIndicatorDataFrame(indicatorsDataPointPerProperty.Select(x => new KeyValuePair<string, List<IndicatorDataPoint>>(x.Name, x.Values)))));
+        }
+
+        private Type GetDataTypeFromSelector(Func<IBaseData, decimal> selector)
+        {
+            Type dataType = null;
+            if (_quoteRequiredFields.Any(x => ReferenceEquals(selector, x)))
+            {
+                dataType = typeof(QuoteBar);
+            }
+            else if (ReferenceEquals(selector, Field.Volume))
+            {
+                dataType = typeof(TradeBar);
+            }
+
+            return dataType;
         }
     }
 }
