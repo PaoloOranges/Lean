@@ -141,7 +141,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             Resolution resolution = Resolution.Hour;
 
             SetStartDate(2023, 1, 1); // Set Start Date
-            SetEndDate(2023, 04, 1); // Set End Date
+            SetEndDate(2024, 09, 1); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
