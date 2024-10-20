@@ -516,33 +516,32 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private bool IsOkToSell(Slice data, decimal current_price)
         {
-            bool is_macd_ok = _macd.Histogram.Current.Value < 0;
-            const decimal cross_ma_linear_interp_value = 0.3m;
-            var cross_ma_value = _veryFastMA * (1m - cross_ma_linear_interp_value) + _fastMA * cross_ma_linear_interp_value;
-
-            bool is_moving_averages_ok = current_price < cross_ma_value /*&& _veryFastMA < _fastMA*/;
-    
-            bool is_adx_ok = GetADXDifference() < 3; // compute line and see slope
-
             bool is_target_price_achieved = current_price > (1.0m + _percentage_price_gain) * _bought_price;
+
+            var veryFastSlope = GetSlope(_veryFastMALine);
+            var fastSlope = GetSlope(_fastMALine);
+            var slowSlope = GetSlope(_slowMALine);
+            var macdSlope = GetSlope(_macdLine);
 
             if (is_target_price_achieved)
             {
-                string body = "Price is ok, MACD is " + is_macd_ok + " with value " + _macd.Histogram.Current.Value + "\nVeryFastMA is " + is_moving_averages_ok + "\nAsset price is " + current_price + " and buy price is " + _bought_price;
-                //Notify.Email(EmailAddress, "Price Ok for SELL", body);
-                //Log(body);
+                bool isVeryFastApproachingFastLine = veryFastSlope < fastSlope;
+                decimal veryFastVsFastMargin = _veryFastMA - _fastMA;
+
+                if(isVeryFastApproachingFastLine && veryFastVsFastMargin < 0.015m)
+                {
+                    return true;
+                }
             }
+            else
+            {
+                //bool slowSlopeOk = slowSlope <= 0.0 && veryFastSlope < 1.5 * fastSlope;
 
-            bool slowSlopeOk = GetSlope(_slowMALine) <= 0.0 && GetSlope(_veryFastMALine) < 1.5 * GetSlope(_fastMALine);
-            bool isFastSlopeOk = GetSlope(_veryFastMALine) < 0.0 && GetSlope(_fastMALine) < 0.05;
+                //bool is_stop_limit = slowSlopeOk && current_price < 0.94m * _max_price_after_buy; ; // _veryFastMA < _fastMA && _fastMA < _slowMA && _adx.PositiveDirectionalIndex < _adx.NegativeDirectionalIndex && _macd < 0 ;  
+                //return is_stop_limit; 
 
-            bool is_stop_limit = slowSlopeOk && current_price < 0.94m * _max_price_after_buy; ; // _veryFastMA < _fastMA && _fastMA < _slowMA && _adx.PositiveDirectionalIndex < _adx.NegativeDirectionalIndex && _macd < 0 ;  
-            //bool is_stop_limit = current_price < _slowMA && current_price < 0.97m * _max_price_after_buy && GetSlope(_veryFastMALine) < 1 && GetSlope(_fastMALine) < Math.PI / 6.0;
-
-            //is_gain_ok = is_target_price_achieved && is_stop_limit;
-
-            return (is_moving_averages_ok && is_target_price_achieved && isFastSlopeOk) || is_stop_limit  /*|| IsStopLoss(data)*/;
-
+            }
+            return false;
         }
 
         private bool IsStopLoss(Slice data)
