@@ -115,6 +115,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         FixedCircularBuffer<decimal> _posADXCircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
         FixedCircularBuffer<decimal> _negADXCircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
 
+        FixedCircularBuffer<IndicatorsFrame> _indicatorsCircularBuffer = new FixedCircularBuffer<IndicatorsFrame>(CircularBufferLength);
+
+
         (double, double) _fastMALine;
         (double, double) _veryFastMALine;
         (double, double) _slowMALine;
@@ -272,6 +275,19 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private void UpdateInternalVariables(Slice data)
         {
+            IndicatorsFrame frame = new()
+            {
+                veryFastMA = _veryFastMA,
+                fastMA = _fastMA,
+                slowMA = _slowMA,
+                MACD = _macd,
+                MACDHistogram = _macd.Histogram,
+                ADXPlus = _adx.PositiveDirectionalIndex,
+                ADXMinus = _adx.NegativeDirectionalIndex,
+            };
+
+            _indicatorsCircularBuffer.Push(frame);
+
             _veryFastMACircularBuffer.Push(_veryFastMA);
             _fastMACircularBuffer.Push(_fastMA);
             _slowMACircularBuffer.Push(_slowMA);
@@ -279,12 +295,14 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             _posADXCircularBuffer.Push(_adx.PositiveDirectionalIndex);
             _negADXCircularBuffer.Push(_adx.NegativeDirectionalIndex);
 
-            _fastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_fastMACircularBuffer));
-            _veryFastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_veryFastMACircularBuffer));
-            _slowMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_slowMACircularBuffer));
-            _macdLine = Fit.Line(FixedArray, ConvertToDoubleArray(_macdCircularBuffer));
-            _posADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(_posADXCircularBuffer));
-            _negADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(_negADXCircularBuffer));
+            var frameArray = _indicatorsCircularBuffer.ToArray();
+
+            _fastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.fastMA)));
+            _veryFastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.veryFastMA)));
+            _slowMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.slowMA)));
+            _macdLine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.MACD)));
+            _posADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.ADXPlus)));
+            _negADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.ADXMinus)));
 
             decimal current_price = data[SymbolName].Value;
             switch (_purchase_status)
@@ -554,11 +572,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             return line.Item2;
         }
 
-        private double[] ConvertToDoubleArray<T>(FixedCircularBuffer<T> fixedCircularBuffer)
+        private double[] ConvertToDoubleArray<T>(FixedCircularBuffer<T> fixedCircularBuffer, Func<T, double> selector)
         {
-            return fixedCircularBuffer.ToArray().Select(x => Convert.ToDouble(x)).ToArray();
-        }
+            return fixedCircularBuffer.ToArray().Select(selector).ToArray();
 
+        }
         internal class MinMaxMACD
         {
             private int _length = 0;
