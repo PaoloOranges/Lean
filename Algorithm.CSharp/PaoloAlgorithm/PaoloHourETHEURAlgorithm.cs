@@ -297,12 +297,12 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             var frameArray = _indicatorsCircularBuffer.ToArray();
 
-            _fastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.fastMA)));
-            _veryFastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.veryFastMA)));
-            _slowMALine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.slowMA)));
-            _macdLine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.MACD)));
-            _posADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.ADXPlus)));
-            _negADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(_indicatorsCircularBuffer, selector: f => Decimal.ToDouble(f.ADXMinus)));
+            _fastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.fastMA)));
+            _veryFastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.veryFastMA)));
+            _slowMALine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.slowMA)));
+            _macdLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.MACD)));
+            _posADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.ADXPlus)));
+            _negADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.ADXMinus)));
 
             decimal current_price = data[SymbolName].Value;
             switch (_purchase_status)
@@ -572,9 +572,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             return line.Item2;
         }
 
-        private double[] ConvertToDoubleArray<T>(FixedCircularBuffer<T> fixedCircularBuffer, Func<T, double> selector)
+        private double[] ConvertToDoubleArray<T>(T[] values, Func<T, double> selector)
         {
-            return fixedCircularBuffer.ToArray().Select(selector).ToArray();
+            return values.Select(selector).ToArray();
 
         }
         internal class MinMaxMACD
