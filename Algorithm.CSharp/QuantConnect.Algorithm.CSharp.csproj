@@ -60,4 +60,7 @@
       <PackagePath></PackagePath>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="PaoloAlgorithm\Test\" />
+  </ItemGroup>
 </Project>
