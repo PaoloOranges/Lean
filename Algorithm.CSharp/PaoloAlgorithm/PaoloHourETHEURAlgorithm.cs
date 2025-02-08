@@ -165,8 +165,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             var adxPeriod = (FastPeriod + VeryFastPeriod) / 2;
             _adx = ADX(_symbol, adxPeriod, resolution);
-            _rsi = RSI(_symbol, SlowPeriod, MovingAverageType.Exponential);
-            _bollingerBands = BB(_symbol, FastPeriod, 1.5m, MovingAverageType.LinearWeightedMovingAverage);
+            _rsi = RSI(_symbol, FastPeriod, MovingAverageType.Exponential);
+            _bollingerBands = BB(_symbol, FastPeriod, 1m, MovingAverageType.Simple);
 
             SetWarmUp(TimeSpan.FromDays(7));
 
