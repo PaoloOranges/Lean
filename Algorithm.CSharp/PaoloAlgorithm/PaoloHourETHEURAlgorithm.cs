@@ -65,6 +65,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         //private ParabolicStopAndReverse _psar;
         private AverageDirectionalIndex _adx;
         private RelativeStrengthIndex _rsi;
+        private BollingerBands _bollingerBands;
 
         private const decimal _stop_loss_percentage = 0.95m;
 
@@ -164,7 +165,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             var adxPeriod = (FastPeriod + VeryFastPeriod) / 2;
             _adx = ADX(_symbol, adxPeriod, resolution);
-            //_rsi = RSI(_symbol, slowPeriod, MovingAverageType.Exponential);
+            _rsi = RSI(_symbol, SlowPeriod, MovingAverageType.Exponential);
+            _bollingerBands = BB(_symbol, FastPeriod, 1.5m, MovingAverageType.LinearWeightedMovingAverage);
 
             SetWarmUp(TimeSpan.FromDays(7));
 
@@ -177,11 +179,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(VolumeSeriesName, SeriesType.Bar, ""));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
-            IndicatorBase[] indicatorsToPlot = { _slowMA, _fastMA, _veryFastMA };
+            IndicatorBase[] indicatorsToPlot = { _slowMA, _fastMA, _veryFastMA , _bollingerBands.MiddleBand, _bollingerBands.UpperBand, _bollingerBands.LowerBand};
             PlotIndicator("Indicators", indicatorsToPlot);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
-            IndicatorBase[] oscillatorsToPlot = { /*_adx,*/ _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex, _macd.Histogram};
+            IndicatorBase[] oscillatorsToPlot = { /*_adx,*/ _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex, _macd.Histogram, _rsi};
             PlotIndicator("Oscillators", oscillatorsToPlot);
 #endif
 
