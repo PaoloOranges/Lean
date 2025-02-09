@@ -47,6 +47,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             Init,
             ReadyToBuy,
             Bought,
+            ReadyToSell,
             Sold,  
         };
 
@@ -69,7 +70,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private const decimal _stop_loss_percentage = 0.95m;
 
-        private PurchaseState _purchase_status = PurchaseState.Init;
+        private PurchaseState _tradingPhase = PurchaseState.Init;
         private decimal _bought_price = 0;
         private decimal _max_price_after_buy = decimal.MinValue;
 
@@ -165,7 +166,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             var adxPeriod = (FastPeriod + VeryFastPeriod) / 2;
             _adx = ADX(_symbol, adxPeriod, resolution);
-            _rsi = RSI(_symbol, FastPeriod, MovingAverageType.Exponential);
+            _rsi = RSI(_symbol, SlowPeriod, MovingAverageType.Exponential);
             _bollingerBands = BB(_symbol, FastPeriod, 1m, MovingAverageType.Simple);
 
             SetWarmUp(TimeSpan.FromDays(7));
@@ -183,7 +184,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             PlotIndicator("Indicators", indicatorsToPlot);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
-            IndicatorBase[] oscillatorsToPlot = { /*_adx,*/ _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex, _macd.Histogram, _rsi};
+            IndicatorBase[] oscillatorsToPlot = { /*_adx,*//* _adx.PositiveDirectionalIndex, _adx.NegativeDirectionalIndex,*/ _macd.Histogram, _rsi};
             PlotIndicator("Oscillators", oscillatorsToPlot);
 #endif
 
@@ -196,7 +197,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             if (cryptoCashBook.Amount > 0)
             {
                 Log(CryptoName + " amount in Portfolio: " + cryptoCashBook.Amount + " - Initialized to Bought");
-                _purchase_status = PurchaseState.Bought;
+                _tradingPhase = PurchaseState.Bought;
                 if (HasBoughtPriceFromPreviousSession)
                 {
                     string bought_price = ObjectStore.Read(LastBoughtObjectStoreKey);
@@ -207,7 +208,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             else
             {
                 Log(CurrencyName + " amount in Portfolio: " + Portfolio.CashBook[CurrencyName].Amount + " - Initialized to Sold");
-                _purchase_status = PurchaseState.Sold;
+                _tradingPhase = PurchaseState.Sold;
                 ready_for_buy_state = ReadyForBuyState.None;
                 if (HasSoldPriceFromPreviousSession)
                 {
@@ -247,7 +248,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             if (IsWarmingUp)
             {
-                if (_purchase_status == PurchaseState.Bought && !HasBoughtPriceFromPreviousSession)
+                if (_tradingPhase == PurchaseState.Bought && !HasBoughtPriceFromPreviousSession)
                 {
                     _bought_price = Math.Max(data[SymbolName].Value, _bought_price);
                 }
@@ -307,7 +308,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             _negADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.ADXMinus)));
 
             decimal current_price = data[SymbolName].Value;
-            switch (_purchase_status)
+            switch (_tradingPhase)
             {
                 case PurchaseState.Bought:
                     {
@@ -359,19 +360,22 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 #if LOG_INDICATORS
             Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
-            decimal current_price = data[SymbolName].Value; // Value == Close
-            switch (_purchase_status)
+            decimal currentPrice = data[SymbolName].Value; // Value == Close
+            switch (_tradingPhase)
             {
                 case PurchaseState.Init:
                     break;
                 case PurchaseState.ReadyToBuy:
-                    OnReadyToBuy(data, current_price);
+                    OnReadyToBuy(data, currentPrice);
                     break;
                 case PurchaseState.Bought:
-                    OnBought(data, current_price);
+                    OnBought(data, currentPrice);
+                    break;
+                case PurchaseState.ReadyToSell:
+                    OnReadyToSell(data, currentPrice);
                     break;
                 case PurchaseState.Sold:
-                    OnPrepareToBuy(data, current_price);
+                    OnPrepareToBuy(data, currentPrice);
                     break;
                 default:
                     Error("Invalid Purchase state");
@@ -379,9 +383,18 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
         }
 
-        private void OnBought(Slice data, decimal current_price)
+        private void OnBought(Slice data, decimal currentPrice)
         {
-            if (IsOkToSell(data, current_price))
+
+            if (currentPrice > _bollingerBands.UpperBand)
+            {
+                _tradingPhase = PurchaseState.ReadyToSell;
+            }
+        }
+
+        private void OnReadyToSell(Slice data, decimal currentPrice)
+        {
+            if (IsOkToSell(data, currentPrice))
             {
 #if !(LIVE_NO_TRADE)
                 Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
@@ -396,13 +409,13 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
         }
 
-        private void OnReadyToBuy(Slice data, decimal current_price)
+        private void OnReadyToBuy(Slice data, decimal currentPrice)
         {
-            if (IsOkToBuy(data, current_price))
+            if (IsOkToBuy(data, currentPrice))
             {
                 const decimal round_multiplier = 1000m;
                 decimal amount_to_buy = Portfolio.CashBook[CurrencyName].Amount * _amount_to_buy;
-                decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / current_price) / round_multiplier;
+                decimal quantity = Math.Truncate(round_multiplier * amount_to_buy / currentPrice) / round_multiplier;
 #if !(LIVE_NO_TRADE)
                 var order = Buy(_symbol, quantity);
 #else
@@ -416,7 +429,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
         }
 
-        private void OnPrepareToBuy(Slice data, decimal current_price)
+        private void OnPrepareToBuy(Slice data, decimal currentPrice)
         {
             bool transitionToNextState = false;
 
@@ -424,48 +437,49 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             var fastSlope = GetSlope(_fastMALine);
             var slowSlope = GetSlope(_slowMALine);
             var macdSlope = GetSlope(_macdLine);
-                        
-            if(_veryFastMACrossState.CrossState == CrossStateEnum.Down)
-            {
-                if (_veryFastMA < _slowMA)
-                {
-                    bool isPriceAndMAOk = current_price > _veryFastMA;
-                    bool isSlopeOk = veryFastSlope > slowSlope && veryFastSlope > Math.PI / 6;
-                    bool isMacdSlopeOk = /*macdSlope > 0.1*/ _macd.Histogram > 0;
-                    bool isAdxOk = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex;
+            
+            transitionToNextState = currentPrice < _bollingerBands.LowerBand;
+            //if(_veryFastMACrossState.CrossState == CrossStateEnum.Down)
+            //{
+            //    if (_veryFastMA < _slowMA)
+            //    {
+            //        bool isPriceAndMAOk = currentPrice > _veryFastMA;
+            //        bool isSlopeOk = veryFastSlope > slowSlope && veryFastSlope > Math.PI / 6;
+            //        bool isMacdSlopeOk = /*macdSlope > 0.1*/ _macd.Histogram > 0;
+            //        bool isAdxOk = _adx.PositiveDirectionalIndex > _adx.NegativeDirectionalIndex;
 
-                    transitionToNextState = isPriceAndMAOk && isSlopeOk && isAdxOk;
-                }
-            }
-            else if(_veryFastMACrossState.CrossState == CrossStateEnum.Up)
-            {
-                bool isPriceAndMAOk = current_price > _fastMA;
-                bool isAdxOk = (_adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex) > 2;
+            //        transitionToNextState = isPriceAndMAOk && isSlopeOk && isAdxOk;
+            //    }
+            //}
+            //else if(_veryFastMACrossState.CrossState == CrossStateEnum.Up)
+            //{
+            //    bool isPriceAndMAOk = currentPrice > _fastMA;
+            //    bool isAdxOk = (_adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex) > 2;
                 
-                bool isMACDSlopeOk = macdSlope > 0.2;
-                bool isMACDOk = _macd.Histogram > 0;
+            //    bool isMACDSlopeOk = macdSlope > 0.2;
+            //    bool isMACDOk = _macd.Histogram > 0;
 
-                transitionToNextState = isPriceAndMAOk && isAdxOk && isMACDOk;
-            }
-            else
-            {
-                bool isMAOk = _veryFastMA > _fastMA && _fastMA > _slowMA;
-                bool isPriceOk = current_price > _veryFastMA;
-                bool isAdxOk = (_adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex) > 5;
-                bool isVolumeOk = _volumeCounter > 2;
+            //    transitionToNextState = isPriceAndMAOk && isAdxOk && isMACDOk;
+            //}
+            //else
+            //{
+            //    bool isMAOk = _veryFastMA > _fastMA && _fastMA > _slowMA;
+            //    bool isPriceOk = currentPrice > _veryFastMA;
+            //    bool isAdxOk = (_adx.PositiveDirectionalIndex - _adx.NegativeDirectionalIndex) > 5;
+            //    bool isVolumeOk = _volumeCounter > 2;
 
-                transitionToNextState = isMAOk && isPriceOk && isAdxOk && isVolumeOk;
-            }
+            //    transitionToNextState = isMAOk && isPriceOk && isAdxOk && isVolumeOk;
+            //}
 
             if(transitionToNextState)
             {
-                _purchase_status = PurchaseState.ReadyToBuy;
+                _tradingPhase = PurchaseState.ReadyToBuy;
             }
         }
 
-        private bool IsOkToBuy(Slice data, decimal current_price)
+        private bool IsOkToBuy(Slice data, decimal currentPrice)
         {
-            bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ current_price > _veryFastMA;
+            bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ currentPrice > _veryFastMA;
 
             var signalDeltaPercent = (_macd - _macd.Signal) / _macd.Fast;
             var tolerance = 0.0025m;
@@ -475,12 +489,17 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             var slowSlope = GetSlope(_slowMALine);
             var macdSlope = GetSlope(_macdLine);
 
-            return true;
+            if (currentPrice > _bollingerBands.LowerBand)
+            {
+                return true;
+            }
+
+            return false;
         }
 
-        private bool IsOkToSell(Slice data, decimal current_price)
+        private bool IsOkToSell(Slice data, decimal currentPrice)
         {
-            bool is_target_price_achieved = current_price > (1.0m + _percentage_price_gain) * _bought_price;
+            bool is_target_price_achieved = currentPrice > (1.0m + _percentage_price_gain) * _bought_price;
 
             var veryFastSlope = GetSlope(_veryFastMALine);
             var fastSlope = GetSlope(_fastMALine);
@@ -489,13 +508,18 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             if (is_target_price_achieved)
             {
-                bool isVeryFastApproachingFastLine = veryFastSlope < fastSlope;
-                decimal veryFastVsFastMargin = _veryFastMA - _fastMA;
-
-                if(isVeryFastApproachingFastLine && veryFastVsFastMargin < 0.015m)
+                if (currentPrice < _bollingerBands.UpperBand)
                 {
                     return true;
                 }
+
+                //bool isVeryFastApproachingFastLine = veryFastSlope < fastSlope;
+                //decimal veryFastVsFastMargin = _veryFastMA - _fastMA;
+
+                //if(isVeryFastApproachingFastLine && veryFastVsFastMargin < 0.015m)
+                //{
+                //    return true;
+                //}
             }
             else
             {
@@ -536,7 +560,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             if (orderEvent.Direction == OrderDirection.Buy && orderEvent.Status == OrderStatus.Filled)
             {
-                _purchase_status = PurchaseState.Bought;
+                _tradingPhase = PurchaseState.Bought;
                 _bought_price = orderEvent.FillPrice;
                 _max_price_after_buy = _bought_price;
                 ResetCrossStates();
@@ -545,7 +569,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             if (orderEvent.Direction == OrderDirection.Sell && orderEvent.Status == OrderStatus.Filled)
             {
-                _purchase_status = PurchaseState.Sold;
+                _tradingPhase = PurchaseState.Sold;
                 _sold_price = orderEvent.FillPrice;
                 _max_price_after_buy = decimal.MinValue;
                 ResetCrossStates();
@@ -554,7 +578,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             if (orderEvent.Status == OrderStatus.Invalid)
             {
-                _purchase_status = orderEvent.Direction == OrderDirection.Buy ? PurchaseState.Sold : PurchaseState.Bought;
+                _tradingPhase = orderEvent.Direction == OrderDirection.Buy ? PurchaseState.Sold : PurchaseState.Bought;
             }
 
             if (orderEvent.Status == OrderStatus.Submitted)
