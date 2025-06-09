@@ -81,7 +81,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private RelativeStrengthIndex _rsi;
         private BollingerBands _bollingerBands;
 
-        private const decimal _stop_loss_percentage = 0.95m;
+        private const decimal _stop_loss_percentage = 0.97m;
+        private const decimal _trailing_stop_gain_percentage = 0.01m; // used to maximize gain
 
         private PurchaseState _tradingPhase = PurchaseState.Init;
         private decimal _boughtPrice = 0;
@@ -333,6 +334,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             switch (_tradingPhase)
             {
                 case PurchaseState.PrepareToSell:
+                case PurchaseState.ReadyToSell:
                     {
                         _max_price_after_buy = Math.Max(_max_price_after_buy, current_price);
                     }
@@ -441,7 +443,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             var slowSlope = GetSlope(_slowMALine);
             var macdSlope = GetSlope(_macdLine);
 
-            if (currentPrice < _bollingerBands.UpperBand)
+            var trailingStopPrice = _max_price_after_buy * (1.0m - _trailing_stop_gain_percentage);
+
+            if (currentPrice < trailingStopPrice)
             {
                 return true;
             }
