@@ -393,7 +393,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                     OnReadyToBuy(data, currentPrice);
                     break;
                 case PurchaseState.PrepareToSell:
-                    OnBought(data, currentPrice);
+                    OnPrepareToSell(data, currentPrice);
                     break;
                 case PurchaseState.ReadyToSell:
                     OnReadyToSell(data, currentPrice);
@@ -407,7 +407,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
         }
 
-        private void OnBought(Slice data, decimal currentPrice)
+        private void OnPrepareToSell(Slice data, decimal currentPrice)
         {
             bool isTargetPriceAchieved = currentPrice > (1.0m + _percentagePriceGain) * _boughtPrice;
             bool isRSIOverBought = _rsi > 70;
