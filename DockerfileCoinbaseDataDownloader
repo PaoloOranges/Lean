@@ -1,10 +1,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS builder
+LABEL stage=builder
 
-WORKDIR /build
+WORKDIR /build/src
 
-COPY . src
+COPY . Lean
 
-RUN dotnet publish src/DownloaderDataProvider/QuantConnect.DownloaderDataProvider.Launcher.csproj -c Release -o /output && rm -rf src
+RUN git clone -b custom https://github.com/PaoloOranges/Lean.Brokerages.CoinbasePro.git CoinbaseBrokerage
+
+RUN dotnet publish Lean/DownloaderDataProvider/QuantConnect.DownloaderDataProvider.Launcher.csproj -c Release -o /output && rm -rf src
+RUN dotnet publish CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage.csproj -c Release -o /output && rm -rf Lean.Brokerages.CoinbasePro
+
 RUN rm /output/*.pdb
 
 FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine
@@ -14,6 +19,9 @@ ARG EXECUTABLE_PATH=/opt/bin/QuantconnectLeanCoinbaseProTickersDownloader
 ENV SHARED_STORAGE_HOME=/Shared
 ENV CONFIG_JSON_FILE=$EXECUTABLE_PATH/config.json
 ENV DOWNLOADER_BIN=$EXECUTABLE_PATH/QuantConnect.DownloaderDataProvider.Launcher.dll
+ENV DATA_FOLDER=$SHARED_STORAGE_HOME/DATA_FOLDER
+ENV COINBASE_API_NAME=""
+ENV COINBASE_API_PRIVATE_KEY=""
 
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
@@ -23,13 +31,10 @@ RUN apk add bash icu-libs
 
 WORKDIR $EXECUTABLE_PATH    
 COPY --from=builder /output .
-# COPY scripts/$ENTRY_POINT_FILE_NAME .
-# COPY $TICKERS_FILE_NAME .
 
-# RUN chmod +x $ENTRY_POINT_FILE_NAME
 
-# # Set Crontab
-# #RUN crontab -l | { cat; echo "30 23 * * * bash $EXECUTABLE_PATH/$ENTRY_POINT_FILE_NAME > $SHARED_STORAGE_HOME/DownloadDataUntilNow.log"; } | crontab -
+# Set Crontab
+#RUN crontab -l | { cat; echo "30 23 * * * bash $EXECUTABLE_PATH/$ENTRY_POINT_FILE_NAME > $SHARED_STORAGE_HOME/DownloadDataUntilNow.log"; } | crontab -
 
 # CMD ["bash", "-c", "$ENTRY_POINT_FILE_PATH > $SHARED_STORAGE_HOME/DownloadDataUntilNow.log"]
 CMD ["bash"]
