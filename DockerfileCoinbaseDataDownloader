@@ -1,0 +1,38 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS builder
+
+WORKDIR /build
+
+COPY . src
+
+RUN dotnet publish src/DownloaderDataProvider/QuantConnect.DownloaderDataProvider.Launcher.csproj -c Release -o /output && rm -rf src
+RUN rm /output/*.pdb
+
+FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine
+
+ARG EXECUTABLE_PATH=/opt/bin/QuantconnectLeanCoinbaseProTickersDownloader
+ARG TICKERS_FILE_NAME=tickers.txt
+ARG ENTRY_POINT_FILE_NAME=entrypoint.sh
+
+ENV SHARED_STORAGE_HOME=/Shared
+ENV CONFIG_JSON_FILE=$EXECUTABLE_PATH/config.json
+ENV TICKERS_FILE=$EXECUTABLE_PATH/$TICKERS_FILE_NAME
+ENV DOWNLOADER_BIN=$EXECUTABLE_PATH/QuantConnect.DownloaderDataProvider.Launcher.dll
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+ENV ENTRY_POINT_FILE_PATH=$EXECUTABLE_PATH/$ENTRY_POINT_FILE_NAME
+
+#Alpine
+RUN apk update
+RUN apk add bash
+
+WORKDIR $EXECUTABLE_PATH    
+COPY --from=builder /output .
+# COPY scripts/$ENTRY_POINT_FILE_NAME .
+# COPY $TICKERS_FILE_NAME .
+
+# RUN chmod +x $ENTRY_POINT_FILE_NAME
+
+# # Set Crontab
+# #RUN crontab -l | { cat; echo "30 23 * * * bash $EXECUTABLE_PATH/$ENTRY_POINT_FILE_NAME > $SHARED_STORAGE_HOME/DownloadDataUntilNow.log"; } | crontab -
+
+# CMD ["bash", "-c", "$ENTRY_POINT_FILE_PATH > $SHARED_STORAGE_HOME/DownloadDataUntilNow.log"]
+CMD ["bash"]
