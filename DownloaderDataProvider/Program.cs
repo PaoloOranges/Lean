@@ -15,18 +15,20 @@
 */
 
 using NodaTime;
-using QuantConnect.Util;
-using QuantConnect.Data;
-using QuantConnect.Logging;
-using QuantConnect.Interfaces;
-using QuantConnect.Securities;
 using QuantConnect.Configuration;
-using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Data;
 using QuantConnect.Data.UniverseSelection;
-using DataFeeds = QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.DownloaderDataProvider.Launcher.Models;
 using QuantConnect.DownloaderDataProvider.Launcher.Models.Constants;
+using QuantConnect.Interfaces;
+using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.HistoricalData;
+using QuantConnect.Logging;
+using QuantConnect.Securities;
+using QuantConnect.Util;
+using System.Globalization;
+using System.Text.Json;
+using DataFeeds = QuantConnect.Lean.Engine.DataFeeds;
 
 namespace QuantConnect.DownloaderDataProvider.Launcher;
 public static class Program
@@ -55,7 +57,7 @@ public static class Program
     /// The main entry point for the application.
     /// </summary>
     /// <param name="args">Command-line arguments passed to the application.</param>
-    public static void Main(string[] args)
+    public static void Main_OLD(string[] args)
     {
         // Parse report arguments and merge with config to use in the optimizer
         if (args.Length > 0)
@@ -65,8 +67,7 @@ public static class Program
 
         InitializeConfigurations();
 
-        //var dataDownloader = Composer.Instance.GetExportedValueByTypeName<IDataDownloader>(Config.Get(DownloaderCommandArguments.CommandDownloaderDataDownloader));
-        var dataDownloader = new BrokerageDataDownloader();
+        var dataDownloader = Composer.Instance.GetExportedValueByTypeName<IDataDownloader>(Config.Get(DownloaderCommandArguments.CommandDownloaderDataDownloader));
         var commandDataType = Config.Get(DownloaderCommandArguments.CommandDataType).ToUpperInvariant();
 
         switch (commandDataType)
@@ -85,6 +86,85 @@ public static class Program
         }
     }
 
+    // PAOLO EDIT
+    private static readonly string _tickerFile = Path.Combine(Globals.DataFolder, "tickers.txt");
+    private static readonly string _lastSuccessFilePath = Path.Combine(Globals.DataFolder, "last_success.json");
+    private static readonly JsonSerializerOptions _jsonSerializationOptions = new JsonSerializerOptions
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private static List<string> _tickers = new List<string>();
+    private static Dictionary<string, string> _tickersAndLastTime = new Dictionary<string, string>();
+
+    private const string DATE_FORMAT = "yyyyMMdd-HH:mm:ss";
+    private static void WriteDownloadProgressToFile()
+    {        
+        string jsonString = JsonSerializer.Serialize(_tickersAndLastTime, _jsonSerializationOptions);
+
+        File.WriteAllText(_lastSuccessFilePath, jsonString);
+    }
+
+    private static void InitTickersAndLastTimeFromFile()
+    {
+        if (File.Exists(_lastSuccessFilePath))
+        {
+            string jsonString = File.ReadAllText(_lastSuccessFilePath);
+            _tickersAndLastTime = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonString) ?? new Dictionary<string, string>();
+        }
+    }
+
+    private static void InitializeTickerFile()
+    {
+        if (!File.Exists(_tickerFile))
+        {
+            File.WriteAllText(_tickerFile, string.Empty);
+        }
+        _tickers = File.ReadAllLines(_tickerFile).Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
+    }
+
+    public static void Main(string[] args)
+    {
+        // Parse report arguments and merge with config to use in the optimizer
+        if (args.Length > 0)
+        {
+            Config.MergeCommandLineArgumentsWithConfiguration(DownloaderDataProviderArgumentParser.ParseArguments(args));
+        }
+
+        InitializeConfigurations();
+        var dataDownloader = new BrokerageDataDownloader();
+
+        InitializeTickerFile();
+        InitTickersAndLastTimeFromFile();
+
+        Resolution[] TIME_RESOLUTIONS = { Resolution.Minute, Resolution.Hour, Resolution.Daily };
+
+        foreach (var ticker in _tickers)
+        {
+            if(!_tickersAndLastTime.TryGetValue(ticker, out string fromDateStr))
+            {
+                fromDateStr = new DateTime(DateTime.Now.Year - 2, 1, 1, 0, 0, 0).ToString(DATE_FORMAT);
+            }
+
+            DateTime fromDate = DateTime.ParseExact(fromDateStr, DATE_FORMAT, CultureInfo.InvariantCulture);
+            DateTime toDate = DateTime.UtcNow;
+
+            foreach(var resolution in TIME_RESOLUTIONS)
+            {
+                Log.Trace($"DownloaderDataProvider.Main(): Downloading {ticker} at {resolution} resolution from {fromDate} to {toDate}.");
+
+                var symbolObject = Symbol.Create(ticker, SecurityType.Crypto, Market.Coinbase);
+
+                DataDownloadConfig dataDownloadConfig = new DataDownloadConfig(TickType.Trade, SecurityType.Equity, Resolution.Daily, fromDate, toDate, Market.Coinbase, new List<Symbol> { symbolObject });
+
+                RunDownload(dataDownloader, dataDownloadConfig, Globals.DataFolder, _dataCacheProvider);
+                
+            }
+            _tickersAndLastTime[ticker] = toDate.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
+        }
+
+    }
     /// <summary>
     /// Executes a data download operation using the specified data downloader.
     /// </summary>
