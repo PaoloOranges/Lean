@@ -33,5 +33,11 @@ namespace QuantConnect.DownloaderDataProvider.Launcher.Models.Constants
         public const string CommandStartDate = "start-date";
 
         public const string CommandEndDate = "end-date";
+
+        public const string DataFolder = "data-folder";
+
+        public const string CoinbaseApiName = "coinbase-api-name";
+
+        public const string CoinbaseApiPrivateKey = "coinbase-api-private-key";
     }
 }

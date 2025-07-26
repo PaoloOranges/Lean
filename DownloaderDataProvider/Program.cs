@@ -156,12 +156,14 @@ public static class Program
 
                 var symbolObject = Symbol.Create(ticker, SecurityType.Crypto, Market.Coinbase);
 
-                DataDownloadConfig dataDownloadConfig = new DataDownloadConfig(TickType.Trade, SecurityType.Equity, Resolution.Daily, fromDate, toDate, Market.Coinbase, new List<Symbol> { symbolObject });
+                DataDownloadConfig dataDownloadConfig = new DataDownloadConfig(TickType.Trade, SecurityType.Equity, resolution, fromDate, toDate, Market.Coinbase, new List<Symbol> { symbolObject });
 
                 RunDownload(dataDownloader, dataDownloadConfig, Globals.DataFolder, _dataCacheProvider);
                 
             }
             _tickersAndLastTime[ticker] = toDate.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
+
+            WriteDownloadProgressToFile();
         }
 
     }

@@ -35,7 +35,10 @@ public static class DownloaderDataProviderArgumentParser
         new CommandLineOption(DownloaderCommandArguments.CommandMarketName, CommandOptionType.SingleValue),
         new CommandLineOption(DownloaderCommandArguments.CommandResolution, CommandOptionType.SingleValue),
         new CommandLineOption(DownloaderCommandArguments.CommandStartDate, CommandOptionType.SingleValue),
-        new CommandLineOption(DownloaderCommandArguments.CommandEndDate, CommandOptionType.SingleValue)
+        new CommandLineOption(DownloaderCommandArguments.CommandEndDate, CommandOptionType.SingleValue),
+        new CommandLineOption(DownloaderCommandArguments.DataFolder, CommandOptionType.SingleValue),
+        new CommandLineOption(DownloaderCommandArguments.CoinbaseApiName, CommandOptionType.SingleValue),
+        new CommandLineOption(DownloaderCommandArguments.CoinbaseApiPrivateKey, CommandOptionType.SingleValue),
     };
 
     /// <summary>
