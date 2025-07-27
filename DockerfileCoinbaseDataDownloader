@@ -18,12 +18,6 @@ FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine
 ARG EXECUTABLE_PATH=/opt/bin/QuantconnectLeanCoinbaseProTickersDownloader
 ARG DOWNLOADER_BIN=$EXECUTABLE_PATH/QuantConnect.DownloaderDataProvider.Launcher.dll
 
-# ENV SHARED_STORAGE_HOME=/Shared
-# ENV CONFIG_JSON_FILE=$EXECUTABLE_PATH/config.json
-# ENV DATA_FOLDER=$SHARED_STORAGE_HOME/"Data"
-# ENV COINBASE_API_NAME=""
-# ENV COINBASE_API_PRIVATE_KEY=""
-
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 #Alpine
@@ -32,10 +26,5 @@ RUN apk add icu-libs
 
 WORKDIR $EXECUTABLE_PATH    
 COPY --from=builder /output .
-
-# RUN echo 'dotnet QuantConnect.DownloaderDataProvider.Launcher.dll --data-folder "$DATA_FOLDER" --coinbase-api-name "$COINBASE_API_NAME" --coinbase-api-private-key "$COINBASE_API_PRIVATE_KEY"' > entrypoint.sh
-# RUN chmod +x entrypoint.sh
-
-# RUN ln -s $(pwd)/entrypoint.sh /usr/local/bin
 
 ENTRYPOINT [ "dotnet", "QuantConnect.DownloaderDataProvider.Launcher.dll" ]
