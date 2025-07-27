@@ -9,6 +9,8 @@ RUN git clone -b custom https://github.com/PaoloOranges/Lean.Brokerages.Coinbase
 RUN dotnet publish Lean/DownloaderDataProvider/QuantConnect.DownloaderDataProvider.Launcher.csproj -c Release -o /output && rm -rf src
 RUN dotnet publish CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage/QuantConnect.CoinbaseBrokerage.csproj -c Release -o /output && rm -rf Lean.Brokerages.CoinbasePro
 
+RUN cp Lean/DownloaderDataProvider/config.json /output/config.json
+
 RUN rm /output/*.pdb
 
 FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine
@@ -16,11 +18,11 @@ FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine
 ARG EXECUTABLE_PATH=/opt/bin/QuantconnectLeanCoinbaseProTickersDownloader
 ARG DOWNLOADER_BIN=$EXECUTABLE_PATH/QuantConnect.DownloaderDataProvider.Launcher.dll
 
-ENV SHARED_STORAGE_HOME=/Shared
+# ENV SHARED_STORAGE_HOME=/Shared
 # ENV CONFIG_JSON_FILE=$EXECUTABLE_PATH/config.json
-ENV DATA_FOLDER=$SHARED_STORAGE_HOME/"Data"
-ENV COINBASE_API_NAME=""
-ENV COINBASE_API_PRIVATE_KEY=""
+# ENV DATA_FOLDER=$SHARED_STORAGE_HOME/"Data"
+# ENV COINBASE_API_NAME=""
+# ENV COINBASE_API_PRIVATE_KEY=""
 
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
@@ -31,10 +33,9 @@ RUN apk add icu-libs
 WORKDIR $EXECUTABLE_PATH    
 COPY --from=builder /output .
 
-RUN echo 'dotnet QuantConnect.DownloaderDataProvider.Launcher.dll --data-folder "$DATA_FOLDER" --coinbase-api-name "$COINBASE_API_NAME" --coinbase-api-private-key "$COINBASE_API_PRIVATE_KEY"' > entrypoint.sh
-RUN chmod +x entrypoint.sh
+# RUN echo 'dotnet QuantConnect.DownloaderDataProvider.Launcher.dll --data-folder "$DATA_FOLDER" --coinbase-api-name "$COINBASE_API_NAME" --coinbase-api-private-key "$COINBASE_API_PRIVATE_KEY"' > entrypoint.sh
+# RUN chmod +x entrypoint.sh
 
-# Set Crontab
-#RUN crontab -l | { cat; echo "30 23 * * * bash $EXECUTABLE_PATH/$ENTRY_POINT_FILE_NAME > $SHARED_STORAGE_HOME/DownloadDataUntilNow.log"; } | crontab -
+# RUN ln -s $(pwd)/entrypoint.sh /usr/local/bin
 
-CMD ["sh", "-c", "entrypoint.sh"]
+ENTRYPOINT [ "dotnet", "QuantConnect.DownloaderDataProvider.Launcher.dll" ]

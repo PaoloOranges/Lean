@@ -1,0 +1,25 @@
+{
+  "map-file-provider": "LocalDiskMapFileProvider",
+  "data-provider": "DefaultDataProvider",
+  "log-handler": "CompositeLogHandler",
+  "factor-file-provider": "LocalDiskFactorFileProvider",
+
+  // The root directory of the data folder for this application
+  "data-folder": "/Shared/Data/",
+
+  // To get your api access token go to quantconnect.com/account
+  "job-user-id": "0",
+  "api-access-token": "",
+  "job-organization-id": "",
+
+  "composer-dll-directory": ".",
+
+  // Data downloader provider
+  "data-downloader": "BrokerageDataDownloader",
+
+  // Specifies the name of the brokerage service used for data downloading (optional).
+  "data-downloader-brokerage": "CoinbaseBrokerage",
+
+  "coinbase-api-name": "organizations/f2defaf3-b69d-43d6-9df2-e8e33c6a2fe3/apiKeys/9846dee6-0c4b-4956-bd8a-6e5e9dec69e8",
+  "coinbase-api-private-key": "MHcCAQEEIDHQqh/1rAxMCGTQBQf3KD89YNi2ICSAAGLNBf57hopYoAoGCCqGSM49\nAwEHoUQDQgAE3vZ8LrKPFuMRB2IPxlW1xDzV7emowZU/HCJja2iikW9YjYL97c0h\n+HyQdO+SHudJwA/mJq1Z6GYq+OMAGxauwQ=="
+}
