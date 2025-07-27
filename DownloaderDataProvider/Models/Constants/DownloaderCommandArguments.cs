@@ -38,6 +38,6 @@ namespace QuantConnect.DownloaderDataProvider.Launcher.Models.Constants
 
         public const string CoinbaseApiName = "coinbase-api-name";
 
-        public const string CoinbaseApiPrivateKey = "coinbase-api-private-key";
+        public const string CoinbaseApiPrivateKey = "coinbase-api-private-key";        
     }
 }

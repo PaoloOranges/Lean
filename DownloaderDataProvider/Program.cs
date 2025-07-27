@@ -144,7 +144,7 @@ public static class Program
         {
             if(!_tickersAndLastTime.TryGetValue(ticker, out string fromDateStr))
             {
-                fromDateStr = new DateTime(DateTime.Now.Year - 2, 1, 1, 0, 0, 0).ToString(DATE_FORMAT);
+                fromDateStr = new DateTime(DateTime.Now.Year - 2, 1, 1, 0, 0, 0).ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
             }
 
             DateTime fromDate = DateTime.ParseExact(fromDateStr, DATE_FORMAT, CultureInfo.InvariantCulture);
