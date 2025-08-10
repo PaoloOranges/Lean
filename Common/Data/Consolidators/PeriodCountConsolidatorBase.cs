@@ -126,7 +126,7 @@ namespace QuantConnect.Data.Consolidators
         /// Updates this consolidator with the specified data. This method is
         /// responsible for raising the DataConsolidated event
         /// In time span mode, the bar range is closed on the left and open on the right: [T, T+TimeSpan).
-        /// For example, if time span is 1 minute, we have [10:00, 10:01): so data at 10:01 is not 
+        /// For example, if time span is 1 minute, we have [10:00, 10:01): so data at 10:01 is not
         /// included in the bar starting at 10:00.
         /// </summary>
         /// <exception cref="InvalidOperationException">Thrown when multiple symbols are being consolidated.</exception>
@@ -206,6 +206,12 @@ namespace QuantConnect.Data.Consolidators
                 if (data.Time >= _lastEmit)
                 {
                     AggregateBar(ref _workingBar, data);
+
+                    if (_maxCount.HasValue)
+                    {
+                        // When using count-based consolidation, set EndTime to the last input's EndTime
+                        _workingBar.EndTime = data.EndTime;
+                    }
                 }
             }
 
@@ -219,11 +225,6 @@ namespace QuantConnect.Data.Consolidators
                     if (_period.HasValue)
                     {
                         workingTradeBar.Period = _period.Value;
-                    }
-                    // since trade bar has period it aggregates this properly
-                    else if (!(data is TradeBar))
-                    {
-                        workingTradeBar.Period = data.Time - _lastEmit.Value;
                     }
                 }
 
@@ -253,6 +254,20 @@ namespace QuantConnect.Data.Consolidators
                 _lastEmit = _workingBar.EndTime;
                 OnDataConsolidated(_workingBar);
             }
+        }
+
+        /// <summary>
+        /// Resets the consolidator
+        /// </summary>
+        public override void Reset()
+        {
+            base.Reset();
+            _securityIdentifier = null;
+            _securityIdentifierIsSet = false;
+            _currentCount = 0;
+            _workingBar = null;
+            _lastEmit = null;
+            _validateTimeSpan = false;
         }
 
         /// <summary>
@@ -308,10 +323,21 @@ namespace QuantConnect.Data.Consolidators
         protected DateTime GetRoundedBarTime(IBaseData inputData)
         {
             var potentialStartTime = GetRoundedBarTime(inputData.Time);
-            if(_period.HasValue && potentialStartTime + _period < inputData.EndTime)
+            if (_period.HasValue && potentialStartTime + _period < inputData.EndTime)
             {
-                // whops! the end time we were giving is beyond our potential end time, so let's use the giving bars star time instead
-                potentialStartTime = inputData.Time;
+                // US equity hour bars from the database starts at 9am but the exchange opens at 9:30am. Thus, the method
+                // GetRoundedBarTime(inputData.Time) returns the market open of the previous day, which is not consistent
+                // with the given end time. For that reason we need to handle this case specifically, by calling
+                // GetRoundedBarTime(inputData.EndTime) as it will return our expected start time: 9:30am
+                if (inputData.EndTime - inputData.Time == Time.OneHour && potentialStartTime.Date < inputData.Time.Date)
+                {
+                    potentialStartTime = GetRoundedBarTime(inputData.EndTime);
+                }
+                else
+                {
+                    // whops! the end time we were giving is beyond our potential end time, so let's use the giving bars star time instead
+                    potentialStartTime = inputData.Time;
+                }
             }
 
             return potentialStartTime;
@@ -337,7 +363,7 @@ namespace QuantConnect.Data.Consolidators
         private static IPeriodSpecification GetPeriodSpecificationFromPyObject(PyObject pyObject)
         {
             Func<DateTime, CalendarInfo> expiryFunc;
-            if (pyObject.TryConvertToDelegate(out expiryFunc))
+            if (pyObject.TrySafeAs(out expiryFunc))
             {
                 return new FuncPeriodSpecification(expiryFunc);
             }

@@ -51,6 +51,7 @@ namespace QuantConnect.Indicators
         public McGinleyDynamic(string name, int period)
             : base(name, period)
         {
+            if (period == 0) throw new ArgumentException("Period can not be zero");
             _period = period;
             _rollingSum = new Sum(name + "_Sum", period);
         }
@@ -72,23 +73,26 @@ namespace QuantConnect.Indicators
         /// <returns>A new value for this indicator</returns>
         protected override decimal ComputeNextValue(IReadOnlyWindow<IndicatorDataPoint> window, IndicatorDataPoint input)
         {
-            _rollingSum.Update(input.Time, input.Value);
+            _rollingSum.Update(input.EndTime, input.Value);
             if (!IsReady)
             {
                 return 0;
             }
-            else if (Samples == _period)
+
+            if (Samples == _period)
             {
                 return _rollingSum.Current.Value / _period;
             }
-            else
+
+            if (Current.Value == 0 || input.Value == 0)
             {
-                if ((Current.Value == 0) || (input.Value == 0) || (_period == 0))
-                {
-                    return Current.Value;
-                }
-                return Current.Value + (input.Value - Current.Value) / (_period * (decimal)Math.Pow((double)(input.Value / Current.Value), 4.0));
+                return Current.Value;
             }
+
+            var ratioValue = (double)input.Value.SafeDivision(Current.Value, 0);
+            if (ratioValue == 0) return Current.Value;
+            var denominator = _period * (decimal)Math.Pow(ratioValue, 4.0);
+            return Current.Value + (input.Value - Current.Value).SafeDivision(denominator, 0);
         }
 
         /// <summary>

@@ -70,7 +70,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
 
             var openInterest = Securities[SpxOption].Cache.GetAll<OpenInterest>();
-            if (openInterest.Single().EndTime != new DateTime(2021, 1, 15, 23, 0, 0))
+            if (openInterest.Single().EndTime != new DateTime(2021, 1, 15, 15, 15, 0))
             {
                 throw new ArgumentException($"Unexpected open interest time: {openInterest.Single().EndTime}");
             }
@@ -106,7 +106,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 121;
+        public override long DataPoints => 122;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -126,7 +126,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Orders", "11"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "621.484%"},
+            {"Compounding Annual Return", "653.545%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
             {"Start Equity", "1000000"},
@@ -149,6 +149,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$0"},
             {"Lowest Capacity Asset", "SPX XL80P3GHDZXQ|SPX 31"},
             {"Portfolio Turnover", "2.42%"},
+            {"Drawdown Recovery", "0"},
             {"OrderListHash", "61e8517ac3da6bed414ef23d26736fef"}
         };
     }

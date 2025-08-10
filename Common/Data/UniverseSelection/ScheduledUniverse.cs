@@ -72,8 +72,7 @@ namespace QuantConnect.Data.UniverseSelection
         public ScheduledUniverse(DateTimeZone timeZone, IDateRule dateRule, ITimeRule timeRule, PyObject selector, UniverseSettings settings = null)
             : base(CreateConfiguration(timeZone, dateRule, timeRule))
         {
-            Func<DateTime, object> func;
-            selector.TryConvertToDelegate(out func);
+            selector.TrySafeAs<Func<DateTime, object>>(out var func);
             _dateRule = dateRule;
             _timeRule = timeRule;
             _selector = func.ConvertSelectionSymbolDelegate();
@@ -100,7 +99,7 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>The data that passes the filter</returns>
         public override IEnumerable<Symbol> SelectSymbols(DateTime utcTime, BaseDataCollection data)
         {
-            return _selector(utcTime);
+            return _selector(DateTime.SpecifyKind(utcTime, DateTimeKind.Unspecified));
         }
 
         /// <summary>

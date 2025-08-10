@@ -91,7 +91,7 @@ namespace QuantConnect.Queues
         /// <summary>
         /// Initialize the job queue:
         /// </summary>
-        public void Initialize(IApi api)
+        public void Initialize(IApi api, IMessagingHandler messagingHandler)
         {
             api.Initialize(Globals.UserId, Globals.UserToken, Globals.DataFolder);
         }
@@ -147,7 +147,7 @@ namespace QuantConnect.Queues
                 MaximumChartSeries = Config.GetInt("maximum-chart-series", 30),
                 StorageLimit = Config.GetValue("storage-limit", 10737418240L),
                 StorageFileCount = Config.GetInt("storage-file-count", 10000),
-                StoragePermissions = (FileAccess)Config.GetInt("storage-permissions", (int)FileAccess.ReadWrite)
+                StorageAccess = Config.GetValue("storage-permissions", new Packets.StoragePermissions())
             };
 
             var algorithmId = Config.Get("algorithm-id", AlgorithmTypeName);
@@ -207,7 +207,7 @@ namespace QuantConnect.Queues
                     }
                     if (brokerageFactoryForDataHandler.BrokerageType == brokerageName)
                     {
-                        //Don't need to add brokearageData again if added by brokerage
+                        //Don't need to add brokerageData again if added by brokerage
                         continue;
                     }
                     foreach (var data in brokerageFactoryForDataHandler.BrokerageData)

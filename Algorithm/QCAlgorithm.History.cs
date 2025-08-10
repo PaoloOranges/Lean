@@ -1026,7 +1026,7 @@ namespace QuantConnect.Algorithm
                 {
                     // If no requested type was passed, use the config type to get the resolution (if not provided) and the exchange hours
                     var type = requestedType ?? config.Type;
-                    var res = GetResolution(symbol, resolution, type);
+                    var res = resolution ?? config.Resolution;
                     var exchange = GetExchangeHours(symbol, type);
                     var start = _historyRequestFactory.GetStartTimeAlgoTz(symbol, periods, res, exchange, config.DataTimeZone,
                         config.Type, extendedMarketHours);
@@ -1053,7 +1053,23 @@ namespace QuantConnect.Algorithm
                 // lets make sure to respect the order of the data types
                 .ThenByDescending(config => GetTickTypeOrder(config.SecurityType, config.TickType));
 
-            var matchingSubscriptions = subscriptions.Where(s => SubscriptionDataConfigTypeFilter(type, s.Type));
+            var matchingSubscriptions = Enumerable.Empty<SubscriptionDataConfig>();
+
+            // If type is Tick, don't rely on matchingSubscriptions
+            // Instead, we generate all available Tick subscriptions for the given resolution,
+            // to avoid cases where, for example with a FutureContract, only OpenInterest would match,
+            // when we actually need to generate Trade, Quote, and OpenInterest.
+            SubscriptionDataConfig referenceSubscription = null;
+            if (type == typeof(Tick))
+            {
+                // Skip filtering to manually generate subscriptions, using the first one as base config.
+                referenceSubscription = subscriptions.FirstOrDefault();
+            }
+            else
+            {
+                // Filter subscriptions matching the requested type
+                matchingSubscriptions = subscriptions.Where(s => SubscriptionDataConfigTypeFilter(type, s.Type));
+            }
 
             var internalConfig = new List<SubscriptionDataConfig>();
             var userConfig = new List<SubscriptionDataConfig>();
@@ -1084,28 +1100,54 @@ namespace QuantConnect.Algorithm
             // since this might be called when creating a security and warming it up
             if (configs != null && configs.Count != 0)
             {
-                if (resolution.HasValue
-                    && (resolution == Resolution.Daily || resolution == Resolution.Hour)
-                    && symbol.SecurityType == SecurityType.Equity)
+                if (resolution.HasValue && symbol.SecurityType == SecurityType.Equity)
                 {
-                    // for Daily and Hour resolution, for equities, we have to
-                    // filter out any existing subscriptions that could be of Quote type
-                    // This could happen if they were Resolution.Minute/Second/Tick
-                    return configs.Where(s => s.TickType != TickType.Quote);
+                    // Check if resolution is set and not Daily or Hourly for an Equity symbol
+                    if (resolution == Resolution.Daily || resolution == Resolution.Hour)
+                    {
+                        // for Daily and Hour resolution, for equities, we have to
+                        // filter out any existing subscriptions that could be of Quote type
+                        // This could happen if they were Resolution.Minute/Second/Tick
+                        return configs.Where(s => s.TickType != TickType.Quote);
+                    }
+
+
+                    // If no existing configuration for the Quote tick type, add the new config
+                    if (type == null && !configs.Any(config => config.TickType == TickType.Quote))
+                    {
+                        type = LeanData.GetDataType(resolution.Value, TickType.Quote);
+                        var entry = MarketHoursDatabase.GetEntry(symbol, new[] { type });
+                        var baseFillForward = configs[0].FillDataForward;
+                        var baseExtendedMarketHours = configs[0].ExtendedMarketHours;
+
+                        // Create a new SubscriptionDataConfig
+                        var newConfig = new SubscriptionDataConfig(
+                            type,
+                            symbol,
+                            resolution.Value,
+                            entry.DataTimeZone,
+                            entry.ExchangeHours.TimeZone,
+                            baseFillForward,
+                            baseExtendedMarketHours,
+                            false, tickType: TickType.Quote);
+
+                        configs.Add(newConfig);
+
+                        // Sort the configs in descending order based on tick type
+                        return configs.OrderByDescending(config => GetTickTypeOrder(config.SecurityType, config.TickType));
+                    }
                 }
 
                 if (symbol.IsCanonical() && configs.Count > 1)
                 {
                     // option/future (canonicals) might add in a ZipEntryName auxiliary data type used for selection, we filter it out from history requests by default
-                    return configs.Where(s => s.Type != typeof(ZipEntryName));
+                    return configs.Where(s => !s.Type.IsAssignableTo(typeof(BaseChainUniverseData)));
                 }
 
                 return configs;
             }
             else
             {
-                resolution = GetResolution(symbol, resolution, type);
-
                 // If type was specified and not a lean data type and also not abstract, we create a new subscription
                 if (type != null && !LeanData.IsCommonLeanDataType(type) && !type.IsAbstract)
                 {
@@ -1113,9 +1155,17 @@ namespace QuantConnect.Algorithm
                     var isCustom = Extensions.IsCustomDataType(symbol, type);
                     var entry = MarketHoursDatabase.GetEntry(symbol, new[] { type });
 
+                    // Retrieve the associated data type from the universe if available, otherwise, use the provided type
+                    var dataType = UniverseManager.TryGetValue(symbol, out var universe) && type.IsAssignableFrom(universe.DataType)
+                        ? universe.DataType
+                        : type;
+
+                    // Determine resolution using the data type
+                    resolution = GetResolution(symbol, resolution, dataType);
+
                     // we were giving a specific type let's fetch it
                     return new[] { new SubscriptionDataConfig(
-                        type,
+                        dataType,
                         symbol,
                         resolution.Value,
                         entry.DataTimeZone,
@@ -1124,33 +1174,44 @@ namespace QuantConnect.Algorithm
                         UniverseSettings.ExtendedMarketHours,
                         true,
                         isCustom,
-                        LeanData.GetCommonTickTypeForCommonDataTypes(type, symbol.SecurityType),
+                        LeanData.GetCommonTickTypeForCommonDataTypes(dataType, symbol.SecurityType),
                         true,
                         UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType))};
                 }
 
+                var res = GetResolution(symbol, resolution, type);
                 return SubscriptionManager
-                    .LookupSubscriptionConfigDataTypes(symbol.SecurityType, resolution.Value, symbol.IsCanonical())
+                    .LookupSubscriptionConfigDataTypes(symbol.SecurityType, res, symbol.IsCanonical())
                     .Where(tuple => SubscriptionDataConfigTypeFilter(type, tuple.Item1))
                     .Select(x =>
                     {
                         var configType = x.Item1;
                         // Use the config type to get an accurate mhdb entry
                         var entry = MarketHoursDatabase.GetEntry(symbol, new[] { configType });
+                        var res = GetResolution(symbol, resolution, configType);
+
+                        // Reuse settings from reference subscription if available
+                        // fallback to UniverseSettings/defaults otherwise
+                        var extendedMarketHours = referenceSubscription?.ExtendedMarketHours ?? UniverseSettings.ExtendedMarketHours;
+                        var dataNormalizationMode = referenceSubscription?.DataNormalizationMode ?? UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType);
+                        var dataMappingMode = referenceSubscription?.DataMappingMode ?? DataMappingMode.OpenInterest;
+                        var contractDepthOffset = referenceSubscription?.ContractDepthOffset ?? 0u;
 
                         return new SubscriptionDataConfig(
                             configType,
                             symbol,
-                            resolution.Value,
+                            res,
                             entry.DataTimeZone,
                             entry.ExchangeHours.TimeZone,
                             UniverseSettings.FillForward,
-                            UniverseSettings.ExtendedMarketHours,
+                            extendedMarketHours,
                             true,
                             false,
                             x.Item2,
                             true,
-                            UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType));
+                            dataNormalizationMode,
+                            dataMappingMode,
+                            contractDepthOffset);
                     })
                     // lets make sure to respect the order of the data types, if used on a history request will affect outcome when using pushthrough for example
                     .OrderByDescending(config => GetTickTypeOrder(config.SecurityType, config.TickType));
@@ -1260,6 +1321,7 @@ namespace QuantConnect.Algorithm
             return symbol.SecurityType == SecurityType.Future ||
                 symbol.SecurityType == SecurityType.Option ||
                 symbol.SecurityType == SecurityType.IndexOption ||
+                symbol.SecurityType == SecurityType.FutureOption ||
                 !symbol.IsCanonical();
         }
 

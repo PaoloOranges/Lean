@@ -191,5 +191,20 @@ namespace QuantConnect.Packets
 
         /// Algorithm tags update
         AlgorithmTagsUpdate,
+
+        /// Research job packet
+        ResearchNode,
+
+        /// Organization update
+        OrganizationUpdate,
+
+        /// Compiler -> User Build Warnings
+        BuildWarning,
+
+        /// Language model function call related packet
+        LanguageModelFunctionCall,
+
+        /// Language model agent message
+        LanguageModelAgentMessage,
     }
 }

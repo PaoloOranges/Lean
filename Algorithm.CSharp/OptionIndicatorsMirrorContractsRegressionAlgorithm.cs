@@ -100,7 +100,7 @@ Rho: {_rho}");
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 49;
+        public long DataPoints => 51;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -143,6 +143,7 @@ Rho: {_rho}");
             {"Estimated Strategy Capacity", "$0"},
             {"Lowest Capacity Asset", ""},
             {"Portfolio Turnover", "0%"},
+            {"Drawdown Recovery", "0"},
             {"OrderListHash", "d41d8cd98f00b204e9800998ecf8427e"}
         };
     }

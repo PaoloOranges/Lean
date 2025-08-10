@@ -61,8 +61,7 @@ namespace QuantConnect.Lean.Engine.HistoricalData
         {
             if (_initialized)
             {
-                // let's make sure no one tries to change our parameters values
-                throw new InvalidOperationException("SubscriptionDataReaderHistoryProvider can only be initialized once");
+                return;
             }
             _initialized = true;
             _dataProvider = parameters.DataProvider;
@@ -104,7 +103,6 @@ namespace QuantConnect.Lean.Engine.HistoricalData
         private Subscription CreateSubscription(HistoryRequest request)
         {
             var config = request.ToSubscriptionDataConfig();
-            DataPermissionManager.AssertConfiguration(config, request.StartTimeLocal, request.EndTimeLocal);
 
             // this security is internal only we do not need to worry about a few of it's properties
             // TODO: we don't need fee/fill/BPM/etc either. Even better we should refactor & remove the need for the security
@@ -166,7 +164,8 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                 }
 
                 var readOnlyRef = Ref.CreateReadOnly(() => request.FillForwardResolution.Value.ToTimeSpan());
-                reader = new FillForwardEnumerator(reader, security.Exchange, readOnlyRef, request.IncludeExtendedMarketHours, request.EndTimeLocal, config.Increment, config.DataTimeZone, useDailyStrictEndTimes);
+                var exchange = GetSecurityExchange(security.Exchange, request.DataType, request.Symbol);
+                reader = new FillForwardEnumerator(reader, exchange, readOnlyRef, request.IncludeExtendedMarketHours, request.StartTimeLocal, request.EndTimeLocal, config.Increment, config.DataTimeZone, useDailyStrictEndTimes, request.DataType);
             }
 
             // since the SubscriptionDataReader performs an any overlap condition on the trade bar's entire

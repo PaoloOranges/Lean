@@ -18,6 +18,7 @@ using System;
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using QuantConnect.Python;
 
 namespace QuantConnect.Data.UniverseSelection
 {
@@ -26,21 +27,18 @@ namespace QuantConnect.Data.UniverseSelection
     /// </summary>
     public class BaseDataCollection : BaseData, IEnumerable<BaseData>
     {
-        /// <summary>
-        /// Cache for the symbols to avoid creating them multiple times
-        /// </summary>
-        private static readonly Dictionary<string, Symbol> _symbolsCache = new();
-
         private DateTime _endTime;
 
         /// <summary>
         /// The associated underlying price data if any
         /// </summary>
+        [PandasNonExpandable]
         public BaseData Underlying { get; set; }
 
         /// <summary>
         /// Gets or sets the contracts selected by the universe
         /// </summary>
+        [PandasIgnore]
         public HashSet<Symbol> FilteredContracts { get; set; }
 
         /// <summary>
@@ -51,6 +49,7 @@ namespace QuantConnect.Data.UniverseSelection
         /// <summary>
         /// Gets or sets the end time of this data
         /// </summary>
+        [PandasIgnore]
         public override DateTime EndTime
         {
             get
@@ -217,33 +216,6 @@ namespace QuantConnect.Data.UniverseSelection
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
-        }
-
-        /// <summary>
-        /// Tries to get a symbol from the cache
-        /// </summary>
-        protected static bool TryGetCachedSymbol(string ticker, out Symbol symbol)
-        {
-            lock (_symbolsCache)
-            {
-                return _symbolsCache.TryGetValue(ticker, out symbol);
-            }
-        }
-
-        /// <summary>
-        /// Caches a symbol
-        /// </summary>
-        protected static void CacheSymbol(string ticker, Symbol symbol)
-        {
-            lock (_symbolsCache)
-            {
-                // limit the cache size to help with memory usage
-                if (_symbolsCache.Count >= 600000)
-                {
-                    _symbolsCache.Clear();
-                }
-                _symbolsCache.TryAdd(ticker, symbol);
-            }
         }
     }
 }

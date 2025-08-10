@@ -213,14 +213,23 @@ namespace QuantConnect.Util
         /// <typeparam name="T">The contract type</typeparam>
         public T GetPart<T>(Func<T, bool> filter)
         {
+            return GetParts<T>().Where(x => filter == null || filter(x)).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Gets all parts of type T instance if any
+        /// </summary>
+        /// <typeparam name="T">The contract type</typeparam>
+        public IEnumerable<T> GetParts<T>()
+        {
             lock (_exportedValuesLockObject)
             {
                 IEnumerable values;
                 if (_exportedValues.TryGetValue(typeof(T), out values))
                 {
-                    return ((IList<T>)values).Where(x => filter == null || filter(x)).FirstOrDefault();
+                    return ((IEnumerable<T>)values).ToList();
                 }
-                return default(T);
+                return Enumerable.Empty<T>();
             }
         }
 
@@ -315,7 +324,7 @@ namespace QuantConnect.Util
                     if (selectedPart == null)
                     {
                         throw new ArgumentException(
-                            $"Unable to locate any exports matching the requested typeName: {typeName}", nameof(typeName));
+                            $"Unable to locate any exports matching the requested typeName: {typeName}. Type: {type}", nameof(typeName));
                     }
 
                     var exportDefinition =

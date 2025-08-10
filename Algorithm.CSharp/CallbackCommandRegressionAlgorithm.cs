@@ -38,6 +38,26 @@ namespace QuantConnect.Algorithm.CSharp
             AddEquity("IBM");
             AddCommand<BoolCommand>();
             AddCommand<VoidCommand>();
+
+            var potentialCommand = new VoidCommand
+            {
+                Target = new[] { "BAC" },
+                Quantity = 10,
+                Parameters = new() { { "tag", "Signal X" } }
+            };
+            var commandLink = Link(potentialCommand);
+            Notify.Email("email@address", "Trade Command Event", $"Signal X trade\nFollow link to trigger: {commandLink}");
+
+            var commandLink2 = Link(new { Symbol = "SPY", Parameters = new Dictionary<string, int>() { { "Quantity", 10 } } });
+            Notify.Email("email@address", "Untyped Command Event", $"Signal Y trade\nFollow link to trigger: {commandLink2}");
+
+            // We need to create a project on QuantConnect to test the BroadcastCommand method
+            // and use the ProjectId in the BroadcastCommand call
+            ProjectId = 21805137;
+
+            // All live deployments receive the broadcasts below
+            var broadcastResult = BroadcastCommand(potentialCommand);
+            var broadcastResult2 = BroadcastCommand(new { Symbol = "SPY", Parameters = new Dictionary<string, int>() { { "Quantity", 10 } } });
         }
 
         /// <summary>

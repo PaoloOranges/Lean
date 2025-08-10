@@ -177,6 +177,21 @@ namespace QuantConnect.Brokerages
         /// <summary>
         /// Transaction and submit/execution rules will use Terminal link models
         /// </summary>
-        TerminalLink
+        TerminalLink,
+
+        /// <summary>
+        /// Transaction and submit/execution rules will use Charles Schwab models
+        /// </summary>
+        CharlesSchwab,
+
+        /// <summary>
+        /// Transaction and submit/execution rules will use Tastytrade models
+        /// </summary>
+        Tastytrade,
+
+        /// <summary>
+        /// Transaction and submit/execution rules will use interactive brokers Fix models
+        /// </summary>
+        InteractiveBrokersFix
     }
 }

@@ -154,7 +154,7 @@ namespace QuantConnect.Research
                         PersistenceIntervalSeconds = -1,
                         StorageLimit = Config.GetValue("storage-limit", 10737418240L),
                         StorageFileCount = Config.GetInt("storage-file-count", 10000),
-                        StoragePermissions = (FileAccess) Config.GetInt("storage-permissions", (int)FileAccess.ReadWrite)
+                        StorageAccess = Config.GetValue("storage-permissions", new Packets.StoragePermissions())
                     });
                 SetObjectStore(algorithmHandlers.ObjectStore);
 
@@ -199,8 +199,13 @@ namespace QuantConnect.Research
                     )
                 );
 
-                SetOptionChainProvider(new CachingOptionChainProvider(new BacktestingOptionChainProvider(_dataCacheProvider, mapFileProvider)));
-                SetFutureChainProvider(new CachingFutureChainProvider(new BacktestingFutureChainProvider(_dataCacheProvider)));
+                var initParameters = new ChainProviderInitializeParameters(mapFileProvider, HistoryProvider);
+                var optionChainProvider = new BacktestingOptionChainProvider();
+                optionChainProvider.Initialize(initParameters);
+                var futureChainProvider = new BacktestingFutureChainProvider();
+                futureChainProvider.Initialize(initParameters);
+                SetOptionChainProvider(new CachingOptionChainProvider(optionChainProvider));
+                SetFutureChainProvider(new CachingFutureChainProvider(futureChainProvider));
 
                 SetAlgorithmMode(AlgorithmMode.Research);
                 SetDeploymentTarget(Config.GetValue("deployment-target", DeploymentTarget.LocalPlatform));
@@ -415,7 +420,7 @@ namespace QuantConnect.Research
                         // only add underlying if not present
                         AddIndex(symbol.Underlying.Value, resolutionToUseForUnderlying, fillForward: fillForward);
                     }
-                    else if(symbol.Underlying.SecurityType == SecurityType.Future && symbol.Underlying.IsCanonical())
+                    else if (symbol.Underlying.SecurityType == SecurityType.Future && symbol.Underlying.IsCanonical())
                     {
                         AddFuture(symbol.Underlying.ID.Symbol, resolutionToUseForUnderlying, fillForward: fillForward,
                             extendedMarketHours: extendedMarketHours);
@@ -426,29 +431,21 @@ namespace QuantConnect.Research
                             extendedMarketHours: extendedMarketHours);
                     }
                 }
-                var allSymbols = new List<Symbol>();
-                for (var date = start; date < end; date = date.AddDays(1))
+
+                var allSymbols = new HashSet<Symbol>();
+                var optionFilterUniverse = new OptionFilterUniverse(option);
+
+                foreach (var (date, chainData, underlyingData) in GetChainHistory<OptionUniverse>(option, start, end.Value, extendedMarketHours))
                 {
-                    if (option.Exchange.DateIsOpen(date, extendedMarketHours: extendedMarketHours))
+                    if (underlyingData is not null)
                     {
-                        allSymbols.AddRange(OptionChainProvider.GetOptionContractList(symbol, date));
+                        optionFilterUniverse.Refresh(chainData, underlyingData, underlyingData.EndTime);
+                        allSymbols.UnionWith(option.ContractFilter.Filter(optionFilterUniverse).Select(x => x.Symbol));
                     }
                 }
 
-                var optionFilterUniverse = new OptionFilterUniverse(option);
-                // TODO: Once we tackle FOPs to work as equity and index options, we can clean this up:
-                //   - Instead of calling OptionChainProvider.GetOptionContractList above to get allSymbol,
-                //     we can directly make a history request for the new option universe type like History<OptionUniverse>(...)
-                //     instead of creating them below, given that the option chain provider does this history request internally.
-                var distinctSymbols = allSymbols.Distinct().Select(x => new OptionUniverse() { Symbol = x, Time = start});
-                symbols = base.History(symbol.Underlying, start, end.Value, resolution)
-                    .SelectMany(x =>
-                    {
-                        // the option chain symbols wont change so we can set 'exchangeDateChange' to false always
-                        optionFilterUniverse.Refresh(distinctSymbols, x, x.EndTime);
-                        return option.ContractFilter.Filter(optionFilterUniverse).Select(x => x.Symbol);
-                    })
-                    .Distinct().Concat(new[] { symbol.Underlying });
+                var distinctSymbols = allSymbols.Distinct().Select(x => new OptionUniverse() { Symbol = x, Time = start });
+                symbols = allSymbols.Concat(new[] { symbol.Underlying });
             }
             else
             {
@@ -500,14 +497,9 @@ namespace QuantConnect.Research
                 // canonical symbol, lets find the contracts
                 var future = Securities[symbol] as Future;
 
-                for (var date = start; date < end; date = date.AddDays(1))
+                foreach (var (date, chainData, underlyingData) in GetChainHistory<FutureUniverse>(future, start, end.Value, extendedMarketHours))
                 {
-                    if (future.Exchange.DateIsOpen(date, extendedMarketHours))
-                    {
-                        var allList = FutureChainProvider.GetFutureContractList(future.Symbol, date);
-
-                        allSymbols.UnionWith(future.ContractFilter.Filter(new FutureFilterUniverse(allList, date)));
-                    }
+                    allSymbols.UnionWith(future.ContractFilter.Filter(new FutureFilterUniverse(chainData, date)).Select(x => x.Symbol));
                 }
             }
             else
@@ -709,17 +701,11 @@ namespace QuantConnect.Research
             var endDate = end ?? DateTime.UtcNow.Date;
             var requests = CreateDateRangeHistoryRequests(new[] { universeSymbol }, typeof(T1), start, endDate);
             var history = GetDataTypedHistory<BaseDataCollection>(requests).Select(x => x.Values.Single());
-            var filteredDates = dateRule?.GetDates(start, endDate)?.ToHashSet();
 
             HashSet<Symbol> filteredSymbols = null;
-            foreach (var data in history)
+            Func<BaseDataCollection, IEnumerable<T2>> castDataPoint = dataPoint =>
             {
-                if (filteredDates != null && !filteredDates.Contains(data.EndTime.Date))
-                {
-                    continue;
-                }
-
-                var castedType = data.Data.OfType<T2>();
+                var castedType = dataPoint.Data.OfType<T2>();
                 if (func != null)
                 {
                     var selection = func(castedType);
@@ -727,13 +713,18 @@ namespace QuantConnect.Research
                     {
                         filteredSymbols = selection.ToHashSet();
                     }
-                    yield return castedType.Where(x => filteredSymbols == null || filteredSymbols.Contains(x.Symbol));
+                    return castedType.Where(x => filteredSymbols == null || filteredSymbols.Contains(x.Symbol));
                 }
                 else
                 {
-                    yield return castedType;
+                    return castedType;
                 }
-            }
+            };
+
+            Func<BaseDataCollection, DateTime> getTime = datapoint => datapoint.EndTime.Date;
+
+
+            return PerformSelection<IEnumerable<T2>, BaseDataCollection>(history, castDataPoint, getTime, start, endDate, dateRule);
         }
 
         /// <summary>
@@ -757,8 +748,13 @@ namespace QuantConnect.Research
         /// <param name="end">Optionally the end date, will default to today</param>
         /// <param name="func">Optionally the universe selection function</param>
         /// <param name="dateRule">Date rule to apply for the history data</param>
+        /// <param name="flatten">Whether to flatten the resulting data frame.
+        /// For universe data, the each row represents a day of data, and the data is stored in a list in a cell of the data frame.
+        /// If flatten is true, the resulting data frame will contain one row per universe constituent,
+        /// and each property of the constituent will be a column in the data frame.</param>
         /// <returns>Enumerable of universe selection data for each date, filtered if the func was provided</returns>
-        public PyObject UniverseHistory(PyObject universe, DateTime start, DateTime? end = null, PyObject func = null, IDateRule dateRule = null)
+        public PyObject UniverseHistory(PyObject universe, DateTime start, DateTime? end = null, PyObject func = null, IDateRule dateRule = null,
+            bool flatten = false)
         {
             if (universe.TryConvert<Universe>(out var convertedUniverse))
             {
@@ -768,7 +764,7 @@ namespace QuantConnect.Research
                 }
                 var filteredUniverseSelectionData = RunUniverseSelection(convertedUniverse, start, end, dateRule);
 
-                return GetDataFrame(filteredUniverseSelectionData);
+                return GetDataFrame(filteredUniverseSelectionData, flatten);
             }
             // for backwards compatibility
             if (universe.TryConvert<Type>(out var convertedType) && convertedType.IsAssignableTo(typeof(BaseDataCollection)))
@@ -777,14 +773,13 @@ namespace QuantConnect.Research
                 var universeSymbol = ((BaseDataCollection)convertedType.GetBaseDataInstance()).UniverseSymbol();
                 if (func == null)
                 {
-                    return History(universe, universeSymbol, start, endDate);
+                    return History(universe, universeSymbol, start, endDate, flatten: flatten);
                 }
 
                 var requests = CreateDateRangeHistoryRequests(new[] { universeSymbol }, convertedType, start, endDate);
                 var history = History(requests);
-                var filteredDates = dateRule?.GetDates(start, endDate)?.ToHashSet();
 
-                return GetDataFrame(GetFilteredSlice(history, func, filteredDates), convertedType);
+                return GetDataFrame(GetFilteredSlice(history, func, start, endDate, dateRule), flatten, convertedType);
             }
 
             throw new ArgumentException($"Failed to convert given universe {universe}. Please provider a valid {nameof(Universe)}");
@@ -860,18 +855,51 @@ namespace QuantConnect.Research
         }
 
         /// <summary>
+        /// Get's the universe data for the specified date
+        /// </summary>
+        private IEnumerable<T> GetChainHistory<T>(Symbol canonicalSymbol, DateTime date, out BaseData underlyingData)
+            where T : BaseChainUniverseData
+        {
+            // Use this GetEntry extension method since it's data type dependent, so we get the correct entry for the option universe
+            var marketHoursEntry = MarketHoursDatabase.GetEntry(canonicalSymbol, new[] { typeof(T) });
+            var startInExchangeTz = QuantConnect.Time.GetStartTimeForTradeBars(marketHoursEntry.ExchangeHours, date, QuantConnect.Time.OneDay, 1,
+                extendedMarketHours: false, marketHoursEntry.DataTimeZone);
+            var start = startInExchangeTz.ConvertTo(marketHoursEntry.ExchangeHours.TimeZone, TimeZone);
+            var end = date.ConvertTo(marketHoursEntry.ExchangeHours.TimeZone, TimeZone);
+            var universeData = History<T>(canonicalSymbol, start, end).SingleOrDefault();
+
+            if (universeData is not null)
+            {
+                underlyingData = universeData.Underlying;
+                return universeData.Data.Cast<T>();
+            }
+
+            underlyingData = null;
+            return Enumerable.Empty<T>();
+        }
+
+        /// <summary>
+        /// Helper method to get option/future chain historical data for a given date range
+        /// </summary>
+        private IEnumerable<(DateTime Date, IEnumerable<T> ChainData, BaseData UnderlyingData)> GetChainHistory<T>(
+            Security security, DateTime start, DateTime end, bool extendedMarketHours)
+            where T : BaseChainUniverseData
+        {
+            foreach (var date in QuantConnect.Time.EachTradeableDay(security, start.Date, end.Date, extendedMarketHours))
+            {
+                var universeData = GetChainHistory<T>(security.Symbol, date, out var underlyingData);
+                yield return (date, universeData, underlyingData);
+            }
+        }
+
+        /// <summary>
         /// Helper method to perform selection on the given data and filter it
         /// </summary>
-        private IEnumerable<Slice> GetFilteredSlice(IEnumerable<Slice> history, dynamic func, HashSet<DateTime> filteredDates = null)
+        private IEnumerable<Slice> GetFilteredSlice(IEnumerable<Slice> history, dynamic func, DateTime start, DateTime end, IDateRule dateRule = null)
         {
             HashSet<Symbol> filteredSymbols = null;
-            foreach (var slice in history)
+            Func<Slice, Slice> processSlice = slice =>
             {
-                if (filteredDates != null && !filteredDates.Contains(slice.Time.Date))
-                {
-                    continue;
-                }
-
                 var filteredData = slice.AllData.OfType<BaseDataCollection>();
                 using (Py.GIL())
                 {
@@ -881,7 +909,7 @@ namespace QuantConnect.Research
                         filteredSymbols = ((Symbol[])selection.AsManagedObject(typeof(Symbol[]))).ToHashSet();
                     }
                 }
-                yield return new Slice(slice.Time, filteredData.Where(x => {
+                return new Slice(slice.Time, filteredData.Where(x => {
                     if (filteredSymbols == null)
                     {
                         return true;
@@ -889,7 +917,10 @@ namespace QuantConnect.Research
                     x.Data = new List<BaseData>(x.Data.Where(dataPoint => filteredSymbols.Contains(dataPoint.Symbol)));
                     return true;
                 }), slice.UtcTime);
-            }
+            };
+
+            Func<Slice, DateTime> getTime = slice => slice.Time.Date;
+            return PerformSelection<Slice, Slice>(history, processSlice, getTime, start, end, dateRule);
         }
 
         /// <summary>
@@ -899,16 +930,10 @@ namespace QuantConnect.Research
         {
             var endDate = end ?? DateTime.UtcNow.Date;
             var history = History(universe, start, endDate);
-            var filteredDates = dateRule?.GetDates(start, endDate)?.ToHashSet();
 
             HashSet<Symbol> filteredSymbols = null;
-            foreach (var dataPoint in history)
+            Func<BaseDataCollection, BaseDataCollection> processDataPoint = dataPoint =>
             {
-                if (filteredDates != null && !filteredDates.Contains(dataPoint.EndTime.Date))
-                {
-                    continue;
-                }
-
                 var utcTime = dataPoint.EndTime.ConvertToUtc(universe.Configuration.ExchangeTimeZone);
                 var selection = universe.SelectSymbols(utcTime, dataPoint);
                 if (!ReferenceEquals(selection, Universe.Unchanged))
@@ -916,8 +941,12 @@ namespace QuantConnect.Research
                     filteredSymbols = selection.ToHashSet();
                 }
                 dataPoint.Data = dataPoint.Data.Where(x => filteredSymbols == null || filteredSymbols.Contains(x.Symbol)).ToList();
-                yield return dataPoint;
-            }
+                return dataPoint;
+            };
+
+            Func<BaseDataCollection, DateTime> getTime = dataPoint => dataPoint.EndTime.Date;
+
+            return PerformSelection<BaseDataCollection, BaseDataCollection>(history, processDataPoint, getTime, start, endDate, dateRule);
         }
 
         /// <summary>
@@ -1065,6 +1094,63 @@ namespace QuantConnect.Research
 
                 RecycleMemory();
             }, TaskScheduler.Current);
+        }
+
+        protected static IEnumerable<T1> PerformSelection<T1, T2>(
+            IEnumerable<T2> history,
+            Func<T2, T1> processDataPointFunction,
+            Func<T2, DateTime> getTime,
+            DateTime start,
+            DateTime endDate,
+            IDateRule dateRule = null)
+        {
+            if (dateRule == null)
+            {
+                foreach(var dataPoint in history)
+                {
+                    yield return processDataPointFunction(dataPoint);
+                }
+
+                yield break;
+            }
+
+            var targetDatesQueue = new Queue<DateTime>(dateRule.GetDates(start, endDate));
+            T2 previousDataPoint = default;
+            foreach (var dataPoint in history)
+            {
+                var dataPointWasProcessed = false;
+
+                // If the datapoint date is greater than the target date on the top, process the last
+                // datapoint and remove target dates from the queue until the target date on the top is
+                // greater than the current datapoint date
+                while (targetDatesQueue.TryPeek(out var targetDate) && getTime(dataPoint) >= targetDate)
+                {
+                    if (getTime(dataPoint) == targetDate)
+                    {
+                        yield return processDataPointFunction(dataPoint);
+
+                        // We use each data point just once, this is, we cannot return the same datapoint
+                        // twice
+                        dataPointWasProcessed = true;
+                    }
+                    else
+                    {
+                        if (!Equals(previousDataPoint, default(T2)))
+                        {
+                            yield return processDataPointFunction(previousDataPoint);
+                        }
+                    }
+
+                    previousDataPoint = default;
+                    // Search the next target date
+                    targetDatesQueue.Dequeue();
+                }
+
+                if (!dataPointWasProcessed)
+                {
+                    previousDataPoint = dataPoint;
+                }
+            }
         }
     }
 }
