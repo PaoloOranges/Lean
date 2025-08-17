@@ -161,8 +161,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             Resolution resolution = Resolution.Hour;
 
-            SetStartDate(2023, 1, 1); // Set Start Date
-            SetEndDate(2023, 8, 1); // Set End Date
+            SetStartDate(2024, 1, 1); // Set Start Date
+            SetEndDate(2024, 8, 1); // Set End Date
 
             SetAccountCurrency(CurrencyName);
             SetCash(1000);
@@ -197,7 +197,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             candleChart.AddSeries(new Series(CloseSeriesName, SeriesType.Line, "€"));
             candleChart.AddSeries(new Series(VolumeSeriesName, SeriesType.Bar, ""));
             //candleChart.AddSeries(new Series("Time", SeriesType.Line, "date"));
-            IndicatorBase[] indicatorsToPlot = { _slowMA, _fastMA, _veryFastMA , _bollingerBands.MiddleBand, _bollingerBands.UpperBand, _bollingerBands.LowerBand};
+            IndicatorBase[] indicatorsToPlot = { /*_slowMA, _fastMA, _veryFastMA ,*/ _bollingerBands.MiddleBand, _bollingerBands.UpperBand, _bollingerBands.LowerBand};
             PlotIndicator("Indicators", indicatorsToPlot);
             //PlotIndicator("Indicators", _psar);
             //PlotIndicator("Indicators", _maximum_price);
