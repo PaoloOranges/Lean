@@ -33,6 +33,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Appccelerate.StateMachine" Version="5.1.0" />
+    <PackageReference Include="CircularBuffer" Version="1.4.0" />
     <PackageReference Include="QuantConnect.pythonnet" Version="2.0.46" />
     <PackageReference Include="Accord" Version="3.6.0" />
     <PackageReference Include="Accord.Fuzzy" Version="3.6.0" />

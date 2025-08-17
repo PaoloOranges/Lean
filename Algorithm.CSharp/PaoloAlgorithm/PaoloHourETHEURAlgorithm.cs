@@ -18,21 +18,24 @@
 #define PLOT_CHART
 //#define LOG_INDICATORS
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Globalization;
-
-using QuantConnect.Data;
-using QuantConnect.Brokerages;
-using QuantConnect.Indicators;
-using QuantConnect.Orders;
-using QuantConnect.Util;
-using MathNet.Numerics;
-using QuantConnect.Algorithm.CSharp.PaoloAlgorithm.Utilities;
 using Appccelerate.StateMachine;
 using Appccelerate.StateMachine.AsyncMachine;
+using CircularBuffer;
+using MathNet.Numerics;
+using QuantConnect.Algorithm.CSharp.PaoloAlgorithm.Utilities;
+using QuantConnect.Brokerages;
+using QuantConnect.Data;
+using QuantConnect.Indicators;
+using QuantConnect.Orders;
+using QuantConnect.Securities;
+using QuantConnect.Util;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 
+// Type alias for a tuple of two doubles representing a line (intercept, slope)
+using Line = System.ValueTuple<double, double>;
 
 namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 {
@@ -50,7 +53,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             PrepareToBuy,  
             ReadyToBuy,
             PrepareToSell,
-            ReadyToSell,
+            ReadyToSellGain,
+            ReadyToSellLoss
         };
 
         private enum PurchaseStateEvents
@@ -58,7 +62,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             InitComplete,
             ReadyToBuy,
             Buy,            
-            ReadyToSell,
+            ReadyToSellGain,
+            ReadyToSellLoss,
             Sell,
 
         };
@@ -87,6 +92,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private PurchaseState _tradingPhase = PurchaseState.Init;
         private decimal _boughtPrice = 0;
         private decimal _max_price_after_buy = decimal.MinValue;
+        private BolingerBandStatisticsProcessor _bolingerBandStatisticsProcessor = new BolingerBandStatisticsProcessor();
 
         private ReadyForBuyState ready_for_buy_state = ReadyForBuyState.None;
 
@@ -122,24 +128,20 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         // State counters
         const int CircularBufferLength = 10;
-        readonly private double[] FixedArray = Enumerable.Range(0, CircularBufferLength).Select(x => Convert.ToDouble(x)).ToArray();
+        static readonly private double[] FixedArray = Enumerable.Range(0, CircularBufferLength).Select(x => Convert.ToDouble(x)).ToArray();
 
-        FixedCircularBuffer<decimal> _fastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
-        FixedCircularBuffer<decimal> _veryFastMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
-        FixedCircularBuffer<decimal> _slowMACircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
-        FixedCircularBuffer<decimal> _macdCircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
-        FixedCircularBuffer<decimal> _posADXCircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
-        FixedCircularBuffer<decimal> _negADXCircularBuffer = new FixedCircularBuffer<decimal>(CircularBufferLength);
-
-        FixedCircularBuffer<IndicatorsFrame> _indicatorsCircularBuffer = new FixedCircularBuffer<IndicatorsFrame>(CircularBufferLength);
-
-
-        (double, double) _fastMALine;
-        (double, double) _veryFastMALine;
-        (double, double) _slowMALine;
-        (double, double) _macdLine;
-        (double, double) _posADXLine;
-        (double, double) _negADXLine;
+        CircularBuffer<IndicatorsFrame> _indicatorsCircularBuffer = new CircularBuffer<IndicatorsFrame>(CircularBufferLength, new IndicatorsFrame[CircularBufferLength]);
+               
+        Line _fastMALine;
+        Line _veryFastMALine;
+        Line _slowMALine;
+        Line _macdLine;
+        Line _macdSignalLine;
+        Line _posADXLine;
+        Line _negADXLine;
+        Line _bbLowLine;
+        Line _bbMidLine;
+        Line _bbUpLine;
 
         private int _volumeCounter = 0; //how many consecutive + or - volume
         private decimal _lastVolume = 0;
@@ -149,7 +151,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private readonly PassiveStateMachine<PurchaseState, PurchaseStateEvents> purchaseStateMachine;
 
-        private Action<Slice> _processDataAction;
+        private Action<Slice, decimal> _processDataAction;
 
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
@@ -207,14 +209,18 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             var builder = new StateMachineDefinitionBuilder<PurchaseState, PurchaseStateEvents>();
 
-            //builder
-            //    .In(PurchaseState.Init)
-            //    .On(PurchaseStateEvents.InitComplete)
-            //    .Goto(PurchaseState.PrepareToBuy)
-            //    .Execute();
+            //builder.In(PurchaseState.Init)
+            //       .On(PurchaseStateEvents.InitComplete)
+            //       .Goto(PurchaseState.PrepareToBuy)
+            //       .Execute(PrepareToBuy);
+
+            //builder.In(PurchaseState.PrepareToBuy)
+            //       .On(PurchaseStateEvents.ReadyToBuy)
+            //       .Goto(PurchaseState.ReadyToBuy)
+            //       .Execute(ReadyToBuy);
 
         }
-        
+
         public override void PostInitialize()
         {
 
@@ -309,19 +315,16 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 fastMA = _fastMA,
                 slowMA = _slowMA,
                 MACD = _macd,
+                MACDSignal = _macd.Signal,
                 MACDHistogram = _macd.Histogram,
                 ADXPlus = _adx.PositiveDirectionalIndex,
                 ADXMinus = _adx.NegativeDirectionalIndex,
+                BBLow = _bollingerBands.LowerBand,
+                BBMid = _bollingerBands.MiddleBand,
+                BBUp = _bollingerBands.UpperBand,
             };
 
-            _indicatorsCircularBuffer.Push(frame);
-
-            _veryFastMACircularBuffer.Push(_veryFastMA);
-            _fastMACircularBuffer.Push(_fastMA);
-            _slowMACircularBuffer.Push(_slowMA);
-            _macdCircularBuffer.Push(_macd);
-            _posADXCircularBuffer.Push(_adx.PositiveDirectionalIndex);
-            _negADXCircularBuffer.Push(_adx.NegativeDirectionalIndex);
+            _indicatorsCircularBuffer.PushBack(frame);
 
             var frameArray = _indicatorsCircularBuffer.ToArray();
 
@@ -329,16 +332,22 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             _veryFastMALine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.veryFastMA)));
             _slowMALine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.slowMA)));
             _macdLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.MACD)));
+            _macdSignalLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.MACDSignal)));
             _posADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.ADXPlus)));
             _negADXLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.ADXMinus)));
+            _bbLowLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.BBLow)));
+            _bbMidLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.BBMid)));
+            _bbUpLine = Fit.Line(FixedArray, ConvertToDoubleArray(frameArray, selector: f => Decimal.ToDouble(f.BBUp)));
 
             decimal current_price = data[SymbolName].Value;
             switch (_tradingPhase)
             {
                 case PurchaseState.PrepareToSell:
-                case PurchaseState.ReadyToSell:
+                case PurchaseState.ReadyToSellGain:
+                case PurchaseState.ReadyToSellLoss:
                     {
                         _max_price_after_buy = Math.Max(_max_price_after_buy, current_price);
+                        _bolingerBandStatisticsProcessor.OnData(current_price, _bollingerBands.LowerBand, _bollingerBands.MiddleBand, _bollingerBands.UpperBand);
                     }
                     break;                
                 case PurchaseState.PrepareToBuy:
@@ -387,9 +396,9 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             Log("INDICATORS. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
 
-            _processDataAction?.Invoke(data);
-
             decimal currentPrice = data[SymbolName].Value; // Value == Close
+            //_processDataAction?.Invoke(data, currentPrice);
+
             switch (_tradingPhase)
             {
                 case PurchaseState.Init:
@@ -400,8 +409,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 case PurchaseState.PrepareToSell:
                     PrepareToSellProcessAction(data, currentPrice);
                     break;
-                case PurchaseState.ReadyToSell:
-                    ReadyToSellProcessAction(data, currentPrice);
+                case PurchaseState.ReadyToSellGain:
+                    ReadyToSellGainProcessAction(data, currentPrice);
+                    break;
+                case PurchaseState.ReadyToSellLoss:
+                    ReadyToSellLossProcessAction(data, currentPrice);
                     break;
                 case PurchaseState.PrepareToBuy:
                     PrepareToBuyProcessAction(data, currentPrice);
@@ -412,25 +424,64 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
         }
 
+        
+
+        private void PrepareToBuy()
+        { 
+            _processDataAction = PrepareToBuyProcessAction;
+        }
+        private void ReadyToBuy()
+        {
+            _processDataAction = ReadyToBuyProcessAction;
+        }
+
         private void PrepareToSellProcessAction(Slice data, decimal currentPrice)
         {
             bool isTargetPriceAchieved = currentPrice > (1.0m + _percentagePriceGain) * _boughtPrice;
-            bool isRSIOverBought = _rsi > 70;
+            bool isRSIOverBought = _rsi > 65;
             bool isPriceOverUpperBand = currentPrice > _bollingerBands.UpperBand;
 
-            // TODO: Collect statistics on price in between BB and decide based on that
-            // check if price goes below the lower band and some stop loss percentage
+            (int lower, int middleLow, int middleUp, int upper) stats = _bolingerBandStatisticsProcessor.GetStatisticsPercentage();
+            int highBand = stats.middleUp + stats.upper;
+            int lowBand = stats.middleLow + stats.lower;
 
-            if (isTargetPriceAchieved && isRSIOverBought && isPriceOverUpperBand)
+
+            bool isRSILowBoutght = _rsi < 55;
+
+            var bbLowSlope = GetSlope(_bbLowLine);
+            var bbMidSlope = GetSlope(_bbMidLine);
+            var bbUpSlope = GetSlope(_bbUpLine);
+
+            if(bbMidSlope <= bbLowSlope && bbUpSlope <= bbMidSlope)
             {
-                _tradingPhase = PurchaseState.ReadyToSell;
+                //_tradingPhase = PurchaseState.ReadyToSellLoss;
+            }
+            else if (isTargetPriceAchieved && isRSIOverBought)
+            {
+                _tradingPhase = PurchaseState.ReadyToSellGain;
+            }
+			
+			if (isTargetPriceAchieved && isRSIOverBought && isPriceOverUpperBand)
+            {
+                _tradingPhase = PurchaseState.ReadyToSellGain;
+            }
+            
+                // TODO: Collect statistics on price in between BB and decide based on that
+                // check if price goes below the lower band and some stop loss percentage
+                // Find a way to wait and not trigger stop loss directly after buy
+                //if (isTargetPriceAchieved && isRSIOverBought && (highBand > lowBand))
+                //{
+                //    _tradingPhase = PurchaseState.ReadyToSellGain;
+                //}
+                //else if (isRSILowBoutght && (highBand <= lowBand))
+                //{
+                //    _tradingPhase = PurchaseState.ReadyToSellLoss;
+                //}
+
+                // check for limiting loss
             }
 
-            // check for limiting loss
-
-        }
-
-        private void ReadyToSellProcessAction(Slice data, decimal currentPrice)
+        private void ReadyToSellGainProcessAction(Slice data, decimal currentPrice)
         {
             if (IsOkToSell(data, currentPrice))
             {
@@ -445,6 +496,13 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                     Log("SELL ORDER. VeryFastEMA: " + _very_fast_ema + " - FastEMA: " + _fast_ema + " - SlowEMA: " + _slow_ema + " - MACD: " + _macd.Histogram.Current.Value);
 #endif
             }
+        }
+
+        private void ReadyToSellLossProcessAction(Slice data, decimal currentPrice)
+        {
+            var stopLossPrice = _boughtPrice * _stop_loss_percentage;
+
+            Sell(_symbol, Portfolio.CashBook[CryptoName].Amount);
         }
 
         private bool IsOkToSell(Slice data, decimal currentPrice)
@@ -596,6 +654,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 _boughtPrice = orderEvent.FillPrice;
                 _max_price_after_buy = _boughtPrice;
                 ResetCrossStates();
+                _bolingerBandStatisticsProcessor.Reset();
                 ObjectStore.Save(LastBoughtObjectStoreKey, _boughtPrice.ToString(_culture_info));
             }
 
