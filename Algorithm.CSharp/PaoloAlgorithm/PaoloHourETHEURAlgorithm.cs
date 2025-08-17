@@ -500,16 +500,26 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private bool IsOkToSell(Slice data, decimal currentPrice)
         {
-            var veryFastSlope = GetSlope(_veryFastMALine);
-            var fastSlope = GetSlope(_fastMALine);
-            var slowSlope = GetSlope(_slowMALine);
+            var bbHighSlope = GetSlope(_bbUpLine);
+            var bbMidSlope = GetSlope(_bbMidLine);
+            var bbLowSlope = GetSlope(_bbLowLine);
             var macdSlope = GetSlope(_macdLine);
+            var macdSignalSlope = GetSlope(_macdSignalLine);
 
             var trailingStopPrice = _max_price_after_buy * (1.0m - _trailing_stop_gain_percentage);
 
+            
+
             if (currentPrice < trailingStopPrice)
             {
-                return true;
+                if (currentPrice < _bollingerBands.MiddleBand)
+                {
+                    return true;
+                }
+                if(macdSlope <= ConvertDegreeToRad(30) && bbMidSlope < bbLowSlope)
+                {
+                    return true;
+                }
             }
 
             return false;
@@ -689,6 +699,12 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             return values.Select(selector).ToArray();
 
         }
+
+        private double ConvertDegreeToRad(double deg)
+        {
+            return (Math.PI / 180.0) * deg;
+        }
+
         internal class MinMaxMACD
         {
             private int _length = 0;
