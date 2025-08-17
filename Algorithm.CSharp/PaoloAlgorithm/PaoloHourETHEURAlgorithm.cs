@@ -92,7 +92,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private PurchaseState _tradingPhase = PurchaseState.Init;
         private decimal _boughtPrice = 0;
         private decimal _max_price_after_buy = decimal.MinValue;
-        private BolingerBandStatisticsProcessor _bolingerBandStatisticsProcessor = new BolingerBandStatisticsProcessor();
 
         private ReadyForBuyState ready_for_buy_state = ReadyForBuyState.None;
 
@@ -347,7 +346,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 case PurchaseState.ReadyToSellLoss:
                     {
                         _max_price_after_buy = Math.Max(_max_price_after_buy, current_price);
-                        _bolingerBandStatisticsProcessor.OnData(current_price, _bollingerBands.LowerBand, _bollingerBands.MiddleBand, _bollingerBands.UpperBand);
                     }
                     break;                
                 case PurchaseState.PrepareToBuy:
@@ -441,11 +439,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             bool isRSIOverBought = _rsi > 65;
             bool isPriceOverUpperBand = currentPrice > _bollingerBands.UpperBand;
 
-            (int lower, int middleLow, int middleUp, int upper) stats = _bolingerBandStatisticsProcessor.GetStatisticsPercentage();
-            int highBand = stats.middleUp + stats.upper;
-            int lowBand = stats.middleLow + stats.lower;
-
-
             bool isRSILowBoutght = _rsi < 55;
 
             var bbLowSlope = GetSlope(_bbLowLine);
@@ -526,11 +519,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         {
             bool transitionToNextState = false;
 
-            var veryFastSlope = GetSlope(_veryFastMALine);
-            var fastSlope = GetSlope(_fastMALine);
-            var slowSlope = GetSlope(_slowMALine);
-            var macdSlope = GetSlope(_macdLine);
-
             if (currentPrice < _bollingerBands.LowerBand)
             {
                 transitionToNextState = true;
@@ -608,16 +596,24 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             var veryFastSlope = GetSlope(_veryFastMALine);
             var fastSlope = GetSlope(_fastMALine);
             var slowSlope = GetSlope(_slowMALine);
-            var macdSlope = GetSlope(_macdLine);
 
-            if (currentPrice > _bollingerBands.LowerBand)
+            var bbUpSlope = GetSlope(_bbUpLine);
+            var bbMidSlope = GetSlope(_bbMidLine);
+            var bbLowSlope = GetSlope(_bbLowLine);
+            var macdSlope = GetSlope(_macdLine);
+            var macdSignalSlope = GetSlope(_macdSignalLine);
+
+            if(macdSlope >= 0 && macdSignalSlope >= 0)
             {
-                return true;
-            }
-            else if(currentPrice > _bollingerBands.MiddleBand && _volumeCounter > 2)
-            { 
-                return true; 
-            }
+                if (currentPrice > _bollingerBands.LowerBand)
+                {
+                    return true;
+                }
+                else if (currentPrice > _bollingerBands.MiddleBand && _volumeCounter > 2)
+                {
+                    return true;
+                }
+            }            
 
             return false;
         }
@@ -654,7 +650,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 _boughtPrice = orderEvent.FillPrice;
                 _max_price_after_buy = _boughtPrice;
                 ResetCrossStates();
-                _bolingerBandStatisticsProcessor.Reset();
                 ObjectStore.Save(LastBoughtObjectStoreKey, _boughtPrice.ToString(_culture_info));
             }
 
