@@ -15,13 +15,15 @@
 
 using QuantConnect.Algorithm.Framework.Portfolio;
 using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Orders;
+using QuantConnect.Python;
 
 namespace QuantConnect.Algorithm.Framework.Execution
 {
     /// <summary>
     /// Provides a base class for execution models
     /// </summary>
-    public class ExecutionModel : IExecutionModel
+    public class ExecutionModel : BasePythonWrapper<ExecutionModel>, IExecutionModel
     {
         /// <summary>
         /// If true, orders should be submitted asynchronously.
@@ -55,6 +57,15 @@ namespace QuantConnect.Algorithm.Framework.Execution
         /// <param name="algorithm">The algorithm instance that experienced the change in securities</param>
         /// <param name="changes">The security additions and removals from the algorithm</param>
         public virtual void OnSecuritiesChanged(QCAlgorithm algorithm, SecurityChanges changes)
+        {
+        }
+
+        /// <summary>
+        /// New order event handler
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance</param>
+        /// <param name="orderEvent">Order event to process</param>
+        public virtual void OnOrderEvent(QCAlgorithm algorithm, OrderEvent orderEvent)
         {
         }
     }

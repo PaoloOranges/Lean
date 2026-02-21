@@ -33,6 +33,7 @@ using Python.Runtime;
 using QuantConnect.Data.Fundamental;
 using QuantConnect.Interfaces;
 using QuantConnect.Data.Shortable;
+using QuantConnect.Util;
 
 namespace QuantConnect.Securities
 {
@@ -329,6 +330,11 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
+        /// Gets the current session of this security
+        /// </summary>
+        public virtual Session Session => Cache.Session;
+
+        /// <summary>
         /// Construct a new security vehicle based on the user options.
         /// </summary>
         public Security(SecurityExchangeHours exchangeHours,
@@ -591,7 +597,7 @@ namespace QuantConnect.Securities
         {
             get
             {
-                return new Fundamental(LocalTime, Symbol);
+                return Fundamental.ForDate(LocalTime, Symbol);
             }
         }
 
@@ -609,6 +615,7 @@ namespace QuantConnect.Securities
         public virtual void SetLocalTimeKeeper(LocalTimeKeeper localTimeKeeper)
         {
             _localTimeKeeper = localTimeKeeper;
+            Cache.SetLocalTimeKeeper(localTimeKeeper);
             Exchange.SetLocalDateTimeFrontierProvider(localTimeKeeper);
         }
 
@@ -632,10 +639,12 @@ namespace QuantConnect.Securities
         /// <param name="data">The security update data</param>
         /// <param name="dataType">The data type</param>
         /// <param name="containsFillForwardData">Flag indicating whether
+        /// <param name="isInternalConfig">True if this update data corresponds to an internal subscription
+        /// such as currency or security benchmark</param>
         /// <paramref name="data"/> contains any fill forward bar or not</param>
-        public void Update(IReadOnlyList<BaseData> data, Type dataType, bool? containsFillForwardData = null)
+        public void Update(IReadOnlyList<BaseData> data, Type dataType, bool? containsFillForwardData = null, bool isInternalConfig = false)
         {
-            Cache.AddDataList(data, dataType, containsFillForwardData);
+            Cache.AddDataList(data, dataType, containsFillForwardData, isInternalConfig);
 
             UpdateMarketPrice(data[data.Count - 1]);
         }
@@ -717,7 +726,10 @@ namespace QuantConnect.Securities
         /// <param name="feelModel">Model that represents a fee model</param>
         public void SetFeeModel(PyObject feelModel)
         {
-            FeeModel = new FeeModelPythonWrapper(feelModel);
+            FeeModel = PythonUtil.CreateInstanceOrWrapper<IFeeModel>(
+                feelModel,
+                py => new FeeModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -735,7 +747,10 @@ namespace QuantConnect.Securities
         /// <param name="fillModel">Model that represents a fill model</param>
         public void SetFillModel(PyObject fillModel)
         {
-            FillModel = new FillModelPythonWrapper(fillModel);
+            FillModel = PythonUtil.CreateInstanceOrWrapper<IFillModel>(
+                fillModel,
+                py => new FillModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -753,7 +768,10 @@ namespace QuantConnect.Securities
         /// <param name="settlementModel">Model that represents a settlement model</param>
         public void SetSettlementModel(PyObject settlementModel)
         {
-            SettlementModel = new SettlementModelPythonWrapper(settlementModel);
+            SettlementModel = PythonUtil.CreateInstanceOrWrapper<ISettlementModel>(
+                settlementModel,
+                py => new SettlementModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -771,7 +789,10 @@ namespace QuantConnect.Securities
         /// <param name="slippageModel">Model that represents a slippage model</param>
         public void SetSlippageModel(PyObject slippageModel)
         {
-            SlippageModel = new SlippageModelPythonWrapper(slippageModel);
+            SlippageModel = PythonUtil.CreateInstanceOrWrapper<ISlippageModel>(
+                slippageModel,
+                py => new SlippageModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -789,7 +810,10 @@ namespace QuantConnect.Securities
         /// <param name="volatilityModel">Model that represents a volatility model</param>
         public void SetVolatilityModel(PyObject volatilityModel)
         {
-            VolatilityModel = new VolatilityModelPythonWrapper(volatilityModel);
+            VolatilityModel = PythonUtil.CreateInstanceOrWrapper<IVolatilityModel>(
+                volatilityModel,
+                py => new VolatilityModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -807,7 +831,10 @@ namespace QuantConnect.Securities
         /// <param name="pyObject">Model that represents a security's model of buying power</param>
         public void SetBuyingPowerModel(PyObject pyObject)
         {
-            SetBuyingPowerModel(new BuyingPowerModelPythonWrapper(pyObject));
+            BuyingPowerModel = PythonUtil.CreateInstanceOrWrapper<IBuyingPowerModel>(
+                pyObject,
+                py => new BuyingPowerModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -825,7 +852,10 @@ namespace QuantConnect.Securities
         /// <param name="pyObject">Model that represents a security's model of margin interest rate</param>
         public void SetMarginInterestRateModel(PyObject pyObject)
         {
-            SetMarginInterestRateModel(new MarginInterestRateModelPythonWrapper(pyObject));
+            MarginInterestRateModel = PythonUtil.CreateInstanceOrWrapper<IMarginInterestRateModel>(
+                pyObject,
+                py => new MarginInterestRateModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -843,7 +873,10 @@ namespace QuantConnect.Securities
         /// <param name="pyObject">Model that represents a security's model of buying power</param>
         public void SetMarginModel(PyObject pyObject)
         {
-            SetMarginModel(new BuyingPowerModelPythonWrapper(pyObject));
+            MarginModel = PythonUtil.CreateInstanceOrWrapper<IBuyingPowerModel>(
+                pyObject,
+                py => new BuyingPowerModelPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -852,21 +885,10 @@ namespace QuantConnect.Securities
         /// <param name="pyObject">Python class that represents a custom shortable provider</param>
         public void SetShortableProvider(PyObject pyObject)
         {
-            if (pyObject.TryConvert<IShortableProvider>(out var shortableProvider))
-            {
-                SetShortableProvider(shortableProvider);
-            }
-            else if (Extensions.TryConvert<IShortableProvider>(pyObject, out _, allowPythonDerivative: true))
-            {
-                SetShortableProvider(new ShortableProviderPythonWrapper(pyObject));
-            }
-            else
-            {
-                using (Py.GIL())
-                {
-                    throw new Exception($"SetShortableProvider: {pyObject.Repr()} is not a valid argument");
-                }
-            }
+            ShortableProvider = PythonUtil.CreateInstanceOrWrapper<IShortableProvider>(
+                pyObject,
+                py => new ShortableProviderPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -885,21 +907,10 @@ namespace QuantConnect.Securities
         /// <exception cref="ArgumentException"></exception>
         public void SetDataFilter(PyObject pyObject)
         {
-            if (pyObject.TryConvert<ISecurityDataFilter>(out var dataFilter))
-            {
-                SetDataFilter(dataFilter);
-            }
-            else if (Extensions.TryConvert<ISecurityDataFilter>(pyObject, out _, allowPythonDerivative: true))
-            {
-                SetDataFilter(new SecurityDataFilterPythonWrapper(pyObject));
-            }
-            else
-            {
-                using (Py.GIL())
-                {
-                    throw new ArgumentException($"SetDataFilter: {pyObject.Repr()} is not a valid argument");
-                }
-            }
+            DataFilter = PythonUtil.CreateInstanceOrWrapper<ISecurityDataFilter>(
+                pyObject,
+                py => new SecurityDataFilterPythonWrapper(py)
+            );
         }
 
         /// <summary>
@@ -1185,6 +1196,11 @@ namespace QuantConnect.Securities
                 SymbolProperties = symbolProperties;
             }
         }
+
+        /// <summary>
+        /// Returns the securities symbol
+        /// </summary>
+        public static implicit operator Symbol(Security security) => security.Symbol;
 
         /// <summary>
         /// Resets the security to its initial state by marking it as uninitialized and non-tradable

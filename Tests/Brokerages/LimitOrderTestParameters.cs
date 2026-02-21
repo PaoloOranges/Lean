@@ -56,19 +56,13 @@ namespace QuantConnect.Tests.Brokerages
 
         public override bool ModifyOrderToFill(IBrokerage brokerage, Order order, decimal lastMarketPrice)
         {
-            // limit orders will process even if they go beyond the market price
-            var limit = (LimitOrder) order;
-            if (order.Quantity > 0)
-            {
-                // for limit buys we need to increase the limit price
-                limit.LimitPrice = Math.Max(limit.LimitPrice * _priceModificationFactor, lastMarketPrice * _priceModificationFactor);
-            }
-            else
-            {
-                // for limit sells we need to decrease the limit price
-                limit.LimitPrice = Math.Min(limit.LimitPrice / _priceModificationFactor, lastMarketPrice / _priceModificationFactor);
-            }
-            limit.LimitPrice = RoundPrice(order, limit.LimitPrice);
+            
+            var newLimitPrice = CalculateAdjustedLimitPrice(order.Direction, (order as LimitOrder).LimitPrice, lastMarketPrice, _priceModificationFactor);
+
+            var updateFields = new UpdateOrderFields() { LimitPrice = RoundPrice(newLimitPrice, GetSymbolProperties(order.Symbol).MinimumPriceVariation) };
+
+            ApplyUpdateOrderRequest(order, updateFields);
+
             return true;
         }
 
@@ -76,6 +70,11 @@ namespace QuantConnect.Tests.Brokerages
         public override OrderStatus ExpectedStatus => OrderStatus.Submitted;
 
         public override bool ExpectedCancellationResult => true;
+
+        public override string ToString()
+        {
+            return $"{OrderType.Limit}: {SecurityType}, {Symbol}";
+        }
     }
 
     // to be used with brokerages which do not support UpdateOrder

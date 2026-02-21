@@ -16,6 +16,7 @@
 using Python.Runtime;
 using QuantConnect.Algorithm.Framework.Portfolio;
 using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Orders;
 using QuantConnect.Python;
 using System;
 
@@ -26,7 +27,7 @@ namespace QuantConnect.Algorithm.Framework.Execution
     /// </summary>
     public class ExecutionModelPythonWrapper : ExecutionModel
     {
-        private readonly BasePythonWrapper<ExecutionModel> _model;
+        private readonly bool _onOrderEventsDefined;
 
         /// <summary>
         /// Constructor for initialising the <see cref="IExecutionModel"/> class with wrapped <see cref="PyObject"/> object
@@ -34,13 +35,21 @@ namespace QuantConnect.Algorithm.Framework.Execution
         /// <param name="model">Model defining how to execute trades to reach a portfolio target</param>
         public ExecutionModelPythonWrapper(PyObject model)
         {
-            _model = new BasePythonWrapper<ExecutionModel>(model, false);
+            SetPythonInstance(model, false);
             foreach (var attributeName in new[] { "Execute", "OnSecuritiesChanged" })
             {
-                if (!_model.HasAttr(attributeName))
+                if (!HasAttr(attributeName))
                 {
                     throw new NotImplementedException($"IExecutionModel.{attributeName} must be implemented. Please implement this missing method on {model.GetPythonType()}");
                 }
+            }
+
+            _onOrderEventsDefined = HasAttr("OnOrderEvent");
+
+            var methodName = nameof(SetPythonInstance);
+            if (HasAttr(methodName))
+            {
+                InvokeMethod(methodName, model);
             }
         }
 
@@ -52,7 +61,7 @@ namespace QuantConnect.Algorithm.Framework.Execution
         /// <param name="targets">The portfolio targets to be ordered</param>
         public override void Execute(QCAlgorithm algorithm, IPortfolioTarget[] targets)
         {
-            _model.InvokeMethod(nameof(Execute), algorithm, targets).Dispose();
+            InvokeMethod(nameof(Execute), algorithm, targets).Dispose();
         }
 
         /// <summary>
@@ -62,7 +71,20 @@ namespace QuantConnect.Algorithm.Framework.Execution
         /// <param name="changes">The security additions and removals from the algorithm</param>
         public override void OnSecuritiesChanged(QCAlgorithm algorithm, SecurityChanges changes)
         {
-            _model.InvokeMethod(nameof(OnSecuritiesChanged), algorithm, changes).Dispose();
+            InvokeMethod(nameof(OnSecuritiesChanged), algorithm, changes).Dispose();
+        }
+
+        /// <summary>
+        /// New order event handler
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance</param>
+        /// <param name="orderEvent">Order event to process</param>
+        public override void OnOrderEvent(QCAlgorithm algorithm, OrderEvent orderEvent)
+        {
+            if (_onOrderEventsDefined)
+            {
+                InvokeMethod(nameof(OnOrderEvent), algorithm, orderEvent).Dispose();
+            }
         }
     }
 }

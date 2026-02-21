@@ -27,6 +27,8 @@ namespace QuantConnect.Algorithm.CSharp
     {
         private List<decimal> _originalLimitPrices = new();
 
+        protected virtual bool AsynchronousOrders => false;
+
         protected override IEnumerable<OrderTicket> PlaceComboOrder(List<Leg> legs, int quantity, decimal? limitPrice = null)
         {
             foreach (var leg in legs)
@@ -35,7 +37,7 @@ namespace QuantConnect.Algorithm.CSharp
                 leg.OrderPrice *= 2; // Won't fill
             }
 
-            return ComboLegLimitOrder(legs, quantity);
+            return ComboLegLimitOrder(legs, quantity, asynchronous: AsynchronousOrders);
         }
 
         protected override void UpdateComboOrder(List<OrderTicket> tickets)
@@ -54,6 +56,14 @@ namespace QuantConnect.Algorithm.CSharp
             if (FillOrderEvents.Zip(OrderLegs).Any(x => x.Second.OrderPrice < x.First.FillPrice))
             {
                 throw new RegressionTestException($"Limit price expected to be greater that the fill price for each order. Limit prices: {string.Join(",", OrderLegs.Select(x => x.OrderPrice))} Fill prices: {string.Join(",", FillOrderEvents.Select(x => x.FillPrice))}");
+            }
+
+            foreach (var ticket in Transactions.GetOrderTickets())
+            {
+                if (ticket.SubmitRequest.Asynchronous != AsynchronousOrders)
+                {
+                    throw new RegressionTestException("Expected all orders to have the same asynchronous flag as the algorithm.");
+                }
             }
         }
 
@@ -111,10 +121,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Treynor Ratio", "0"},
             {"Total Fees", "$26.00"},
             {"Estimated Strategy Capacity", "$58000.00"},
-            {"Lowest Capacity Asset", "GOOCV W78ZERHAOVVQ|GOOCV VP83T1ZUHROL"},
+            {"Lowest Capacity Asset", "GOOCV W78ZERHAT67A|GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "30.22%"},
             {"Drawdown Recovery", "0"},
-            {"OrderListHash", "ab6171073cd96df46fd9d7bce62f5594"}
+            {"OrderListHash", "6168ffaa5b9f3c389f5da52e90455889"}
         };
     }
 }

@@ -40,6 +40,8 @@ namespace QuantConnect.Lean.Engine.Setup
     /// </summary>
     public class BrokerageSetupHandler : ISetupHandler
     {
+        private bool _disposed;
+
         /// <summary>
         /// Max allocation limit configuration variable name
         /// </summary>
@@ -85,7 +87,7 @@ namespace QuantConnect.Lean.Engine.Setup
         public BrokerageSetupHandler()
         {
             Errors = new List<Exception>();
-            MaximumRuntime = TimeSpan.FromDays(10*365);
+            MaximumRuntime = TimeSpan.FromDays(10 * 365);
             MaxOrders = int.MaxValue;
         }
 
@@ -133,6 +135,7 @@ namespace QuantConnect.Lean.Engine.Setup
 
             // initialize the correct brokerage using the resolved factory
             var brokerage = _factory.CreateBrokerage(liveJob, uninitializedAlgorithm);
+            Composer.Instance.AddPart(brokerage);
 
             return brokerage;
         }
@@ -215,7 +218,7 @@ namespace QuantConnect.Lean.Engine.Setup
 
                 Log.Trace($"BrokerageSetupHandler.Setup(): {message}");
 
-                algorithm.Debug(message);
+                parameters.ResultHandler.DebugMessage(message);
                 if (accountCurrency != null && accountCurrency != algorithm.AccountCurrency)
                 {
                     algorithm.SetAccountCurrency(accountCurrency);
@@ -228,7 +231,7 @@ namespace QuantConnect.Lean.Engine.Setup
                 //Execute the initialize code:
                 var controls = liveJob.Controls;
                 var isolator = new Isolator();
-                var initializeComplete = isolator.ExecuteWithTimeLimit(TimeSpan.FromSeconds(300), () =>
+                var initializeComplete = isolator.ExecuteWithTimeLimit(BaseSetupHandler.InitializationTimeout, () =>
                 {
                     try
                     {
@@ -318,7 +321,7 @@ namespace QuantConnect.Lean.Engine.Setup
                 BaseSetupHandler.SetBrokerageTradingDayPerYear(algorithm);
 
                 var dataAggregator = Composer.Instance.GetPart<IDataAggregator>();
-                dataAggregator?.Initialize(new () { AlgorithmSettings = algorithm.Settings });
+                dataAggregator?.Initialize(new() { AlgorithmSettings = algorithm.Settings });
 
                 //Finalize Initialization
                 algorithm.PostInitialize();
@@ -372,8 +375,13 @@ namespace QuantConnect.Lean.Engine.Setup
                 var cashBalance = brokerage.GetCashBalance();
                 foreach (var cash in cashBalance)
                 {
-                    Log.Trace($"BrokerageSetupHandler.Setup(): Setting {cash.Currency} cash to {cash.Amount}");
+                    if (!CashAmountUtil.ShouldAddCashBalance(cash, algorithm.AccountCurrency))
+                    {
+                        Log.Trace($"BrokerageSetupHandler.Setup(): Skipping {cash.Currency} cash because quantity is zero");
+                        continue;
+                    }
 
+                    Log.Trace($"BrokerageSetupHandler.Setup(): Setting {cash.Currency} cash to {cash.Amount}");
                     algorithm.Portfolio.SetCash(cash.Currency, cash.Amount, 0);
                 }
             }
@@ -513,6 +521,11 @@ namespace QuantConnect.Lean.Engine.Setup
         /// <filterpriority>2</filterpriority>
         public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
             _factory?.DisposeSafely();
 
             if (_dataQueueHandlerBrokerage != null)

@@ -60,7 +60,8 @@ namespace QuantConnect.Tests.Algorithm
         [TestCase(Resolution.Daily, SecurityType.Crypto)]
         public void WarmupDifferentResolutions(Resolution resolution, SecurityType securityType)
         {
-            _algorithm = TestSetupHandler.TestAlgorithm = new TestWarmupAlgorithm(resolution);
+            var warmupPeriod = resolution != Resolution.Tick ? TimeSpan.FromDays(2) : TimeSpan.FromHours(10);
+            _algorithm = TestSetupHandler.TestAlgorithm = new TestWarmupAlgorithm(resolution, warmupPeriod);
 
             _algorithm.SecurityType = securityType;
             if (securityType == SecurityType.Forex)
@@ -120,6 +121,7 @@ namespace QuantConnect.Tests.Algorithm
             {
                 HistoryProvider = new SubscriptionDataReaderHistoryProvider()
             };
+            algo.Settings.SeedInitialPrices = false;
 
             algo.SetStartDate(2013, 10, 08);
             algo.AddCfd("DE30EUR", Resolution.Second, Market.Oanda);
@@ -393,6 +395,7 @@ class TestAlgo(AlgorithmStub):
         private class TestWarmupAlgorithm : QCAlgorithm
         {
             private readonly Resolution _resolution;
+            private readonly TimeSpan _warmupPeriod;
             private Symbol _symbol;
             public SecurityType SecurityType { get; set; }
 
@@ -402,9 +405,10 @@ class TestAlgo(AlgorithmStub):
 
             public int WarmUpDataCount { get; set; }
 
-            public TestWarmupAlgorithm(Resolution resolution)
+            public TestWarmupAlgorithm(Resolution resolution, TimeSpan warmupPeriod)
             {
                 _resolution = resolution;
+                _warmupPeriod = warmupPeriod;
             }
 
             public override void Initialize()
@@ -425,7 +429,7 @@ class TestAlgo(AlgorithmStub):
                 {
                     _symbol = AddCrypto("BTCUSD", _resolution).Symbol;
                 }
-                SetWarmUp(TimeSpan.FromDays(2));
+                SetWarmUp(_warmupPeriod);
             }
 
             public override void OnData(Slice data)
@@ -439,6 +443,7 @@ class TestAlgo(AlgorithmStub):
                     if (!Portfolio.Invested)
                     {
                         SetHoldings(_symbol, 1);
+                        Quit();
                     }
                 }
             }

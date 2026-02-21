@@ -14,7 +14,6 @@
 */
 
 using System;
-using RestSharp;
 using QuantConnect.Api;
 using System.Threading;
 
@@ -76,8 +75,7 @@ namespace QuantConnect.Brokerages.Authentication
 
             try
             {
-                var request = new RestRequest("live/auth0/refresh", Method.POST);
-                request.AddJsonBody(_jsonBodyRequest);
+                using var request = ApiUtils.CreateJsonPostRequest("live/auth0/refresh", _jsonBodyRequest);
 
                 if (_apiClient.TryRequest<TResponse>(request, out var response))
                 {
@@ -89,7 +87,9 @@ namespace QuantConnect.Brokerages.Authentication
                     }
                 }
 
-                throw new InvalidOperationException(string.Join(",", response.Errors));
+                Logging.Log.Error($"{nameof(OAuthTokenHandler<TRequest, TResponse>)}.{nameof(GetAccessToken)}: Failed to retrieve access token. Response: {response}. Last known expiration: {_accessTokenMetaData?.Expiration.ToStringInvariant() ?? "Not requested yet"}.");
+                throw new InvalidOperationException($"Authentication failed. " +
+                    $"Details: {(response?.Errors?.Count > 0 ? string.Join(",", response.Errors) : "empty")}");
             }
             catch (Exception ex)
             {

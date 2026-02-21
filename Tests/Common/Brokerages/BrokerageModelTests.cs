@@ -31,6 +31,7 @@ using QuantConnect.Tests.Engine.DataFeeds;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.Slippage;
 using QuantConnect.Data.Shortable;
+using QuantConnect.Data.Market;
 
 namespace QuantConnect.Tests.Common.Brokerages
 {
@@ -275,10 +276,10 @@ class CustomBrokerageModel(DefaultBrokerageModel):
                 Assert.AreEqual(typeof(ImmediateFillModel), fillModel.GetType());
                 var order = new Mock<MarketOrder>();
                 var subscriptionDataConfigProvider = new Mock<ISubscriptionDataConfigProvider>();
-                var securitiesForOrders = new Dictionary<Order, Security>() { { order.Object, security} };
+                var securitiesForOrders = new Dictionary<Order, Security>() { { order.Object, security } };
                 var fillModelParameters = new FillModelParameters(security, order.Object, subscriptionDataConfigProvider.Object, TimeSpan.Zero, securitiesForOrders);
                 var result = fillModel.Fill(fillModelParameters);
-                foreach( var entry in result)
+                foreach (var entry in result)
                 {
                     Assert.AreEqual(OrderStatus.Filled, entry.Status);
                 }
@@ -663,6 +664,167 @@ class CustomBrokerageModel(DefaultBrokerageModel):
             }
         }
 
+        [Test]
+        public void TradingTechnologiesBrokerageModelValidatesStopLimitOrders()
+        {
+            var model = new TradingTechnologiesBrokerageModel();
+            var symbol = Symbols.Future_CLF19_Jan2019;
+            var security = GetSecurity(symbol);
+            security.SetMarketPrice(new Tick(DateTime.UtcNow, symbol, 4500m, 4500m));
+
+            var invalidStopLimit = new StopLimitOrder
+            {
+                Symbol = symbol,
+                Quantity = 1,
+                StopPrice = 4510m,
+                LimitPrice = 4505m
+            };
+
+            var canSubmit = model.CanSubmitOrder(security, invalidStopLimit, out var message);
+            Assert.IsFalse(canSubmit);
+            StringAssert.Contains("StopLimit Buy limit price must be greater than or equal to stop price", message.Message);
+        }
+
+        [TestCase(BrokerageName.Alpaca, OrderType.MarketOnOpen, 10, -15, false)]
+        [TestCase(BrokerageName.Alpaca, OrderType.MarketOnOpen, 10, -10, true)]
+        [TestCase(BrokerageName.Alpaca, OrderType.MarketOnClose, 10, -15, false)]
+        [TestCase(BrokerageName.Alpaca, OrderType.MarketOnClose, 10, -10, true)]
+        [TestCase(BrokerageName.TradeStation, OrderType.MarketOnOpen, 10, -15, false)]
+        [TestCase(BrokerageName.TradeStation, OrderType.MarketOnOpen, 10, -10, true)]
+        [TestCase(BrokerageName.TradeStation, OrderType.MarketOnClose, 10, -15, false)]
+        [TestCase(BrokerageName.TradeStation, OrderType.MarketOnClose, 10, -10, true)]
+        [TestCase(BrokerageName.Tastytrade, OrderType.MarketOnOpen, 10, -15, false)]
+        [TestCase(BrokerageName.Tastytrade, OrderType.MarketOnOpen, 10, -10, false, Description = "Not support MOO")]
+        [TestCase(BrokerageName.Tastytrade, OrderType.MarketOnClose, 10, -15, false)]
+        [TestCase(BrokerageName.Tastytrade, OrderType.MarketOnClose, 10, -10, false, Description = "doesn't support MOC")]
+        [TestCase(BrokerageName.TradierBrokerage, OrderType.MarketOnOpen, 10, -15, false)]
+        [TestCase(BrokerageName.TradierBrokerage, OrderType.MarketOnOpen, 10, -10, false, Description = "Not support MOO")]
+        [TestCase(BrokerageName.TradierBrokerage, OrderType.MarketOnClose, 10, -15, false)]
+        [TestCase(BrokerageName.TradierBrokerage, OrderType.MarketOnClose, 10, -10, false, Description = "Not support MOC")]
+        public void BrokerageModelCanSubmitNotSupportCrossZeroOrderType(BrokerageName brokerageName, OrderType orderType, decimal holdingQuantity, decimal orderQuantity, bool isShouldSubmitOrder)
+        {
+            // Initialize: BrokerageModel
+            var brokerageModel = GetBrokerageModel(brokerageName);
+
+            // Initialize: Order
+            var AAPL = Symbols.AAPL;
+            Order order = orderType switch
+            {
+                OrderType.MarketOnOpen => new MarketOnOpenOrder(AAPL, orderQuantity, new(default)),
+                OrderType.MarketOnClose => new MarketOnCloseOrder(AAPL, orderQuantity, new(default)),
+                _ => throw new NotImplementedException()
+            };
+
+            // Initialize: Security
+            var algorithm = new AlgorithmStub();
+            algorithm.SetDateTime(new DateTime(2025, 09, 16, 7, 0, 0).ConvertToUtc(algorithm.TimeZone));
+            algorithm.AddEquity(AAPL.Value).Holdings.SetHoldings(209m, holdingQuantity);
+            var security = algorithm.Securities[AAPL];
+
+            var isPossibleUpdate = brokerageModel.CanSubmitOrder(security, order, out var message);
+
+            Assert.That(isPossibleUpdate, Is.EqualTo(isShouldSubmitOrder));
+        }
+
+        private static IEnumerable<TestCaseData> MarketOnOpenOrderTimeExecutions
+        {
+            get
+            {
+                var ts = BrokerageName.TradeStation;
+                var alpaca = BrokerageName.Alpaca;
+                var ib = BrokerageName.InteractiveBrokersBrokerage;
+
+                foreach (var bn in new BrokerageName[3] { ts, alpaca, ib })
+                {
+                    yield return new TestCaseData(bn, Symbols.SPY, new DateTime(2025, 04, 30, 8, 0, 0), true);
+                    yield return new TestCaseData(bn, Symbols.SPY, new DateTime(2025, 04, 30, 12, 0, 0), false);
+                    yield return new TestCaseData(bn, Symbols.SPY, new DateTime(2025, 04, 30, 15, 30, 0), false);
+                    yield return new TestCaseData(bn, Symbols.SPY, new DateTime(2025, 04, 30, 6, 0, 0), true);
+                    yield return new TestCaseData(bn, Symbols.SPY, new DateTime(2025, 04, 30, 9, 27, 59), true);
+
+                    yield return new TestCaseData(bn, Symbols.Future_CLF19_Jan2019, new DateTime(2025, 04, 30, 9, 27, 59), false).SetDescription("The Brokerage doesn't support MOO for future");
+                    yield return new TestCaseData(bn, Symbols.SBIN, new DateTime(2025, 04, 30, 9, 0, 0), true).SetDescription("Allow place order with different market");
+                }
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 15, 59, 0), false);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 15, 59, 0), false);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 16, 0, 0), true);
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 17, 0, 0), false);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 17, 0, 0), false);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 17, 0, 0), true);
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 17, 59, 0), false);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 17, 59, 0), false);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 17, 59, 0), true);
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 19, 0, 0), false);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 19, 0, 0), true);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 19, 0, 0), true);
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 19, 1, 0), false);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 19, 1, 0), true);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 19, 1, 0), true);
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 21, 0, 0), false);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 21, 0, 0), true);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 21, 0, 0), true);
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 9, 28, 0), true);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 9, 28, 0), false);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 9, 28, 0), false);
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 04, 30, 5, 59, 0), false);
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 04, 30, 5, 59, 0), true);
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 04, 30, 5, 59, 0), true);
+
+                yield return new TestCaseData(ts, Symbols.SPY_C_192_Feb19_2016, new DateTime(2025, 04, 30, 9, 28, 0), true).SetDescription("The TS supports option");
+                yield return new TestCaseData(alpaca, Symbols.SPY_C_192_Feb19_2016, new DateTime(2025, 04, 30, 9, 28, 0), false).SetDescription("The Alpaca doesn't support option");
+                yield return new TestCaseData(ib, Symbols.SPY_C_192_Feb19_2016, new DateTime(2025, 04, 30, 5, 59, 0), true).SetDescription("The IB supports option");
+
+                yield return new TestCaseData(ts, Symbols.SPY, new DateTime(2025, 09, 13, 12, 0, 0), true).SetDescription("2025 September Saturday");
+                yield return new TestCaseData(alpaca, Symbols.SPY, new DateTime(2025, 09, 13, 12, 0, 0), true).SetDescription("2025 September Saturday");
+                yield return new TestCaseData(ib, Symbols.SPY, new DateTime(2025, 09, 13, 12, 0, 0), true).SetDescription("2025 September Saturday");
+            }
+        }
+
+        [TestCaseSource(nameof(MarketOnOpenOrderTimeExecutions))]
+        public void CanSubmitMarketOnOpen(BrokerageName brokerageName, Symbol symbol, DateTime algorithmDateTime, bool shouldSubmit)
+        {
+            var brokerageModel = GetBrokerageModel(brokerageName);
+
+            var algorithm = new AlgorithmStub();
+            algorithm.SetStartDate(algorithmDateTime.Date);
+
+            var security = algorithm.AddSecurity(symbol);
+            algorithm.SetFinishedWarmingUp();
+            // Set algorithm time to the given hour
+            algorithm.SetDateTime(algorithmDateTime.ConvertToUtc(security.Exchange.TimeZone));
+
+            security.Update([new Tick(algorithm.Time, symbol, string.Empty, string.Empty, 10m, 550m)], typeof(TradeBar));
+
+            var order = new MarketOnOpenOrder(security.Symbol, 1, DateTime.UtcNow);
+
+            var canSubmit = brokerageModel.CanSubmitOrder(security, order, out var message);
+
+            Assert.That(canSubmit, Is.EqualTo(shouldSubmit));
+        }
+
+        /// <summary>
+        /// Creates a brokerage model instance for the specified <see cref="BrokerageName"/>.
+        /// </summary>
+        /// <param name="brokerageName">The <see cref="BrokerageName"/> identifying which brokerage model to create.</param>
+        /// <returns>An <see cref="IBrokerageModel"/> corresponding to the given <paramref name="brokerageName"/>.</returns>
+        private static IBrokerageModel GetBrokerageModel(BrokerageName brokerageName) => brokerageName switch
+        {
+            BrokerageName.Alpaca => new AlpacaBrokerageModel(),
+            BrokerageName.TradeStation => new TradeStationBrokerageModel(),
+            BrokerageName.Tastytrade => new TastytradeBrokerageModel(),
+            BrokerageName.TradierBrokerage => new TradierBrokerageModel(),
+            BrokerageName.InteractiveBrokersBrokerage => new InteractiveBrokersBrokerageModel(),
+            _ => throw new NotImplementedException($"{nameof(BrokerageModelTests)}.{nameof(GetBrokerageModel)}: does not support brokerage '{brokerageName}'.")
+        };
+
         private static Security GetSecurity(Symbol symbol) =>
         new(symbol,
             SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc),
@@ -706,25 +868,25 @@ class CustomBrokerageModel(DefaultBrokerageModel):
             };
         }
 
-        private class CustomInteractiveBrokersBrokerageModel : InteractiveBrokersBrokerageModel {}
-        private class CustomTradierBrokerageModel : TradierBrokerageModel {}
-        private class CustomOandaBrokerageModel : OandaBrokerageModel {}
-        private class CustomFxcmBrokerageModel : FxcmBrokerageModel {}
-        private class CustomBitfinexBrokerageModel : BitfinexBrokerageModel {}
-        private class CustomBinanceUSBrokerageModel : BinanceUSBrokerageModel {}
-        private class CustomBinanceBrokerageModel : BinanceBrokerageModel {}
-        private class CustomCoinbaseBrokerageModel : CoinbaseBrokerageModel {}
-        private class CustomAlphaStreamsBrokerageModel : AlphaStreamsBrokerageModel {}
-        private class CustomZerodhaBrokerageModel : ZerodhaBrokerageModel {}
-        private class CustomAxosBrokerageModel : AxosClearingBrokerageModel {}
-        private class CustomTradingTechnologiesBrokerageModel : TradingTechnologiesBrokerageModel {}
-        private class CustomSamcoBrokerageModel : SamcoBrokerageModel {}
-        private class CustomKrakenBrokerageModel : KrakenBrokerageModel {}
-        private class CustomExanteBrokerageModel : ExanteBrokerageModel {}
-        private class CustomFTXUSBrokerageModel : FTXUSBrokerageModel {}
-        private class CustomFTXBrokerageModel : FTXBrokerageModel {}
-        private  class CustomBybitBrokerageModel : BybitBrokerageModel { }
-        private class CustomDefaultBrokerageModel : DefaultBrokerageModel {}
+        private class CustomInteractiveBrokersBrokerageModel : InteractiveBrokersBrokerageModel { }
+        private class CustomTradierBrokerageModel : TradierBrokerageModel { }
+        private class CustomOandaBrokerageModel : OandaBrokerageModel { }
+        private class CustomFxcmBrokerageModel : FxcmBrokerageModel { }
+        private class CustomBitfinexBrokerageModel : BitfinexBrokerageModel { }
+        private class CustomBinanceUSBrokerageModel : BinanceUSBrokerageModel { }
+        private class CustomBinanceBrokerageModel : BinanceBrokerageModel { }
+        private class CustomCoinbaseBrokerageModel : CoinbaseBrokerageModel { }
+        private class CustomAlphaStreamsBrokerageModel : AlphaStreamsBrokerageModel { }
+        private class CustomZerodhaBrokerageModel : ZerodhaBrokerageModel { }
+        private class CustomAxosBrokerageModel : AxosClearingBrokerageModel { }
+        private class CustomTradingTechnologiesBrokerageModel : TradingTechnologiesBrokerageModel { }
+        private class CustomSamcoBrokerageModel : SamcoBrokerageModel { }
+        private class CustomKrakenBrokerageModel : KrakenBrokerageModel { }
+        private class CustomExanteBrokerageModel : ExanteBrokerageModel { }
+        private class CustomFTXUSBrokerageModel : FTXUSBrokerageModel { }
+        private class CustomFTXBrokerageModel : FTXBrokerageModel { }
+        private class CustomBybitBrokerageModel : BybitBrokerageModel { }
+        private class CustomDefaultBrokerageModel : DefaultBrokerageModel { }
 
         private static TestCaseData[] GetCustomBrokerageNameTestCases()
         {

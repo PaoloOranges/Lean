@@ -39,6 +39,8 @@ using QuantConnect.Data.Market;
 using QuantConnect.Algorithm.Framework.Alphas.Analysis;
 using QuantConnect.Commands;
 using QuantConnect.Algorithm.Framework.Portfolio.SignalExports;
+using QuantConnect.Algorithm.Framework.Execution;
+using Common.Util;
 
 namespace QuantConnect.AlgorithmFactory.Python.Wrappers
 {
@@ -49,7 +51,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
     {
         private readonly dynamic _onData;
         private readonly dynamic _onMarginCall;
-        private readonly IAlgorithm _baseAlgorithm;
+        private readonly QCAlgorithm _baseAlgorithm;
 
         // QCAlgorithm methods that might be implemented in the python algorithm:
         // We keep them to avoid the BasePythonWrapper caching and eventual lookup overhead since these methods are called quite frequently
@@ -77,6 +79,11 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// True if the underlying python algorithm implements "OnEndOfDay(symbol)"
         /// </summary>
         public bool IsOnEndOfDaySymbolImplemented { get; }
+
+        /// <summary>
+        /// The wrapped algorithm instance cast to <see cref="QCAlgorithm"/>
+        /// </summary>
+        public QCAlgorithm BaseAlgorithm => _baseAlgorithm;
 
         /// <summary>
         /// <see cref = "AlgorithmPythonWrapper"/> constructor.
@@ -175,7 +182,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
             catch (Exception e)
             {
                 // perform exception interpretation for error in module import
-                var interpreter = StackExceptionInterpreter.CreateFromAssemblies(AppDomain.CurrentDomain.GetAssemblies());
+                var interpreter = StackExceptionInterpreter.CreateFromAssemblies();
                 e = interpreter.Interpret(e, interpreter);
 
                 throw new Exception($"AlgorithmPythonWrapper(): {interpreter.GetExceptionMessageHeader(e)}");
@@ -570,6 +577,11 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         public SignalExportManager SignalExport => ((QCAlgorithm)_baseAlgorithm).SignalExport;
 
         /// <summary>
+        /// The execution model
+        /// </summary>
+        public IExecutionModel Execution => ((QCAlgorithm)_baseAlgorithm).Execution;
+
+        /// <summary>
         /// Set a required SecurityType-symbol and resolution for algorithm
         /// </summary>
         /// <param name="securityType">SecurityType Enum: Equity, Commodity, FOREX or Future</param>
@@ -670,7 +682,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <summary>
         /// Gets a read-only dictionary with all current parameters
         /// </summary>
-        public IReadOnlyDictionary<string, string> GetParameters() => _baseAlgorithm.GetParameters();
+        public ReadOnlyExtendedDictionary<string, string> GetParameters() => _baseAlgorithm.GetParameters();
 
         /// <summary>
         /// Gets the parameter with the specified name. If a parameter with the specified name does not exist,
@@ -1002,7 +1014,8 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// open orders and then liquidate any existing holdings
         /// </summary>
         /// <param name="symbol">The symbol of the security to be removed</param>
-        public bool RemoveSecurity(Symbol symbol) => _baseAlgorithm.RemoveSecurity(symbol);
+        /// <param name="tag">Optional tag to indicate the cause of removal</param>
+        public bool RemoveSecurity(Symbol symbol, string tag = null) => _baseAlgorithm.RemoveSecurity(symbol, tag);
 
         /// <summary>
         /// Set the algorithm Id for this backtest or live run. This can be used to identify the order and equity records.
@@ -1075,9 +1088,23 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// Get the last known price using the history provider.
         /// Useful for seeding securities with the correct price
         /// </summary>
-        /// <param name="security"><see cref="Security"/> object for which to retrieve historical data</param>
+        /// <param name="symbol">Symbol for which to retrieve historical data</param>
         /// <returns>A single <see cref="BaseData"/> object with the last known price</returns>
-        public BaseData GetLastKnownPrice(Security security) => _baseAlgorithm.GetLastKnownPrice(security);
+        public BaseData GetLastKnownPrice(Symbol symbol) => _baseAlgorithm.GetLastKnownPrice(symbol);
+
+        /// <summary>
+        /// Yields data to warmup a security for all it's subscribed data types
+        /// </summary>
+        /// <param name="symbol">Symbol for which to retrieve historical data</param>
+        /// <returns>Securities historical data</returns>
+        public IEnumerable<BaseData> GetLastKnownPrices(Symbol symbol) => _baseAlgorithm.GetLastKnownPrices(symbol);
+
+        /// <summary>
+        /// Yields data to warm up multiple securities for all their subscribed data types
+        /// </summary>
+        /// <param name="symbols">The symbols we want to get seed data for</param>
+        /// <returns>Securities historical data</returns>
+        public DataDictionary<IEnumerable<BaseData>> GetLastKnownPrices(IEnumerable<Symbol> symbols) => _baseAlgorithm.GetLastKnownPrices(symbols);
 
         /// <summary>
         /// Set the runtime error
@@ -1269,6 +1296,11 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <param name="command">The callback command instance</param>
         /// <returns>The command result</returns>
         public CommandResultPacket RunCommand(CallbackCommand command) => _baseAlgorithm.RunCommand(command);
+
+        /// <summary>
+        /// Gets the default order properties
+        /// </summary>
+        public IOrderProperties DefaultOrderProperties => _baseAlgorithm.DefaultOrderProperties;
 
         /// <summary>
         /// Dispose of this instance
