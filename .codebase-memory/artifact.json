@@ -1,0 +1,11 @@
+{
+    "schema_version": 1,
+    "commit": "d79f0134cd0716a0ae2986333c8ef10c0be96aa1",
+    "indexed_at": "2026-08-09T18:12:58Z",
+    "project": "mnt-g-SourceCode-QuantitativeTrading-QuantConnect-Lean",
+    "nodes": 74142,
+    "edges": 220496,
+    "original_size": 208535552,
+    "compressed_size": 20794397,
+    "compression_level": 3
+}
