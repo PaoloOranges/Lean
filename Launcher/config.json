@@ -6,10 +6,10 @@
   // two predefined environments, 'backtesting' and 'live', feel free
   // to add more!
 
-  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
+  "environment": "backtesting", // "backtesting", "paper-coinbase", "live-coinbase"
 
   // algorithm class selector
-  "algorithm-type-name": "BasicTemplateFrameworkAlgorithm",
+  "algorithm-type-name": "PaoloHourETHEURAlgorithm",
 
   // Algorithm language selector - options CSharp, Python
   "algorithm-language": "CSharp",
@@ -19,10 +19,12 @@
   //"algorithm-location": "../../../Algorithm.Python/BasicTemplateFrameworkAlgorithm.py",
 
   //Research notebook
-  //"composer-dll-directory": ".",
+  //"composer-dll-directory": "../../../../LeanPlugins/",
 
   // engine
-  "data-folder": "../../../Data/",
+  "data-folder": "../../../../Data/",
+  "object-store-root": "../../../../LeanStorage",
+  "results-destination-folder": "../../../../LeanStorage/Results",
 
   // debugging configuration - options for debugging-method LocalCmdLine, VisualStudio, Debugpy, PyCharm
   "debugging": false,
@@ -83,8 +85,8 @@
   "reserved-words-prefix": "@",
 
   // To get your api access token go to quantconnect.com/account
-  "job-user-id": "0",
-  "api-access-token": "",
+  "job-user-id": "40630",
+  "api-access-token": "4f5045ac5049f94bf1f8daed7110241dc48328a6b758830be7ca1a33af824c08",
   "job-organization-id": "",
 
   // live data configuration
@@ -135,8 +137,9 @@
   // coinbase configuration
   "coinbase-rest-api": "https://api.coinbase.com",
   "coinbase-url": "wss://advanced-trade-ws.coinbase.com",
-  "coinbase-api-key": "",
-  "coinbase-api-secret": "",
+  "coinbase-api-key": "9f74c9958e3042941f2a90f2dfa687e6",
+  "coinbase-api-secret": "uJBuANb4gXmxmzbWFJLdF937mwikF99J3hHoad4YUHmN/jovxswP64eazaALg54k6vC5WXoxAMVQn+53ZUjnGA==",
+  "coinbase-passphrase": "kvbcqn30z6o",
 
   // bitfinex configuration
   "bitfinex-api-secret": "",
@@ -428,6 +431,20 @@
       "history-provider": [ "BrokerageHistoryProvider", "SubscriptionDataReaderHistoryProvider" ]
     },
 
+    // Coinbase Paper mode
+    "paper-coinbase": {
+      "live-mode": true,
+
+      "live-mode-brokerage": "PaperBrokerage",
+
+      "data-queue-handler": [ "CoinbaseBrokerage" ],
+      "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
+      "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
+      "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
+      "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "history-provider": [ "BrokerageHistoryProvider", "SubscriptionDataReaderHistoryProvider" ]
+    },
     // defines the 'live-tradier' environment
     "live-tradier": {
       "live-mode": true,
