@@ -73,3 +73,22 @@ daemon host (environment limitation, not a config defect — the identical confi
 **inside a real `mcr.microsoft.com/dotnet/sdk:10.0` container** with the same
 post-create/run command lines via the daemon's container+exec APIs (publish → run →
 results copied out), which exercises exactly what the devcontainer lifecycle would.
+
+## Re-verification (run 8, 2026-09-27 12:19Z)
+
+- Dropped the stray upstream `.devcontainer/Dockerfile` (violates the image-only rule)
+  and the duplicate root `.devcontainer.json`; `.devcontainer/devcontainer.json` is the
+  single config location.
+- The container run was re-executed against the remote Docker endpoint (engine 29.8.1,
+  arm64, image `mcr.microsoft.com/dotnet/sdk:10.0` digest-pulled): publish exit 0
+  (post-create), launcher exit 0, 0 ` ERROR ` lines in log.txt and algorithm log,
+  result set (PaoloHourETHEURAlgorithm.json/summary/order-events/log, data-monitor
+  report, failed-data-requests) copied out via the daemon archive API and placed
+  at `../lean-storage/results` — the exact host path the devcontainer bind maps to
+  `/lean-storage/results`. Stats: start equity 1000 -> end equity 1116.67, 8 trades,
+  drawdown 25.4%%.
+- Push blocker (unchanged): no GitHub credential exists anywhere in this sandbox or
+  on the Docker daemon host (env vars, git credential stores, ~/.netrc, profile .env
+  files, /home/paolo-oranges on the daemon host — all probed absent). `git push`
+  cannot authenticate; card blocked pending a GITHUB_TOKEN or an out-of-band push of
+  branch `paolo/lean-devcontainer`.
