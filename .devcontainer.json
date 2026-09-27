@@ -11,7 +11,7 @@
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
     "DOTNET_NOLOG": "1"
   },
-  "updateContentCommand": "python3 tools/fetch_etheur_hourly.py || echo 'updateContent: ETHEUR hourly refresh skipped (source API unavailable); using committed zip'",
+  "updateContentCommand": "python3 tools/fetch_etheur_hourly.py || echo 'updateContent: ETHEUR hourly fetch skipped (source API unavailable)'",
   "postCreateCommand": "bash /Lean/.devcontainer/post-create.sh",
   "runArgs": [
     "--network=host",
@@ -21,7 +21,6 @@
     "vscode": {
       "extensions": [
         "ms-dotnettools.csdevkit",
-        "ms-python.python",
         "eamodio.gitlens"
       ]
     }
