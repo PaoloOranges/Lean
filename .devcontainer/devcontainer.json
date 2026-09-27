@@ -4,14 +4,16 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/Lean,type=bind",
   "workspaceFolder": "/Lean",
   "mounts": [
-    "source=${localWorkspaceFolder}/../lean-storage,target=/lean-storage,type=bind"
+    "source=/opt/data/docker-shared,target=/data,type=bind,ro",
+    "source=/opt/data/workspace/lean-storage,target=/lean-storage,type=bind"
   ],
   "containerEnv": {
-    "LEAN_CONFIG": "/Lean/config.devcontainer.json",
+    "QUANTCONNECT_API_USERNAME": "${localEnv:QUANTCONNECT_API_USERNAME}",
+    "QUANTCONNECT_API_TOKEN": "${localEnv:QUANTCONNECT_API_TOKEN}",
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
     "DOTNET_NOLOG": "1"
   },
-  "updateContentCommand": "python3 tools/fetch_etheur_hourly.py || echo 'updateContent: ETHEUR hourly refresh skipped (source API unavailable); using committed zip'",
+  "updateContentCommand": "bash /Lean/docker/data-mount-check.sh",
   "postCreateCommand": "bash /Lean/.devcontainer/post-create.sh",
   "runArgs": [
     "--network=host",
