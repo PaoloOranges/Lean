@@ -1,44 +1,31 @@
 {
-	"name": "Lean Development Container",
-	"workspaceMount": "source=${localWorkspaceFolder},target=/Lean,type=bind",
-	"workspaceFolder": "/Lean",
-	// Use devcontainer Dockerfile that is based on Lean foundation image
-	"build": {
-		"dockerfile": "Dockerfile"
-	},
-	//See https://containers.dev/implementors/json_reference/ for a comprehensive json schema used to define this file.
-	"customizations": {
-		"vscode": {
-			// Add the IDs of extensions you want installed when the container is created.
-			"extensions": [
-				"ms-dotnettools.csdevkit",
-				"ms-python.python",
-				"eamodio.gitlens",
-				"yzhang.markdown-all-in-one",
-				"SonarSource.sonarlint-vscode"
-			],
-			// Set *default* vscode specific settings.json values on container create.
-			"settings": {
-				"terminal.integrated.profiles.linux": {
-					"bash": {
-						"path": "bash",
-						"icon": "terminal-bash"
-					}
-				}
-			}
-		}
-	},
-	//use the same network configuration as the host machine, ensuring no problems with firewalls, proxies etc.
-	"runArgs": [
-		"--network=host"
-	],
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	// Uncomment the next line to run commands after the container is created - for example installing curl.
-	"postCreateCommand": "dotnet nuget add source /Lean/LocalPackages;chmod u+x /Lean/.vscode/launch_research.sh;dos2unix /Lean/.vscode/launch_research.sh",
-	// Add mounts to docker container
-	"mounts": [
-		// Example data mount from local machine, must use target directory in Config.json
-		// "source=C:/Users/XXXXXXXXXXXX/Lean/Data,target=/Data,type=bind,consistency=cached" 
-	]
+  "name": "Lean SDK 10 (image-only, no build)",
+  "image": "mcr.microsoft.com/dotnet/sdk:10.0",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/Lean,type=bind",
+  "workspaceFolder": "/Lean",
+  "mounts": [
+    "source=/opt/data/docker-shared,target=/data,type=bind,ro",
+    "source=/opt/data/workspace/lean-storage,target=/lean-storage,type=bind"
+  ],
+  "containerEnv": {
+    "QUANTCONNECT_API_USERNAME": "${localEnv:QUANTCONNECT_API_USERNAME}",
+    "QUANTCONNECT_API_TOKEN": "${localEnv:QUANTCONNECT_API_TOKEN}",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "DOTNET_NOLOG": "1"
+  },
+  "updateContentCommand": "bash /Lean/docker/data-mount-check.sh",
+  "postCreateCommand": "bash /Lean/.devcontainer/post-create.sh",
+  "runArgs": [
+    "--network=host",
+    "--shm-size=1g"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-python.python",
+        "eamodio.gitlens"
+      ]
+    }
+  }
 }

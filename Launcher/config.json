@@ -22,9 +22,9 @@
   //"composer-dll-directory": "../../../../LeanPlugins/",
 
   // engine
-  "data-folder": "../../../../Data/",
-  "object-store-root": "../../../../LeanStorage",
-  "results-destination-folder": "../../../../LeanStorage/Results",
+  "data-folder": "../../../../docker-shared/QuantConnect/Data",
+  "object-store-root": "../../../lean-storage",
+  "results-destination-folder": "../../../lean-storage/results",
 
   // debugging configuration - options for debugging-method LocalCmdLine, VisualStudio, Debugpy, PyCharm
   "debugging": false,
@@ -86,7 +86,7 @@
 
   // To get your api access token go to quantconnect.com/account
   "job-user-id": "40630",
-  "api-access-token": "4f5045ac5049f94bf1f8daed7110241dc48328a6b758830be7ca1a33af824c08",
+  "api-access-token": "__REDACTED__",
   "job-organization-id": "",
 
   // live data configuration
