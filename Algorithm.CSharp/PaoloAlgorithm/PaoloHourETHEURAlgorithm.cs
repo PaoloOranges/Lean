@@ -600,7 +600,10 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         {
             bool is_moving_averages_ok = /*_very_fast_wma > _slow_hullma &&*/ /*_very_fast_wma > _fast_lsma &&*/ currentPrice > _veryFastMA;
 
-            var signalDeltaPercent = (_macd - _macd.Signal) / _macd.Fast;
+            // D1 fix: dead code removed. These two locals were never used and
+            // `(_macd - _macd.Signal) / _macd.Fast` throws Runtime DivideByZero
+            // when _macd.Fast ~ 0 (latent defect D1, see t_467d0e8e handoff).
+
             var tolerance = 0.0025m;
 
             var veryFastSlope = GetSlope(_veryFastMALine);
