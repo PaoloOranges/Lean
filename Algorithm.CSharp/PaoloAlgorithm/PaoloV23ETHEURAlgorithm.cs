@@ -729,7 +729,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         public override void OnData(Slice data)
         {
             base.OnData(data);
-            if (IsWarmingUp || !data.Bars.ContainsKey(Symbol))
+            if (IsWarmingUp || !data.Bars.ContainsKey(EthEurSymbol))
             {
                 return;
             }
