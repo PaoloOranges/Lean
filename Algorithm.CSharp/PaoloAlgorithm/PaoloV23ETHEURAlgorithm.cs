@@ -234,7 +234,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             }
 
             UpdateHysteresisGate();
-            RollClosingHigh(close);
             RollMonth();
 
             if (!_macd.IsReady || !_adx.IsReady || !_rsi.IsReady || !_bollingerBands.IsReady || !_atr.IsReady)
@@ -258,6 +257,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                     HandleLong(close);
                     break;
             }
+
+            // queue updated AFTER the state machine so the breakout predicate
+            // close > max(close[t-24..t-1]) excludes the CURRENT bar (proposal §2);
+            // enqueuing before evaluation would make the strict > unsatisfiable.
+            RollClosingHigh(close);
         }
 
         // ---- gate (shared singleton state machine; arms are consumers, proposal §3) ------------
