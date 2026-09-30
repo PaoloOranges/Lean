@@ -736,13 +736,13 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             Log($"EQUI|{Time:u}|{Portfolio.TotalPortfolioValue:F4}|{Portfolio.CashBook["ETH"].Amount}|probe|1|0");
         }
 
-        private Symbol Symbol
+        private Symbol EthEurSymbol
         {
             get
             {
                 foreach (var s in Securities.Values)
                 {
-                    if (s.Value == "ETHEUR") return s.Symbol;
+                    if (s.Symbol.Value == "ETHEUR") return s.Symbol;
                 }
                 return default;
             }
