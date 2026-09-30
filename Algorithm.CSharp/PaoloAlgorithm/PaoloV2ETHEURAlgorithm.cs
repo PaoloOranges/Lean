@@ -17,6 +17,7 @@ using QuantConnect.Brokerages;
 using QuantConnect.Data;
 using QuantConnect.Indicators;
 using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
 using QuantConnect.Securities;
 using System;
 using System.Globalization;
@@ -112,6 +113,7 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
         private Phase _phase = Phase.Flat;
         private decimal? _prevHistogram;                  // track MACD histogram delta manually (no Previous accessor in this fork)
+        private bool _histRising;
         private bool _armedByLowerBand;                   // which arm rule set the Armed state (regime gate applies to MR arm only)
         private decimal _entryPrice;
         private decimal _peakPrice;
@@ -136,9 +138,14 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
 
             _symbol = AddCrypto(SymbolName, Resolution.Hour, Market.Coinbase).Symbol;
 
-            // (e) honest net P&L: T3 verified CoinbaseBrokerageModel -> CoinbaseFeeModel with
-            // Advanced-1 default taker 0.80%/side; set it explicitly rather than relying on wiring.
-            SetFeeModel(new CoinbaseFeeModel());
+            // (e) honest net P&L: T3 verified this fork has no QCAlgorithm.SetFeeModel(); the fee
+            // model arrives via SetBrokerageModel(Coinbase) above -> CoinbaseBrokerageModel.GetFeeModel
+            // -> new CoinbaseFeeModel() with Advanced-1 defaults (taker 0.80%/side, maker 0.60%).
+            // That is exactly the model T3 validated against the 2026 fills (7/7 at 0.8000%), so
+            // v2 inherits it unchanged - gross/net stay directly comparable with v1.
+            // Set it explicitly on the security too (card 3e): same object the brokerage model
+            // would inject, but now the algo declares its own fee assumptions.
+            Securities[_symbol].SetFeeModel(new CoinbaseFeeModel());
             // (e) benchmark = the traded instrument, so reported alpha is vs buy-and-hold ETHEUR.
             SetBenchmark(_symbol);
 
@@ -179,6 +186,11 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
             {
                 return;
             }
+
+            // track MACD histogram delta every bar (independent of state machine)
+            var hist = _macd.Histogram.Current.Value;
+            _histRising = _prevHistogram.HasValue && hist > _prevHistogram.Value;
+            _prevHistogram = hist;
 
             switch (_phase)
             {
@@ -224,7 +236,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private void HandleArmed(decimal close)
         {
             // If a mean-reversion arm aged out of the trend regime, disarm instead of holding a
-            // stale signal (cheap re-check of the same gate).
+            // stale signal (cheap re-check of the same gate). Mirrors v1's persistent ReadyToBuy
+            // state: the arm survives across bars until confirmed (or the regime vetoes it).
             if (_armedByLowerBand && !IsConfirmedUpTrend())
             {
                 _phase = Phase.Flat;
@@ -241,12 +254,6 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
                 }
                 _phase = Phase.Flat; // disarm either way; fill event moves us to Long
             }
-            // Unarmed stall: an arm is only valid for one confirmation bar, mirroring v1's
-            // same-bar arm->confirm cadence without letting signals stack up.
-            else
-            {
-                _phase = Phase.Flat;
-            }
         }
 
         private bool IsConfirmedUpTrend()
@@ -258,11 +265,8 @@ namespace QuantConnect.Algorithm.CSharp.PaoloAlgorithm
         private bool IsOkToBuy(decimal close)
         {
             // "Recovering momentum" (replacement for v1's OLS-slope veto, see class comment):
-            var histogram = _macd.Histogram;
             var macdAboveSignal = _macd > _macd.Signal;
-            var histogramRising = histogram.IsReady && _prevHistogram.HasValue
-                && histogram.Current.Value > _prevHistogram.Value;
-            _prevHistogram = histogram.IsReady ? histogram.Current.Value : (decimal?)null;
+            var histogramRising = _histRising;
             var aboveLowerBand = close > _bollingerBands.LowerBand;
 
             // MACD must be recovering while price has stepped back above the lower band:
